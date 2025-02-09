@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -36,6 +39,12 @@ type AssetForUpload struct {
 }
 
 func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
+	if runtime.GOOS == "windows" {
+		args, err = globAssetPatterns(args)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, arg := range args {
 		var label string
 		fn := arg
@@ -61,6 +70,22 @@ func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
 		})
 	}
 	return
+}
+
+func globAssetPatterns(patterns []string) ([]string, error) {
+	var assets []string
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %s", pattern, err)
+		}
+		if len(matches) > 0 {
+			assets = append(assets, matches...)
+		} else {
+			assets = append(assets, pattern)
+		}
+	}
+	return assets, nil
 }
 
 func typeForFilename(fn string) string {
