@@ -85,7 +85,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		},
 		Aliases: []string{"new"},
 		RunE: func(c *cobra.Command, args []string) error {
-			opts.Filenames = args
+			opts.Filenames = args[:]
 
 			if runF != nil {
 				return runF(&opts)
@@ -102,12 +102,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	fileArgs := opts.Filenames
-	if len(fileArgs) == 0 {
-		fileArgs = []string{"-"}
+	filenames, err := cmdutil.GlobWindowsPaths(opts.Filenames)
+	if err != nil {
+		return err
 	}
 
-	files, err := processFiles(opts.IO.In, opts.FilenameOverride, fileArgs)
+	if len(filenames) == 0 {
+		filenames = []string{"-"}
+	}
+
+	files, err := processFiles(opts.IO.In, opts.FilenameOverride, filenames)
 	if err != nil {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
