@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -102,9 +103,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	filenames, err := cmdutil.GlobWindowsPaths(opts.Filenames)
-	if err != nil {
-		return err
+	filenames := opts.Filenames
+	if runtime.GOOS == "windows" {
+		globbedNames, err := cmdutil.GlobWindowsPaths(opts.Filenames)
+		if err != nil {
+			return err
+		}
+		filenames = globbedNames
 	}
 
 	if len(filenames) == 0 {

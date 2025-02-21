@@ -3,7 +3,6 @@ package cmdutil
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -61,14 +60,12 @@ func NoArgsQuoteReminder(cmd *cobra.Command, args []string) error {
 }
 
 func GlobWindowsPaths(patterns []string) ([]string, error) {
-	if runtime.GOOS != "windows" {
-		return patterns, nil
-	}
-	var expansions []string
+	expansions := []string{}
+
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %s", pattern, err)
+			return nil, fmt.Errorf("%s: %v", pattern, err)
 		}
 		if len(matches) > 0 {
 			expansions = append(expansions, matches...)
@@ -76,5 +73,6 @@ func GlobWindowsPaths(patterns []string) ([]string, error) {
 			expansions = append(expansions, pattern)
 		}
 	}
+
 	return expansions, nil
 }
