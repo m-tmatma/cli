@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,7 +57,7 @@ func TestMinimumNs_with_error(t *testing.T) {
 	}
 }
 
-func TestGlobWindowsPaths(t *testing.T) {
+func TestGlobPaths(t *testing.T) {
 	tests := []struct {
 		name     string
 		os       string
@@ -72,9 +73,9 @@ func TestGlobWindowsPaths(t *testing.T) {
 		},
 		{
 			name:     "When no files match, it returns an empty expansions array, it returns the unmatched patterns",
-			patterns: []string{"foo", "bar"},
-			wantOut:  []string{"foo", "bar"},
-			wantErr:  nil,
+			patterns: []string{"foo"},
+			wantOut:  []string{},
+			wantErr:  errors.New("no matches found for `foo`"),
 		},
 		{
 			name: "When a single pattern, '*.txt' is passed with one match, it returns that match",
@@ -92,8 +93,8 @@ func TestGlobWindowsPaths(t *testing.T) {
 				"*/*.txt",
 			},
 			wantOut: []string{
-				"subDir1/subDir1_file.txt",
-				"subDir2/subDir2_file.txt",
+				filepath.Join("subDir1", "subDir1_file.txt"),
+				filepath.Join("subDir2", "subDir2_file.txt"),
 			},
 			wantErr: nil,
 		},
@@ -104,9 +105,9 @@ func TestGlobWindowsPaths(t *testing.T) {
 				"*/*.go",
 			},
 			wantOut: []string{
-				"subDir1/subDir1_file.txt",
-				"subDir2/subDir2_file.txt",
-				"subDir2/subDir2_file.go",
+				filepath.Join("subDir1", "subDir1_file.txt"),
+				filepath.Join("subDir2", "subDir2_file.txt"),
+				filepath.Join("subDir2", "subDir2_file.go"),
 			},
 			wantErr: nil,
 		},
@@ -117,7 +118,7 @@ func TestGlobWindowsPaths(t *testing.T) {
 			cleanupFn := createTestDir(t)
 			defer cleanupFn()
 
-			got, err := GlobWindowsPaths(tt.patterns)
+			got, err := GlobPaths(tt.patterns)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			} else {

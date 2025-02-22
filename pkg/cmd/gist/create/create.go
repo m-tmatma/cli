@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 
@@ -49,13 +48,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "create [<filename>... | -]",
+		Use:   "create [<filename>... | <pattern>... | -]",
 		Short: "Create a new gist",
 		Long: heredoc.Docf(`
 			Create a new GitHub gist with given contents.
 
 			Gists can be created from one or multiple files. Alternatively, pass %[1]s-%[1]s as
-			file name to read from standard input.
+			filename to read from standard input.
 
 			By default, gists are secret; use %[1]s--public%[1]s to make publicly listed ones.
 		`, "`"),
@@ -68,6 +67,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			# create a gist containing several files
 			$ gh gist create hello.py world.py cool.txt
+
+			# create a gist containing several files using patterns
+			$ gh gist create *.md *.txt artifact.*
 
 			# read from standard input to create a gist
 			$ gh gist create -
@@ -103,13 +105,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	filenames := opts.Filenames
-	if runtime.GOOS == "windows" {
-		globbedNames, err := cmdutil.GlobWindowsPaths(opts.Filenames)
-		if err != nil {
-			return err
-		}
-		filenames = globbedNames
+	filenames, err := cmdutil.GlobPaths(opts.Filenames)
+	if err != nil {
+		return err
 	}
 
 	if len(filenames) == 0 {

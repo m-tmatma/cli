@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"time"
 
@@ -38,11 +37,9 @@ type AssetForUpload struct {
 }
 
 func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
-	if runtime.GOOS == "windows" {
-		args, err = cmdutil.GlobWindowsPaths(args)
-		if err != nil {
-			return nil, err
-		}
+	args, err = cmdutil.GlobPaths(args)
+	if err != nil {
+		return nil, err
 	}
 	for _, arg := range args {
 		var label string

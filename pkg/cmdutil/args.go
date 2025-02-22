@@ -3,6 +3,7 @@ package cmdutil
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -59,18 +60,21 @@ func NoArgsQuoteReminder(cmd *cobra.Command, args []string) error {
 	return FlagErrorf("%s", errMsg)
 }
 
-func GlobWindowsPaths(patterns []string) ([]string, error) {
+func GlobPaths(patterns []string) ([]string, error) {
 	expansions := []string{}
 
 	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %v", pattern, err)
-		}
-		if len(matches) > 0 {
-			expansions = append(expansions, matches...)
-		} else {
+		if pattern == "-" || strings.Contains(pattern, "#") {
 			expansions = append(expansions, pattern)
+		} else {
+			matches, err := filepath.Glob(pattern)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %v", pattern, err)
+			}
+			if len(matches) == 0 {
+				return []string{}, fmt.Errorf("no matches found for `%s`", pattern)
+			}
+			expansions = append(expansions, matches...)
 		}
 	}
 
