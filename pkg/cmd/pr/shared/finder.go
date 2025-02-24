@@ -99,10 +99,10 @@ type FindOptions struct {
 
 // TODO: Does this also need the BaseBranchName?
 // PR's are represented by the following:
-// baseRef -----PR-----> headRef
+// headRef -----PR-----> baseRef
 //
 // A ref is described as "remoteName/branchName", so
-// baseRepoName/baseBranchName -----PR-----> headRepoName/headBranchName
+// headRepoName/headBranchName -----PR-----> baseRepoName/baseBranchName
 type PullRequestRefs struct {
 	BranchName string
 	HeadRepo   ghrepo.Interface
