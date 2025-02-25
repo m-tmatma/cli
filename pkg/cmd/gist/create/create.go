@@ -88,7 +88,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		},
 		Aliases: []string{"new"},
 		RunE: func(c *cobra.Command, args []string) error {
-			opts.Filenames = args[:]
+			opts.Filenames = args
 
 			if runF != nil {
 				return runF(&opts)
