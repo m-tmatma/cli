@@ -72,7 +72,19 @@ func TestGlobPaths(t *testing.T) {
 			wantErr:  nil,
 		},
 		{
-			name:     "When no files match, it returns an empty expansions array, it returns the unmatched patterns",
+			name:     "When - is passed, return -",
+			patterns: []string{"-"},
+			wantOut:  []string{"-"},
+			wantErr:  nil,
+		},
+		{
+			name:     "When labels are passed, return labels",
+			patterns: []string{"file.txt#Text File", "README.md#README"},
+			wantOut:  []string{"file.txt#Text File", "README.md#README"},
+			wantErr:  nil,
+		},
+		{
+			name:     "When no files match, it returns an empty expansions array with error",
 			patterns: []string{"foo"},
 			wantOut:  []string{},
 			wantErr:  errors.New("no matches found for `foo`"),
