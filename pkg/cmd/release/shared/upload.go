@@ -37,7 +37,9 @@ type AssetForUpload struct {
 }
 
 func AssetsFromArgs(args []string) (assets []*AssetForUpload, err error) {
-	args, err = cmdutil.GlobPaths(args)
+	args, err = cmdutil.GlobPaths(args, func(pattern string) bool {
+		return strings.Contains(pattern, "#")
+	})
 	if err != nil {
 		return nil, err
 	}

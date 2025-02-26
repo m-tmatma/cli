@@ -105,7 +105,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	filenames, err := cmdutil.GlobPaths(opts.Filenames)
+	filenames, err := cmdutil.GlobPaths(opts.Filenames, nil)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,7 +131,9 @@ func TestGlobPaths(t *testing.T) {
 			cleanupFn := createTestDir(t)
 			defer cleanupFn()
 
-			got, err := GlobPaths(tt.patterns)
+			got, err := GlobPaths(tt.patterns, func(pattern string) bool {
+				return strings.Contains(pattern, "#")
+			})
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			} else {
