@@ -16,8 +16,6 @@ exec gh repo create ${ORG}/${REPO} --add-readme --private
 
 # Defer repo cleanup of upstream
 defer gh repo delete --yes ${ORG}/${REPO}
-exec gh repo view ${ORG}/${REPO} --json id --jq '.id'
-stdout2env REPO_ID
 
 # Create a user fork of repository. This will be owned by USER.
 exec gh repo fork ${ORG}/${REPO} --fork-name ${FORK}
@@ -40,9 +38,13 @@ exec git checkout -b feature-branch
 exec git branch --set-upstream-to origin/main
 exec git rev-parse --abbrev-ref feature-branch@{upstream}
 stdout origin/main
-
-# Create the PR
 exec git commit --allow-empty -m 'Empty Commit'
 exec git push
+
+# Create the PR
 exec gh pr create --title 'Feature Title' --body 'Feature Body'
 stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
+
+# Assert that the PR was created with the correct head repository and refs
+exec gh pr view --json headRefName,headRepository,baseRefName,isCrossRepository
+stdout {"baseRefName":"main","headRefName":"feature-branch","headRepository":{"id":"${FORK_ID}","name":"${FORK}"},"isCrossRepository":true}
