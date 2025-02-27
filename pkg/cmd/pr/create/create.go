@@ -629,7 +629,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		isPushEnabled = false
 		// If the --head provided contains a colon, that means
 		// this is <remote>:<branch> syntax.
-		// TODO KW: write test for this syntax.
 		if idx := strings.IndexRune(headBranch, ':'); idx >= 0 {
 			headBranch = headBranch[idx+1:]
 		}
