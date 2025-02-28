@@ -679,10 +679,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				return nil, err
 			}
 
-			headBranchLabel = prRefs.BranchName
-			if !ghrepo.IsSame(baseRepo, headRepo) {
-				headBranchLabel = fmt.Sprintf("%s:%s", headRepo.RepoOwner(), prRefs.BranchName)
-			}
+			headBranchLabel = prRefs.GetPRHeadLabel()
 		}
 	}
 
