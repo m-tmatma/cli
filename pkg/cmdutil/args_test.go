@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,6 +57,69 @@ func TestMinimumNs_with_error(t *testing.T) {
 	}
 }
 
+func TestPartition(t *testing.T) {
+	tests := []struct {
+		name            string
+		slice           []any
+		predicate       func(any) bool
+		wantMatching    []any
+		wantNonMatching []any
+	}{
+		{
+			name:  "When the slice is empty, it returns two empty slices",
+			slice: []any{},
+			predicate: func(any) bool {
+				return true
+			},
+			wantMatching:    []any{},
+			wantNonMatching: []any{},
+		},
+		{
+			name: "when the slice has one element that satisfies the predicate, it returns a slice with that element and an empty slice",
+			slice: []any{
+				"foo",
+			},
+			predicate: func(any) bool {
+				return true
+			},
+			wantMatching:    []any{"foo"},
+			wantNonMatching: []any{},
+		},
+		{
+			name: "when the slice has one element that does not satisfy the predicate, it returns an empty slice and a slice with that element",
+			slice: []any{
+				"foo",
+			},
+			predicate: func(any) bool {
+				return false
+			},
+			wantMatching:    []any{},
+			wantNonMatching: []any{"foo"},
+		},
+		{
+			name: "when the slice has multiple elements, it returns a slice with the elements that satisfy the predicate and a slice with the elements that do not satisfy the predicate",
+			slice: []any{
+				"foo",
+				"bar",
+				"baz",
+			},
+			predicate: func(s any) bool {
+				return s.(string) != "foo"
+			},
+			wantMatching:    []any{"bar", "baz"},
+			wantNonMatching: []any{"foo"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotMatching, gotNonMatching := Partition(tt.slice, tt.predicate)
+			assert.ElementsMatch(t, tt.wantMatching, gotMatching)
+			assert.ElementsMatch(t, tt.wantNonMatching, gotNonMatching)
+		})
+	}
+}
+
 func TestGlobPaths(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -70,18 +132,6 @@ func TestGlobPaths(t *testing.T) {
 			name:     "When no patterns are passed, return an empty slice",
 			patterns: []string{},
 			wantOut:  []string{},
-			wantErr:  nil,
-		},
-		{
-			name:     "When - is passed, return -",
-			patterns: []string{"-"},
-			wantOut:  []string{"-"},
-			wantErr:  nil,
-		},
-		{
-			name:     "When labels are passed, return labels",
-			patterns: []string{"file.txt#Text File", "README.md#README"},
-			wantOut:  []string{"file.txt#Text File", "README.md#README"},
 			wantErr:  nil,
 		},
 		{
@@ -131,9 +181,7 @@ func TestGlobPaths(t *testing.T) {
 			cleanupFn := createTestDir(t)
 			defer cleanupFn()
 
-			got, err := GlobPaths(tt.patterns, func(pattern string) bool {
-				return strings.Contains(pattern, "#")
-			})
+			got, err := GlobPaths(tt.patterns)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			} else {

@@ -105,10 +105,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	filenames, err := cmdutil.GlobPaths(opts.Filenames, nil)
+
+	readFromStdInArg, filenames := cmdutil.Partition(opts.Filenames, func(f string) bool {
+		return f == "-"
+	})
+
+	filenames, err := cmdutil.GlobPaths(filenames)
 	if err != nil {
 		return err
 	}
+
+	filenames = append(filenames, readFromStdInArg...)
 
 	if len(filenames) == 0 {
 		filenames = []string{"-"}
