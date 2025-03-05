@@ -650,6 +650,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	// If it is, we can use it as the head repo for the PR
 	// and avoid prompting the user.
 	if prRefs.HeadRepo != nil && prRefs.BranchName != "" {
+		// Check if the head branch is up-to-date with the local branch
 		headRemote, err := remotes.FindByRepo(prRefs.HeadRepo.RepoOwner(), prRefs.HeadRepo.RepoName())
 		if err == nil {
 			headRefName := fmt.Sprintf("refs/remotes/%s/%s", headRemote, prRefs.BranchName)
