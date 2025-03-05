@@ -1,4 +1,4 @@
-# skip 'it creates a fork owned by the user running the test'
+skip 'it creates a fork owned by the user running the test'
 
 # Setup environment variables used for testscript
 env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
