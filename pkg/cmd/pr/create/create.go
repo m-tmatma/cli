@@ -516,36 +516,6 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	return nil
 }
 
-// isRemoteHeadCurrent returns true if the remote head is on the same sha as the local head.
-// This is used to determine if we might need to push the local head branch to the remote.
-func isRemoteHeadCurrent(gitClient *git.Client, prRefs shared.PullRequestRefs, remotes ghContext.Remotes) bool {
-	headRemote, err := remotes.FindByRepo(prRefs.HeadRepo.RepoOwner(), prRefs.HeadRepo.RepoName())
-	if err != nil {
-		return false
-	}
-
-	refsForLookup := []string{"HEAD", fmt.Sprintf("refs/remotes/%s/%s", headRemote, prRefs.BranchName)}
-	resolvedRefs, err := gitClient.ShowRefs(context.Background(), refsForLookup)
-	if err != nil {
-		return false
-	}
-
-	// If there is more than one resolved ref, then remote head ref was resolved.
-	if len(resolvedRefs) > 1 {
-		headRef := resolvedRefs[0]
-		for _, r := range resolvedRefs[1:] {
-			// If the head ref is not the same as the remote head ref, then the remote head is not current.
-			if r.Hash != headRef.Hash {
-				continue
-			}
-
-			return true
-		}
-	}
-
-	return false
-}
-
 func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadataState, error) {
 	var milestoneTitles []string
 	if opts.Milestone != "" {
@@ -623,10 +593,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	var targetHeadBranch string
 	var targetHeadRepoOwner string
 
-	isPushEnabled := true
+	promptForHeadRepo := true
 
 	if opts.HeadBranch != "" {
-		isPushEnabled = false
+		promptForHeadRepo = false
 		targetHeadBranch = opts.HeadBranch
 		// If the --head provided contains a colon, that means
 		// this is <repo_name>:<branch> syntax.
@@ -672,25 +642,39 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		prRefs.HeadRepo = ghrepo.New(targetHeadRepoOwner, prRefs.HeadRepo.RepoName())
 	}
 
+	var headRemote *ghContext.Remote
+
 	// We received the head repository and branch from ParsePRRefs, or inferred
 	// it from --head input, but we need to check if it's up-to-date with
 	// our local branch state.
 	// If it is, we can use it as the head repo for the PR
 	// and avoid prompting the user.
-	var headRemote *ghContext.Remote
-	var forkHeadRepo bool
+	if prRefs.HeadRepo != nil && prRefs.BranchName != "" {
+		headRemote, err := remotes.FindByRepo(prRefs.HeadRepo.RepoOwner(), prRefs.HeadRepo.RepoName())
+		if err == nil {
+			refsForLookup := []string{"HEAD", fmt.Sprintf("refs/remotes/%s/%s", headRemote, prRefs.BranchName)}
+			resolvedRefs, err := gitClient.ShowRefs(context.Background(), refsForLookup)
 
-	remoteHeadCurrent := isRemoteHeadCurrent(gitClient, prRefs, remotes)
-	if remoteHeadCurrent && prRefs.HeadRepo != nil && prRefs.BranchName != "" {
-		isPushEnabled = false
-		headRemote, err = remotes.FindByRepo(prRefs.HeadRepo.RepoOwner(), prRefs.HeadRepo.RepoName())
-		// TODO: KW what does an err here mean?
-		// If we fail to find a remote for that repo, shouldn't we just try to prompt
-		// for head repos?
-		if err != nil {
-			return nil, err
+			// If there is more than one resolved ref, then remote head ref was resolved.
+			if err == nil && len(resolvedRefs) > 1 {
+				headRef := resolvedRefs[0]
+				for _, r := range resolvedRefs[1:] {
+					// If the head ref is the same as the remote head ref,
+					// then the remote head is current.
+					if r.Hash == headRef.Hash {
+						promptForHeadRepo = false
+						break
+					}
+				}
+			}
 		}
-	} else if isPushEnabled && opts.IO.CanPrompt() {
+	}
+
+	var forkHeadRepo bool
+	var isPushEnabled bool
+	
+	if promptForHeadRepo && opts.IO.CanPrompt() {
+		isPushEnabled = true
 		// Since we could not determine a head ref, prompt the user for the head repository to push
 		// using a list of repositories obtained from the API
 		pushableRepos, err := repoContext.HeadRepos()
