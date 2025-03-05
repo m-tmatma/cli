@@ -629,7 +629,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		isPushEnabled = false
 		targetHeadBranch = opts.HeadBranch
 		// If the --head provided contains a colon, that means
-		// this is <remote>:<branch> syntax.
+		// this is <repo_name>:<branch> syntax.
 		if idx := strings.IndexRune(opts.HeadBranch, ':'); idx >= 0 {
 			targetHeadRepoOwner = opts.HeadBranch[:idx]
 			targetHeadBranch = opts.HeadBranch[idx+1:]
@@ -666,7 +666,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
-	// If the --head provided contains <owner>:<branch> syntax, we need to use
+	// If the --head provided contains <repo_name>:<branch>  syntax, we need to use
 	// the provided owner instead of the owner of the base repository.
 	if targetHeadRepoOwner != "" {
 		prRefs.HeadRepo = ghrepo.New(targetHeadRepoOwner, prRefs.HeadRepo.RepoName())
@@ -675,7 +675,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	// We received the head repository and branch from ParsePRRefs, or inferred
 	// it from --head input, but we need to check if it's up-to-date with
 	// our local branch state.
-	// If it is, we can use it as the head remote for the PR
+	// If it is, we can use it as the head repo for the PR
 	// and avoid prompting the user.
 	var headRemote *ghContext.Remote
 	var forkHeadRepo bool
