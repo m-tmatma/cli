@@ -10,6 +10,7 @@ permissions:
 jobs:
   issue-auto:
     runs-on: ubuntu-latest
+    environemnt: production
     steps:
       - name: label incoming issue
         env:
