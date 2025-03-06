@@ -1599,8 +1599,8 @@ func Test_createRun(t *testing.T) {
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
 			cs.Register(`git status --porcelain`, 0, "")
-			// TODO this could be be values in the test struct with a helper
-			// function to invoke the apporpriate command stubs based on
+			// TODO this could be values in the test struct with a helper
+			// function to invoke the appropriate command stubs based on
 			// those values.
 			if !tt.customPushDestination {
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
