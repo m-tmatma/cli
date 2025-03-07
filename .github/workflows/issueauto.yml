@@ -10,7 +10,7 @@ permissions:
 jobs:
   issue-auto:
     runs-on: ubuntu-latest
-    environemnt: production
+    environment: cli-automation
     steps:
       - name: label incoming issue
         env:

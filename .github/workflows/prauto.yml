@@ -11,7 +11,7 @@ permissions:
 jobs:
   pr-auto:
     runs-on: ubuntu-latest
-    environment: production
+    environment: cli-automation
     steps:
       - name: lint pr
         env:
