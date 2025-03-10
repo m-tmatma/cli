@@ -972,6 +972,52 @@ func TestPRRefs_GetPRHeadLabel(t *testing.T) {
 	}
 }
 
+func TestPullRequestRefs_HasHead(t *testing.T) {
+	tests := []struct {
+		name   string
+		prRefs PullRequestRefs
+		want   bool
+	}{
+		{
+			name: "HeadRepo is nil and BranchName is empty, return false",
+			prRefs: PullRequestRefs{
+				HeadRepo:   nil,
+				BranchName: "",
+			},
+			want: false,
+		},
+		{
+			name: "HeadRepo is not nil and BranchName is empty, return false",
+			prRefs: PullRequestRefs{
+				HeadRepo:   ghrepo.New("ORIGINOWNER", "REPO"),
+				BranchName: "",
+			},
+			want: false,
+		},
+		{
+			name: "HeadRepo is nil and BranchName is not empty, return false",
+			prRefs: PullRequestRefs{
+				HeadRepo:   nil,
+				BranchName: "feature-branch",
+			},
+			want: false,
+		},
+		{
+			name: "HeadRepo is not nil and BranchName is not empty, return true",
+			prRefs: PullRequestRefs{
+				HeadRepo:   ghrepo.New("ORIGINOWNER", "REPO"),
+				BranchName: "feature-branch",
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.prRefs.HasHead())
+		})
+	}
+}
+
 func stubBranchConfig(branchConfig git.BranchConfig, err error) func(string) (git.BranchConfig, error) {
 	return func(branch string) (git.BranchConfig, error) {
 		return branchConfig, err

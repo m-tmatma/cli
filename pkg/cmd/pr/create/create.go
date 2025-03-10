@@ -649,7 +649,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	// our local branch state.
 	// If it is, we can use it as the head repo for the PR
 	// and avoid prompting the user.
-	if prRefs.HeadRepo != nil && prRefs.BranchName != "" {
+	if prRefs.HasHead() {
 		// Check if the head branch is up-to-date with the local branch
 		headRemote, err := remotes.FindByRepo(prRefs.HeadRepo.RepoOwner(), prRefs.HeadRepo.RepoName())
 		if headRemote != nil && err == nil {
@@ -662,7 +662,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				headRef := resolvedRefs[0]
 				for _, r := range resolvedRefs[1:] {
 					// If the head ref is the same as the remote head ref,
-					// then the remote head is current.
+					// then the remote head is current, and we can use it.
 					if r.Hash == headRef.Hash {
 						promptForHeadRepo = false
 						break

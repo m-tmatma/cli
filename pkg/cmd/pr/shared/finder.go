@@ -109,6 +109,10 @@ type PullRequestRefs struct {
 	BaseRepo   ghrepo.Interface
 }
 
+func (s *PullRequestRefs) HasHead() bool {
+	return s.HeadRepo != nil && s.BranchName != ""
+}
+
 // GetPRHeadLabel returns the string that the GitHub API uses to identify the PR. This is
 // either just the branch name or, if the PR is originating from a fork, the fork owner
 // and the branch name, like <owner>:<branch>.
