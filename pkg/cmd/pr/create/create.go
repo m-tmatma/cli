@@ -599,7 +599,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		promptForHeadRepo = false
 		targetHeadBranch = opts.HeadBranch
 		// If the --head provided contains a colon, that means
-		// this is <repo_name>:<branch> syntax.
+		// this is <owner>:<branch> syntax.
 		if idx := strings.IndexRune(opts.HeadBranch, ':'); idx >= 0 {
 			targetHeadRepoOwner = opts.HeadBranch[:idx]
 			targetHeadBranch = opts.HeadBranch[idx+1:]
