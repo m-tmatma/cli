@@ -652,7 +652,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	if prRefs.HeadRepo != nil && prRefs.BranchName != "" {
 		// Check if the head branch is up-to-date with the local branch
 		headRemote, err := remotes.FindByRepo(prRefs.HeadRepo.RepoOwner(), prRefs.HeadRepo.RepoName())
-		if err == nil {
+		if headRemote != nil && err == nil {
 			headRefName := fmt.Sprintf("refs/remotes/%s/%s", headRemote, prRefs.BranchName)
 			refsForLookup := []string{"HEAD", headRefName}
 			resolvedRefs, err := gitClient.ShowRefs(context.Background(), refsForLookup)
