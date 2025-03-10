@@ -662,7 +662,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 				headRef := resolvedRefs[0]
 				for _, r := range resolvedRefs[1:] {
 					// If the head ref is the same as the remote head ref,
-					// then the remote head is current, and we can use it.
+					// then the remote head is current and we can use it.
 					if r.Hash == headRef.Hash {
 						promptForHeadRepo = false
 						break
