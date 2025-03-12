@@ -34,15 +34,13 @@ cd ${FORK}
 
 # Prepare a branch where changes are pulled from the upstream default branch but pushed to fork
 exec git checkout -b feature-branch upstream/main
-exec git config remote.pushDefault origin
-exec git config unset remote.upstream.gh-resolved
 exec git commit --allow-empty -m 'Empty Commit'
-exec git push
+exec git push origin feature-branch
 
 # Create the PR spanning upstream and fork repositories
 exec gh pr create --title 'Feature Title' --body 'Feature Body' --head ${USER}:feature-branch
 stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
 
 # Assert that the PR was created with the correct head repository and refs
-exec gh pr view --json headRefName,headRepository,baseRefName,isCrossRepository
+exec gh pr view ${USER}:feature-branch --json headRefName,headRepository,baseRefName,isCrossRepository
 stdout {"baseRefName":"main","headRefName":"feature-branch","headRepository":{"id":"${FORK_ID}","name":"${FORK}"},"isCrossRepository":true}
