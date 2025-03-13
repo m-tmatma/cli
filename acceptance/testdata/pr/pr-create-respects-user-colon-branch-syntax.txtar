@@ -33,7 +33,8 @@ exec gh repo clone ${USER}/${FORK}
 cd ${FORK}
 
 # Prepare a branch where changes are pulled from the upstream default branch but pushed to fork
-exec git checkout -b feature-branch upstream/main
+exec git checkout -b feature-branch
+exec git branch --set-upstream-to upstream/main
 exec git commit --allow-empty -m 'Empty Commit'
 exec git push origin feature-branch
 
