@@ -6,7 +6,7 @@
 set -e
 
 sign_macos() {
-  if [ -z "$APPLE_DEVELOPER_ID" ]; then
+  if [[ -z "$APPLE_DEVELOPER_ID" ]]; then
     echo "skipping macOS code-signing; APPLE_DEVELOPER_ID not set" >&2
     return 0
   fi
@@ -18,21 +18,17 @@ sign_macos() {
   fi
 }
 
-if [ $# -eq 0 ]; then
+if [[ $# -eq 0 ]]; then
   echo "usage: script/sign <file>" >&2
   exit 1
 fi
 
 platform="$(uname -s)"
+if [[ $platform != "Darwin" ]]; then
+  echo "error: must run on macOS; skipping codesigning/notarization" >&2
+  exit 1
+fi
 
 for input_file; do
-  case "$input_file" in
-  *)
-    if [ "$platform" = "Darwin" ]; then
-      sign_macos "$input_file"
-    else
-      printf "warning: don't know how to sign %s on %s\n" "$1", "$platform" >&2
-    fi
-    ;;
-  esac
+  sign_macos "$input_file"
 done
