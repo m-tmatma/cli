@@ -226,7 +226,7 @@ func Test_commentRun(t *testing.T) {
 		wantsErr      bool
 	}{
 		{
-			name: "creating new issue comment with interactive editor succeeds",
+			name: "creating new comment with interactive editor succeeds",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
@@ -242,7 +242,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "updating last issue comment with interactive editor fails if there are no comments and decline prompt to create",
+			name: "updating last comment with interactive editor fails if there are no comments and decline prompt to create",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
@@ -257,7 +257,7 @@ func Test_commentRun(t *testing.T) {
 			wantsErr:      true,
 		},
 		{
-			name: "updating last issue comment with interactive editor succeeds if there are comments",
+			name: "updating last comment with interactive editor succeeds if there are comments",
 			input: &shared.CommentableOptions{
 				Interactive: true,
 				InputType:   0,
@@ -274,7 +274,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "updating last issue comment with interactive editor creates new comment if there are no comments but --create-if-none",
+			name: "updating last comment with interactive editor creates new comment if there are no comments but --create-if-none",
 			input: &shared.CommentableOptions{
 				Interactive:  true,
 				InputType:    0,
@@ -294,7 +294,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "creating new issue comment with non-interactive web opens issue in browser focusing on new comment",
+			name: "creating new comment with non-interactive web opens issue in browser focusing on new comment",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
@@ -306,7 +306,7 @@ func Test_commentRun(t *testing.T) {
 			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive web opens issue in browser focusing on the last comment",
+			name: "updating last comment with non-interactive web opens issue in browser focusing on the last comment",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
@@ -322,7 +322,7 @@ func Test_commentRun(t *testing.T) {
 			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive web errors because there are no comments",
+			name: "updating last comment with non-interactive web errors because there are no comments",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
@@ -333,7 +333,7 @@ func Test_commentRun(t *testing.T) {
 			wantsErr:      true,
 		},
 		{
-			name: "creating new issue comment with non-interactive editor succeeds",
+			name: "creating new comment with non-interactive editor succeeds",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
@@ -347,7 +347,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive editor fails if there are no comments",
+			name: "updating last comment with non-interactive editor fails if there are no comments",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
@@ -360,7 +360,7 @@ func Test_commentRun(t *testing.T) {
 			wantsErr:      true,
 		},
 		{
-			name: "updating last issue comment with non-interactive editor succeeds if there are comments",
+			name: "updating last comment with non-interactive editor succeeds if there are comments",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
@@ -376,7 +376,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive editor creates new comment if there are no comments but --create-if-none",
+			name: "updating last comment with non-interactive editor creates new comment if there are no comments but --create-if-none",
 			input: &shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeEditor,
@@ -393,7 +393,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "creating new issue comment with non-interactive succeeds if comment body is provided",
+			name: "creating new comment with non-interactive inline succeeds if comment body is provided",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -405,7 +405,7 @@ func Test_commentRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive succeeds if there are comments and comment body is provided",
+			name: "updating last comment with non-interactive inline succeeds if there are comments and comment body is provided",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
@@ -419,7 +419,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive creates new comment if there are no comments but --create-if-none",
+			name: "updating last comment with non-interactive inline creates new comment if there are no comments but --create-if-none",
 			input: &shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeInline,
