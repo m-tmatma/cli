@@ -308,30 +308,29 @@ func Test_commentRun(t *testing.T) {
 		{
 			name: "updating last issue comment with non-interactive web opens issue in browser focusing on the last comment",
 			input: &shared.CommentableOptions{
-				Interactive:  false,
-				InputType:    shared.InputTypeWeb,
-				Body:         "",
-				EditLast:     true,
-				CreateIfNone: true,
+				Interactive: false,
+				InputType:   shared.InputTypeWeb,
+				Body:        "",
+				EditLast:    true,
 
 				OpenInBrowser: func(u string) error {
 					assert.Contains(t, u, "#issuecomment-111")
 					return nil
 				},
 			},
-			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
+			emptyComments: false,
+			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive web opens issue in browser focusing on new comment if there are no comments",
+			name: "updating last issue comment with non-interactive web errors because there are no comments",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
 				Body:        "",
-
-				OpenInBrowser: func(string) error { return nil },
+				EditLast:    true,
 			},
 			emptyComments: true,
-			stderr:        "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
+			wantsErr:      true,
 		},
 		{
 			name: "creating new issue comment with non-interactive editor succeeds",
@@ -377,7 +376,7 @@ func Test_commentRun(t *testing.T) {
 			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
 		},
 		{
-			name: "updating last issue comment with non-interactive editor creates new issue if there are no comments but --create-if-none",
+			name: "updating last issue comment with non-interactive editor creates new comment if there are no comments but --create-if-none",
 			input: &shared.CommentableOptions{
 				Interactive:  false,
 				InputType:    shared.InputTypeEditor,
@@ -418,6 +417,21 @@ func Test_commentRun(t *testing.T) {
 			},
 			emptyComments: false,
 			stdout:        "https://github.com/OWNER/REPO/issues/123#issuecomment-111\n",
+		},
+		{
+			name: "updating last issue comment with non-interactive creates new comment if there are no comments but --create-if-none",
+			input: &shared.CommentableOptions{
+				Interactive:  false,
+				InputType:    shared.InputTypeInline,
+				Body:         "comment body",
+				EditLast:     true,
+				CreateIfNone: true,
+			},
+			emptyComments: true,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentCreate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/issues/123#issuecomment-456\n",
 		},
 	}
 	for _, tt := range tests {
