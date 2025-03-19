@@ -5,16 +5,16 @@ env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 exec gh auth setup-git
 
 # Create a repository with a file so it has a default branch
-exec gh repo create $ORG/$REPO --add-readme --private
+exec gh repo create ${ORG}/${REPO} --add-readme --private
 
 # Defer repo cleanup
-defer gh repo delete --yes $ORG/$REPO
+defer gh repo delete --yes ${ORG}/${REPO}
 
 # Clone the repo
-exec gh repo clone $ORG/$REPO
+exec gh repo clone ${ORG}/${REPO}
 
 # Prepare a branch to PR
-cd $REPO
+cd ${REPO}
 exec git checkout -b feature-branch
 exec git commit --allow-empty -m 'Empty Commit'
 exec git push -u origin feature-branch
@@ -24,8 +24,8 @@ exec gh pr create --title 'Feature Title' --body 'Feature Body'
 stdout2env PR_URL
 
 # Comment on the PR
-exec gh pr comment $PR_URL --body 'Looks like a great feature!'
+exec gh pr comment ${PR_URL} --body 'Looks like a great feature!'
 
 # View the PR
-exec gh pr view $PR_URL --comments
+exec gh pr view ${PR_URL} --comments
 stdout 'Looks like a great feature!'
