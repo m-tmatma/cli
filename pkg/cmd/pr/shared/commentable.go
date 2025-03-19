@@ -114,16 +114,16 @@ func CommentableRun(opts *CommentableOptions) error {
 			return err
 		}
 	}
-
-	// Create new comment because updating the last comment failed due to no user comments
-	if opts.CreateIfNone {
-		if opts.Interactive {
-			fmt.Fprintln(opts.IO.ErrOut, "No comments found. Creating a new comment.")
-		}
-		return createComment(commentable, opts)
+	if !opts.CreateIfNone {
+		return errNoUserComments
 	}
 
-	return errNoUserComments
+	// Create new comment because updating the last comment failed due to no user comments
+	if opts.Interactive {
+		fmt.Fprintln(opts.IO.ErrOut, "No comments found. Creating a new comment.")
+	}
+
+	return createComment(commentable, opts)
 }
 
 func createComment(commentable Commentable, opts *CommentableOptions) error {
