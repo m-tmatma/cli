@@ -32,6 +32,7 @@ var (
 	highlight        = ansi.ColorFunc(highlightStyle)
 	darkTableHeader  = ansi.ColorFunc("white+du")
 	lightTableHeader = ansi.ColorFunc("black+hu")
+	noneTableHeader  = ansi.ColorFunc("default+u")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
@@ -260,6 +261,7 @@ func (c *ColorScheme) HexToRGB(hex string, x string) string {
 }
 
 func (c *ColorScheme) TableHeader(t string) string {
+	// Table headers are only stylized if color is enabled including underline modifier.
 	if !c.enabled {
 		return t
 	}
@@ -270,6 +272,6 @@ func (c *ColorScheme) TableHeader(t string) string {
 	case LightTheme:
 		return lightTableHeader(t)
 	default:
-		return t
+		return noneTableHeader(t)
 	}
 }
