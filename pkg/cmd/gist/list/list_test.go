@@ -694,7 +694,7 @@ func Test_highlightMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := iostreams.NewColorScheme(tt.color, false, false)
+			cs := iostreams.NewColorScheme(tt.color, false, false, iostreams.NoTheme)
 
 			matched := false
 			got, err := highlightMatch(tt.input, regex, &matched, cs.Blue, cs.Highlight)
