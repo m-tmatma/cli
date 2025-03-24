@@ -39,8 +39,8 @@ type httpClient interface {
 }
 
 type Client interface {
-	GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error)
-	GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error)
+	GetByRepoAndDigest(repo, digest, predicateType string, limit int) ([]*Attestation, error)
+	GetByOwnerAndDigest(owner, digest, predicateType string, limit int) ([]*Attestation, error)
 	GetTrustDomain() (string, error)
 }
 
@@ -61,21 +61,21 @@ func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClien
 }
 
 // GetByRepoAndDigest fetches the attestation by repo and digest
-func (c *LiveClient) GetByRepoAndDigest(repo, digest string, limit int) ([]*Attestation, error) {
+func (c *LiveClient) GetByRepoAndDigest(repo, digest, predicateType string, limit int) ([]*Attestation, error) {
 	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
 	url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, repo, digest)
-	return c.getByURL(url, limit)
+	return c.getByURL(url, predicateType, limit)
 }
 
 // GetByOwnerAndDigest fetches attestation by owner and digest
-func (c *LiveClient) GetByOwnerAndDigest(owner, digest string, limit int) ([]*Attestation, error) {
+func (c *LiveClient) GetByOwnerAndDigest(owner, digest, predicateType string, limit int) ([]*Attestation, error) {
 	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
 	url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, owner, digest)
-	return c.getByURL(url, limit)
+	return c.getByURL(url, predicateType, limit)
 }
 
-func (c *LiveClient) getByURL(url string, limit int) ([]*Attestation, error) {
-	attestations, err := c.getAttestations(url, limit)
+func (c *LiveClient) getByURL(url, predicateType string, limit int) ([]*Attestation, error) {
+	attestations, err := c.getAttestations(url, predicateType, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (c *LiveClient) GetTrustDomain() (string, error) {
 	return c.getTrustDomain(MetaPath)
 }
 
-func (c *LiveClient) getAttestations(url string, limit int) ([]*Attestation, error) {
+func (c *LiveClient) getAttestations(url, predicateType string, limit int) ([]*Attestation, error) {
 	perPage := limit
 	if perPage <= 0 || perPage > maxLimitForFlag {
 		return nil, fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)
@@ -106,6 +106,9 @@ func (c *LiveClient) getAttestations(url string, limit int) ([]*Attestation, err
 
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
 	url = fmt.Sprintf("%s?per_page=%d", url, perPage)
+	if predicateType != "" {
+		url = fmt.Sprintf("%s&predicate_type=%s", url, predicateType)
+	}
 
 	var attestations []*Attestation
 	var resp AttestationsResponse

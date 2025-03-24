@@ -44,14 +44,14 @@ func NewClientWithMockGHClient(hasNextPage bool) Client {
 
 func TestGetByDigest(t *testing.T) {
 	c := NewClientWithMockGHClient(false)
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.NoError(t, err)
 
 	require.Equal(t, 5, len(attestations))
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
 
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.NoError(t, err)
 
 	require.Equal(t, 5, len(attestations))
@@ -64,14 +64,14 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 
 	limit := 3
 	// The method should return five results when the limit is not set
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, limit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", limit)
 	require.NoError(t, err)
 
 	require.Equal(t, 3, len(attestations))
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
 
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, limit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", limit)
 	require.NoError(t, err)
 
 	require.Equal(t, len(attestations), limit)
@@ -81,14 +81,14 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 
 func TestGetByDigestWithNextPage(t *testing.T) {
 	c := NewClientWithMockGHClient(true)
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.NoError(t, err)
 
 	require.Equal(t, len(attestations), 10)
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
 
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.NoError(t, err)
 
 	require.Equal(t, len(attestations), 10)
@@ -101,14 +101,14 @@ func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
 
 	limit := 7
 	// The method should return five results when the limit is not set
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, limit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", limit)
 	require.NoError(t, err)
 
 	require.Equal(t, len(attestations), limit)
 	bundle := (attestations)[0].Bundle
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
 
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, limit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", limit)
 	require.NoError(t, err)
 
 	require.Equal(t, len(attestations), limit)
@@ -130,12 +130,12 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 		logger:     io.NewTestHandler(),
 	}
 
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.Error(t, err)
 	require.IsType(t, ErrNoAttestationsFound, err)
 	require.Nil(t, attestations)
 
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.Error(t, err)
 	require.IsType(t, ErrNoAttestationsFound, err)
 	require.Nil(t, attestations)
@@ -153,11 +153,11 @@ func TestGetByDigest_Error(t *testing.T) {
 		logger: io.NewTestHandler(),
 	}
 
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.Error(t, err)
 	require.Nil(t, attestations)
 
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.Error(t, err)
 	require.Nil(t, attestations)
 }
@@ -362,7 +362,7 @@ func TestGetAttestationsRetries(t *testing.T) {
 		logger:     io.NewTestHandler(),
 	}
 
-	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.NoError(t, err)
 
 	// assert the error path was executed; because this is a paged
@@ -375,7 +375,7 @@ func TestGetAttestationsRetries(t *testing.T) {
 	require.Equal(t, bundle.GetMediaType(), "application/vnd.dev.sigstore.bundle.v0.3+json")
 
 	// same test as above, but for GetByOwnerAndDigest:
-	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, DefaultLimit)
+	attestations, err = c.GetByOwnerAndDigest(testOwner, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.NoError(t, err)
 
 	// because we haven't reset the mock, we have added 2 more failed requests
@@ -401,7 +401,7 @@ func TestGetAttestationsMaxRetries(t *testing.T) {
 		logger: io.NewTestHandler(),
 	}
 
-	_, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
+	_, err := c.GetByRepoAndDigest(testRepo, testDigest, "https://slsa.dev/provenance/v1", DefaultLimit)
 	require.Error(t, err)
 
 	fetcher.AssertNumberOfCalls(t, "OnREST500Error", 4)
