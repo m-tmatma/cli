@@ -62,6 +62,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			Note that providing the %[1]sworkflow_name%[1]s to the %[1]s-w%[1]s flag will not fetch disabled workflows.
 			Also pass the %[1]s-a%[1]s flag to fetch disabled workflow runs using the %[1]sworkflow_name%[1]s and the %[1]s-w%[1]s flag.
+
+			A run with no workflow name indicates that the run likely belongs an organization ruleset required workflow,
+			and the authenticated user does not have access to the workflow definition.
 		`, "`"),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
