@@ -367,7 +367,7 @@ func TestListRun(t *testing.T) {
 			`),
 		},
 		{
-			name: "organization required workflow in run list (workflow GET returns 404)",
+			name: "org required workflow in runs list shows with empty workflow name",
 			opts: &ListOptions{
 				Limit: defaultLimit,
 				now:   shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
