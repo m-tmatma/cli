@@ -10,7 +10,24 @@ import (
 )
 
 func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestation, string, error) {
-	if o.BundlePath != "" {
+	if o.FetchAttestationsFromGitHubAPI() {
+		params := verification.FetchRemoteAttestationsParams{
+			Digest:        a.DigestWithAlg(),
+			Limit:         o.Limit,
+			Owner:         o.Owner,
+			PredicateType: o.PredicateType,
+			Repo:          o.Repo,
+		}
+
+		attestations, err := verification.GetRemoteAttestations(o.APIClient, params)
+		if err != nil {
+			msg := "✗ Loading attestations from GitHub API failed"
+			return nil, msg, err
+		}
+		pluralAttestation := text.Pluralize(len(attestations), "attestation")
+		msg := fmt.Sprintf("Loaded %s from GitHub API", pluralAttestation)
+		return attestations, msg, nil
+	} else if o.BundlePath != "" {
 		attestations, err := verification.GetLocalAttestations(o.BundlePath)
 		if err != nil {
 			msg := fmt.Sprintf("✗ Loading attestations from %s failed", a.URL)
@@ -19,9 +36,7 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 		pluralAttestation := text.Pluralize(len(attestations), "attestation")
 		msg := fmt.Sprintf("Loaded %s from %s", pluralAttestation, o.BundlePath)
 		return attestations, msg, nil
-	}
-
-	if o.UseBundleFromRegistry {
+	} else if o.UseBundleFromRegistry {
 		attestations, err := verification.GetOCIAttestations(o.OCIClient, a)
 		if err != nil {
 			msg := "✗ Loading attestations from OCI registry failed"
@@ -32,21 +47,7 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 		return attestations, msg, nil
 	}
 
-	params := verification.FetchRemoteAttestationsParams{
-		Digest: a.DigestWithAlg(),
-		Limit:  o.Limit,
-		Owner:  o.Owner,
-		Repo:   o.Repo,
-	}
-
-	attestations, err := verification.GetRemoteAttestations(o.APIClient, params)
-	if err != nil {
-		msg := "✗ Loading attestations from GitHub API failed"
-		return nil, msg, err
-	}
-	pluralAttestation := text.Pluralize(len(attestations), "attestation")
-	msg := fmt.Sprintf("Loaded %s from GitHub API", pluralAttestation)
-	return attestations, msg, nil
+	return nil, "", fmt.Errorf("no valid attestation source provided")
 }
 
 func verifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, sgVerifier verification.SigstoreVerifier, ec verification.EnforcementCriteria) ([]*verification.AttestationProcessingResult, string, error) {

@@ -275,7 +275,7 @@ func TestRunDownload(t *testing.T) {
 	t.Run("no attestations found", func(t *testing.T) {
 		opts := baseOpts
 		opts.APIClient = api.MockClient{
-			OnGetByOwnerAndDigest: func(repo, digest string, limit int) ([]*api.Attestation, error) {
+			OnGetByOwnerAndDigest: func(repo, digest, predicateType string, limit int) ([]*api.Attestation, error) {
 				return nil, api.ErrNoAttestationsFound
 			},
 		}
@@ -291,7 +291,7 @@ func TestRunDownload(t *testing.T) {
 	t.Run("failed to fetch attestations", func(t *testing.T) {
 		opts := baseOpts
 		opts.APIClient = api.MockClient{
-			OnGetByOwnerAndDigest: func(repo, digest string, limit int) ([]*api.Attestation, error) {
+			OnGetByOwnerAndDigest: func(repo, digest, predicateType string, limit int) ([]*api.Attestation, error) {
 				return nil, fmt.Errorf("failed to fetch attestations")
 			},
 		}
