@@ -447,7 +447,7 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 			// Look up workflow by ID because it may have been deleted
 			workflow, err := workflowShared.GetWorkflow(client, repo, run.WorkflowID)
 			// If the error is an httpError and it is a 404, this is likely a
-			// organization-level "required workflow" ruleset. The user does not
+			// organization or enterprise ruleset workflow. The user does not
 			// have permissions to view the details of the workflow, so we cannot
 			// look it up directly without receiving a 404, but it is nonetheless
 			// in the workflow run list. To handle this, we set the workflow name
