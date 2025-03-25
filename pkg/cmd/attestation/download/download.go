@@ -133,7 +133,7 @@ func runDownload(opts *Options) error {
 		Owner:  opts.Owner,
 		Repo:   opts.Repo,
 	}
-	attestations, err := verification.GetRemoteAttestations(opts.APIClient, params)
+	attestations, err := opts.APIClient.GetByDigest(params)
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
 			fmt.Fprintf(opts.Logger.IO.Out, "No attestations found for %s\n", opts.ArtifactPath)

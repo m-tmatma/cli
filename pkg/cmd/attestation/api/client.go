@@ -48,8 +48,7 @@ type httpClient interface {
 }
 
 type Client interface {
-	GetByRepoAndDigest(params FetchParams) ([]*Attestation, error)
-	GetByOwnerAndDigest(params FetchParams) ([]*Attestation, error)
+	GetByDigest(params FetchParams) ([]*Attestation, error)
 	GetTrustDomain() (string, error)
 }
 
@@ -69,16 +68,28 @@ func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClien
 	}
 }
 
-// GetByRepoAndDigest fetches the attestation by repo and digest
-func (c *LiveClient) GetByRepoAndDigest(params FetchParams) ([]*Attestation, error) {
-	url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, params.Repo, params.Digest)
-	return c.getByURL(url, params)
-}
-
-// GetByOwnerAndDigest fetches attestation by owner and digest
-func (c *LiveClient) GetByOwnerAndDigest(params FetchParams) ([]*Attestation, error) {
-	url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, params.Owner, params.Digest)
-	return c.getByURL(url, params)
+// GetByDigest fetches the attestation by digest and either owner or repo
+// depending on which is provided
+func (c *LiveClient) GetByDigest(params FetchParams) ([]*Attestation, error) {
+	if params.Repo == "" && params.Owner == "" {
+		return nil, fmt.Errorf("owner or repo must be provided")
+	} else if params.Repo != "" {
+		// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
+		// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
+		url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, params.Repo, params.Digest)
+		attestations, err := c.getByURL(url, params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch attestations from %s: %w", params.Repo, err)
+		}
+		return attestations, nil
+	} else {
+		url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, params.Owner, params.Digest)
+		attestations, err := c.getByURL(url, params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch attestations from %s: %w", params.Owner, err)
+		}
+		return attestations, nil
+	}
 }
 
 func (c *LiveClient) getByURL(url string, params FetchParams) ([]*Attestation, error) {

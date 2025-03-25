@@ -6,58 +6,44 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 )
 
+func makeTestAttestation() Attestation {
+	return Attestation{Bundle: data.SigstoreBundle(nil), BundleURL: "https://example.com"}
+}
+
 type MockClient struct {
-	OnGetByRepoAndDigest  func(params FetchParams) ([]*Attestation, error)
-	OnGetByOwnerAndDigest func(params FetchParams) ([]*Attestation, error)
-	OnGetTrustDomain      func() (string, error)
+	OnGetByDigest    func(params FetchParams) ([]*Attestation, error)
+	OnGetTrustDomain func() (string, error)
 }
 
-func (m MockClient) GetByRepoAndDigest(params FetchParams) ([]*Attestation, error) {
-	return m.OnGetByRepoAndDigest(params)
-}
-
-func (m MockClient) GetByOwnerAndDigest(params FetchParams) ([]*Attestation, error) {
-	return m.OnGetByOwnerAndDigest(params)
+func (m MockClient) GetByDigest(params FetchParams) ([]*Attestation, error) {
+	return m.OnGetByDigest(params)
 }
 
 func (m MockClient) GetTrustDomain() (string, error) {
 	return m.OnGetTrustDomain()
 }
 
-func makeTestAttestation() Attestation {
-	return Attestation{Bundle: data.SigstoreBundle(nil), BundleURL: "https://example.com"}
-}
-
-func OnGetByRepoAndDigestSuccess(params FetchParams) ([]*Attestation, error) {
+func OnGetByDigestSuccess(params FetchParams) ([]*Attestation, error) {
 	att1 := makeTestAttestation()
 	att2 := makeTestAttestation()
 	return []*Attestation{&att1, &att2}, nil
 }
 
-func OnGetByRepoAndDigestFailure(params FetchParams) ([]*Attestation, error) {
-	return nil, fmt.Errorf("failed to fetch by repo and digest")
-}
-
-func OnGetByOwnerAndDigestSuccess(params FetchParams) ([]*Attestation, error) {
-	att1 := makeTestAttestation()
-	att2 := makeTestAttestation()
-	return []*Attestation{&att1, &att2}, nil
-}
-
-func OnGetByOwnerAndDigestFailure(params FetchParams) ([]*Attestation, error) {
+func OnGetByDigestFailure(params FetchParams) ([]*Attestation, error) {
+	if params.Repo != "" {
+		return nil, fmt.Errorf("failed to fetch by repo and digest")
+	}
 	return nil, fmt.Errorf("failed to fetch by owner and digest")
 }
 
 func NewTestClient() *MockClient {
 	return &MockClient{
-		OnGetByRepoAndDigest:  OnGetByRepoAndDigestSuccess,
-		OnGetByOwnerAndDigest: OnGetByOwnerAndDigestSuccess,
+		OnGetByDigest: OnGetByDigestSuccess,
 	}
 }
 
 func NewFailTestClient() *MockClient {
 	return &MockClient{
-		OnGetByRepoAndDigest:  OnGetByRepoAndDigestFailure,
-		OnGetByOwnerAndDigest: OnGetByOwnerAndDigestFailure,
+		OnGetByDigest: OnGetByDigestFailure,
 	}
 }

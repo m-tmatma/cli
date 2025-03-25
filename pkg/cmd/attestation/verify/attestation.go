@@ -29,7 +29,7 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 			Repo:          o.Repo,
 		}
 
-		attestations, err := verification.GetRemoteAttestations(o.APIClient, params)
+		attestations, err := o.APIClient.GetByDigest(params)
 		if err != nil {
 			msg := "✗ Loading attestations from GitHub API failed"
 			return nil, msg, err

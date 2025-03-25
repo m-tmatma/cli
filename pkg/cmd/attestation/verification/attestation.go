@@ -82,31 +82,6 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	return attestations, nil
 }
 
-func GetRemoteAttestations(client api.Client, params api.FetchParams) ([]*api.Attestation, error) {
-	if client == nil {
-		return nil, fmt.Errorf("api client must be provided")
-	}
-	// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
-	// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
-	var attestations []*api.Attestation
-	var err error
-	var owner string
-	if params.Repo != "" {
-		attestations, err = client.GetByRepoAndDigest(params)
-		owner = params.Repo
-	} else if params.Owner != "" {
-		attestations, err = client.GetByOwnerAndDigest(params)
-		owner = params.Owner
-	} else {
-		return nil, fmt.Errorf("owner or repo must be provided")
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch attestations from %s: %w", owner, err)
-	}
-	return attestations, err
-}
-
 func GetOCIAttestations(client oci.Client, artifact artifact.DigestedArtifact) ([]*api.Attestation, error) {
 	attestations, err := client.GetAttestations(artifact.NameRef(), artifact.DigestWithAlg())
 	if err != nil {
