@@ -37,39 +37,35 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 		pluralAttestation := text.Pluralize(len(attestations), "attestation")
 		msg := fmt.Sprintf("Loaded %s from GitHub API", pluralAttestation)
 		return attestations, msg, nil
-	} else if o.BundlePath != "" {
-		attestations, err := verification.GetLocalAttestations(o.BundlePath)
-		if err != nil {
-			msg := fmt.Sprintf("✗ Loading attestations from %s failed", a.URL)
-			return nil, msg, err
-		}
-
-		filtered, errMsg, err := filterByPredicateType(o.PredicateType, attestations)
-		if err != nil {
-			return nil, errMsg, err
-		}
-
-		pluralAttestation := text.Pluralize(len(filtered), "attestation")
-		msg := fmt.Sprintf("Loaded %s from %s", pluralAttestation, o.BundlePath)
-		return filtered, msg, nil
-	} else if o.UseBundleFromRegistry {
-		attestations, err := verification.GetOCIAttestations(o.OCIClient, a)
-		if err != nil {
-			msg := "✗ Loading attestations from OCI registry failed"
-			return nil, msg, err
-		}
-
-		filtered, errMsg, err := filterByPredicateType(o.PredicateType, attestations)
-		if err != nil {
-			return nil, errMsg, err
-		}
-
-		pluralAttestation := text.Pluralize(len(filtered), "attestation")
-		msg := fmt.Sprintf("Loaded %s from %s", pluralAttestation, o.ArtifactPath)
-		return filtered, msg, nil
 	}
 
-	return nil, "", fmt.Errorf("no valid attestation source provided")
+	var attestations []*api.Attestation
+	var err error
+	var errMsg string
+	if o.BundlePath != "" {
+		attestations, err = verification.GetLocalAttestations(o.BundlePath)
+		if err != nil {
+			errMsg = fmt.Sprintf("✗ Loading attestations from %s failed", a.URL)
+		}
+	} else if o.UseBundleFromRegistry {
+		attestations, err = verification.GetOCIAttestations(o.OCIClient, a)
+		if err != nil {
+			errMsg = "✗ Loading attestations from OCI registry failed"
+		}
+	}
+
+	if err != nil {
+		return nil, errMsg, err
+	}
+
+	filtered, errMsg, err := filterByPredicateType(o.PredicateType, attestations)
+	if err != nil {
+		return nil, errMsg, err
+	}
+
+	pluralAttestation := text.Pluralize(len(filtered), "attestation")
+	msg := fmt.Sprintf("Loaded %s from %s", pluralAttestation, o.BundlePath)
+	return filtered, msg, nil
 }
 
 func verifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, sgVerifier verification.SigstoreVerifier, ec verification.EnforcementCriteria) ([]*verification.AttestationProcessingResult, string, error) {
