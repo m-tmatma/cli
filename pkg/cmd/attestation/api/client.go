@@ -27,6 +27,15 @@ const (
 // Allow injecting backoff interval in tests.
 var getAttestationRetryInterval = time.Millisecond * 200
 
+// FetchParams are the parameters for fetching attestations from the GitHub API
+type FetchParams struct {
+	Digest        string
+	Limit         int
+	Owner         string
+	PredicateType string
+	Repo          string
+}
+
 // githubApiClient makes REST calls to the GitHub API
 type githubApiClient interface {
 	REST(hostname, method, p string, body io.Reader, data interface{}) error
@@ -39,8 +48,8 @@ type httpClient interface {
 }
 
 type Client interface {
-	GetByRepoAndDigest(repo, digest, predicateType string, limit int) ([]*Attestation, error)
-	GetByOwnerAndDigest(owner, digest, predicateType string, limit int) ([]*Attestation, error)
+	GetByRepoAndDigest(params FetchParams) ([]*Attestation, error)
+	GetByOwnerAndDigest(params FetchParams) ([]*Attestation, error)
 	GetTrustDomain() (string, error)
 }
 
@@ -61,21 +70,20 @@ func NewLiveClient(hc *http.Client, host string, l *ioconfig.Handler) *LiveClien
 }
 
 // GetByRepoAndDigest fetches the attestation by repo and digest
-func (c *LiveClient) GetByRepoAndDigest(repo, digest, predicateType string, limit int) ([]*Attestation, error) {
-	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
-	url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, repo, digest)
-	return c.getByURL(url, predicateType, limit)
+func (c *LiveClient) GetByRepoAndDigest(params FetchParams) ([]*Attestation, error) {
+	url := fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, params.Repo, params.Digest)
+	return c.getByURL(url, params)
 }
 
 // GetByOwnerAndDigest fetches attestation by owner and digest
-func (c *LiveClient) GetByOwnerAndDigest(owner, digest, predicateType string, limit int) ([]*Attestation, error) {
-	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", digest)
-	url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, owner, digest)
-	return c.getByURL(url, predicateType, limit)
+func (c *LiveClient) GetByOwnerAndDigest(params FetchParams) ([]*Attestation, error) {
+	url := fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, params.Owner, params.Digest)
+	return c.getByURL(url, params)
 }
 
-func (c *LiveClient) getByURL(url, predicateType string, limit int) ([]*Attestation, error) {
-	attestations, err := c.getAttestations(url, predicateType, limit)
+func (c *LiveClient) getByURL(url string, params FetchParams) ([]*Attestation, error) {
+	c.logger.VerbosePrintf("Fetching attestations for artifact digest %s\n\n", params.Digest)
+	attestations, err := c.getAttestations(url, params)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +102,8 @@ func (c *LiveClient) GetTrustDomain() (string, error) {
 	return c.getTrustDomain(MetaPath)
 }
 
-func (c *LiveClient) getAttestations(url, predicateType string, limit int) ([]*Attestation, error) {
-	perPage := limit
+func (c *LiveClient) getAttestations(url string, params FetchParams) ([]*Attestation, error) {
+	perPage := params.Limit
 	if perPage <= 0 || perPage > maxLimitForFlag {
 		return nil, fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)
 	}
@@ -106,8 +114,8 @@ func (c *LiveClient) getAttestations(url, predicateType string, limit int) ([]*A
 
 	// ref: https://github.com/cli/go-gh/blob/d32c104a9a25c9de3d7c7b07a43ae0091441c858/example_gh_test.go#L96
 	url = fmt.Sprintf("%s?per_page=%d", url, perPage)
-	if predicateType != "" {
-		url = fmt.Sprintf("%s&predicate_type=%s", url, predicateType)
+	if params.PredicateType != "" {
+		url = fmt.Sprintf("%s&predicate_type=%s", url, params.PredicateType)
 	}
 
 	var attestations []*Attestation
@@ -115,7 +123,7 @@ func (c *LiveClient) getAttestations(url, predicateType string, limit int) ([]*A
 	bo := backoff.NewConstantBackOff(getAttestationRetryInterval)
 
 	// if no attestation or less than limit, then keep fetching
-	for url != "" && len(attestations) < limit {
+	for url != "" && len(attestations) < params.Limit {
 		err := backoff.Retry(func() error {
 			newURL, restErr := c.githubAPI.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
 
@@ -143,8 +151,8 @@ func (c *LiveClient) getAttestations(url, predicateType string, limit int) ([]*A
 		return nil, ErrNoAttestationsFound
 	}
 
-	if len(attestations) > limit {
-		return attestations[:limit], nil
+	if len(attestations) > params.Limit {
+		return attestations[:params.Limit], nil
 	}
 
 	return attestations, nil

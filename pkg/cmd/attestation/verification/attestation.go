@@ -20,14 +20,6 @@ const SLSAPredicateV1 = "https://slsa.dev/provenance/v1"
 var ErrUnrecognisedBundleExtension = errors.New("bundle file extension not supported, must be json or jsonl")
 var ErrEmptyBundleFile = errors.New("provided bundle file is empty")
 
-type FetchRemoteAttestationsParams struct {
-	Digest        string
-	Limit         int
-	Owner         string
-	PredicateType string
-	Repo          string
-}
-
 // GetLocalAttestations returns a slice of attestations read from a local bundle file.
 func GetLocalAttestations(path string) ([]*api.Attestation, error) {
 	var attestations []*api.Attestation
@@ -90,20 +82,20 @@ func loadBundlesFromJSONLinesFile(path string) ([]*api.Attestation, error) {
 	return attestations, nil
 }
 
-func GetRemoteAttestations(client api.Client, params FetchRemoteAttestationsParams) ([]*api.Attestation, error) {
+func GetRemoteAttestations(client api.Client, params api.FetchParams) ([]*api.Attestation, error) {
 	if client == nil {
 		return nil, fmt.Errorf("api client must be provided")
 	}
 	// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
 	// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
 	if params.Repo != "" {
-		attestations, err := client.GetByRepoAndDigest(params.Repo, params.Digest, params.PredicateType, params.Limit)
+		attestations, err := client.GetByRepoAndDigest(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch attestations from %s: %w", params.Repo, err)
 		}
 		return attestations, nil
 	} else if params.Owner != "" {
-		attestations, err := client.GetByOwnerAndDigest(params.Owner, params.Digest, params.PredicateType, params.Limit)
+		attestations, err := client.GetByOwnerAndDigest(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch attestations from %s: %w", params.Owner, err)
 		}

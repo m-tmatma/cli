@@ -7,17 +7,17 @@ import (
 )
 
 type MockClient struct {
-	OnGetByRepoAndDigest  func(repo, digest, predicateType string, limit int) ([]*Attestation, error)
-	OnGetByOwnerAndDigest func(owner, digest, predicateType string, limit int) ([]*Attestation, error)
+	OnGetByRepoAndDigest  func(params FetchParams) ([]*Attestation, error)
+	OnGetByOwnerAndDigest func(params FetchParams) ([]*Attestation, error)
 	OnGetTrustDomain      func() (string, error)
 }
 
-func (m MockClient) GetByRepoAndDigest(repo, digest, predicateType string, limit int) ([]*Attestation, error) {
-	return m.OnGetByRepoAndDigest(repo, digest, predicateType, limit)
+func (m MockClient) GetByRepoAndDigest(params FetchParams) ([]*Attestation, error) {
+	return m.OnGetByRepoAndDigest(params)
 }
 
-func (m MockClient) GetByOwnerAndDigest(owner, digest, predicateType string, limit int) ([]*Attestation, error) {
-	return m.OnGetByOwnerAndDigest(owner, digest, predicateType, limit)
+func (m MockClient) GetByOwnerAndDigest(params FetchParams) ([]*Attestation, error) {
+	return m.OnGetByOwnerAndDigest(params)
 }
 
 func (m MockClient) GetTrustDomain() (string, error) {
@@ -28,23 +28,23 @@ func makeTestAttestation() Attestation {
 	return Attestation{Bundle: data.SigstoreBundle(nil), BundleURL: "https://example.com"}
 }
 
-func OnGetByRepoAndDigestSuccess(repo, digest, predicateType string, limit int) ([]*Attestation, error) {
+func OnGetByRepoAndDigestSuccess(params FetchParams) ([]*Attestation, error) {
 	att1 := makeTestAttestation()
 	att2 := makeTestAttestation()
 	return []*Attestation{&att1, &att2}, nil
 }
 
-func OnGetByRepoAndDigestFailure(repo, digest, predicateType string, limit int) ([]*Attestation, error) {
+func OnGetByRepoAndDigestFailure(params FetchParams) ([]*Attestation, error) {
 	return nil, fmt.Errorf("failed to fetch by repo and digest")
 }
 
-func OnGetByOwnerAndDigestSuccess(owner, digest, predicateType string, limit int) ([]*Attestation, error) {
+func OnGetByOwnerAndDigestSuccess(params FetchParams) ([]*Attestation, error) {
 	att1 := makeTestAttestation()
 	att2 := makeTestAttestation()
 	return []*Attestation{&att1, &att2}, nil
 }
 
-func OnGetByOwnerAndDigestFailure(owner, digest, predicateType string, limit int) ([]*Attestation, error) {
+func OnGetByOwnerAndDigestFailure(params FetchParams) ([]*Attestation, error) {
 	return nil, fmt.Errorf("failed to fetch by owner and digest")
 }
 

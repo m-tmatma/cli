@@ -21,7 +21,7 @@ func filterByPredicateType(predicateType string, attestations []*api.Attestation
 
 func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestation, string, error) {
 	if o.FetchAttestationsFromGitHubAPI() {
-		params := verification.FetchRemoteAttestationsParams{
+		params := api.FetchParams{
 			Digest:        a.DigestWithAlg(),
 			Limit:         o.Limit,
 			Owner:         o.Owner,
