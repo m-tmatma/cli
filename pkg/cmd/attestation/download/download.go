@@ -144,10 +144,9 @@ func runDownload(opts *Options) error {
 
 	// Apply predicate type filter to returned attestations
 	if opts.PredicateType != "" {
-		filteredAttestations := verification.FilterAttestations(opts.PredicateType, attestations)
-
-		if len(filteredAttestations) == 0 {
-			return fmt.Errorf("no attestations found with predicate type: %s", opts.PredicateType)
+		filteredAttestations, err := verification.FilterAttestations(opts.PredicateType, attestations)
+		if err != nil {
+			return fmt.Errorf("failed to filter attestations: %v", err)
 		}
 
 		attestations = filteredAttestations

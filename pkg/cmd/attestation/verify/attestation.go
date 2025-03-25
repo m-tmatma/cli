@@ -9,16 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 )
 
-func filterByPredicateType(predicateType string, attestations []*api.Attestation) ([]*api.Attestation, string, error) {
-	// Apply predicate type filter to returned attestations
-	filteredAttestations := verification.FilterAttestations(predicateType, attestations)
-	if len(filteredAttestations) == 0 {
-		msg := fmt.Sprintf("✗ No attestations found with predicate type: %s\n", predicateType)
-		return nil, msg, fmt.Errorf("no matching predicate found")
-	}
-	return filteredAttestations, "", nil
-}
-
 func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestation, string, error) {
 	if o.FetchAttestationsFromGitHubAPI() {
 		params := api.FetchParams{
@@ -58,9 +48,9 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 		return nil, errMsg, err
 	}
 
-	filtered, errMsg, err := filterByPredicateType(o.PredicateType, attestations)
+	filtered, err := verification.FilterAttestations(o.PredicateType, attestations)
 	if err != nil {
-		return nil, errMsg, err
+		return nil, err.Error(), err
 	}
 
 	pluralAttestation := text.Pluralize(len(filtered), "attestation")

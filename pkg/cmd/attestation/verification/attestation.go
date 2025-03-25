@@ -97,7 +97,7 @@ type IntotoStatement struct {
 	PredicateType string `json:"predicateType"`
 }
 
-func FilterAttestations(predicateType string, attestations []*api.Attestation) []*api.Attestation {
+func FilterAttestations(predicateType string, attestations []*api.Attestation) ([]*api.Attestation, error) {
 	filteredAttestations := []*api.Attestation{}
 
 	for _, each := range attestations {
@@ -118,5 +118,9 @@ func FilterAttestations(predicateType string, attestations []*api.Attestation) [
 		}
 	}
 
-	return filteredAttestations
+	if len(filteredAttestations) == 0 {
+		return nil, fmt.Errorf("no attestations found with predicate type: %s", predicateType)
+	}
+
+	return filteredAttestations, nil
 }
