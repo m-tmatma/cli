@@ -98,29 +98,21 @@ func (c *LiveClient) GetByDigest(params FetchParams) ([]*Attestation, error) {
 	return bundles, nil
 }
 
-func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error) {
+func (c *LiveClient) buildRequestURL(params FetchParams) (string, error) {
 	if err := params.Validate(); err != nil {
-		return nil, err
+		return "", err
 	}
 
-	var urlTemplate string
-	var resourceOwner string
+	var url string
 	if params.Repo != "" {
 		// check if Repo is set first because if Repo has been set, Owner will be set using the value of Repo.
 		// If Repo is not set, the field will remain empty. It will not be populated using the value of Owner.
-		urlTemplate = GetAttestationByRepoAndSubjectDigestPath
-		resourceOwner = params.Repo
+		url = fmt.Sprintf(GetAttestationByRepoAndSubjectDigestPath, params.Repo, params.Digest)
 	} else {
-		urlTemplate = GetAttestationByOwnerAndSubjectDigestPath
-		resourceOwner = params.Owner
+		url = fmt.Sprintf(GetAttestationByOwnerAndSubjectDigestPath, params.Owner, params.Digest)
 	}
-	url := fmt.Sprintf(urlTemplate, resourceOwner, params.Digest)
 
 	perPage := params.Limit
-	if perPage <= 0 || perPage > maxLimitForFlag {
-		return nil, fmt.Errorf("limit must be greater than 0 and less than or equal to %d", maxLimitForFlag)
-	}
-
 	if perPage > maxLimitForFetch {
 		perPage = maxLimitForFetch
 	}
@@ -129,6 +121,14 @@ func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error)
 	url = fmt.Sprintf("%s?per_page=%d", url, perPage)
 	if params.PredicateType != "" {
 		url = fmt.Sprintf("%s&predicate_type=%s", url, params.PredicateType)
+	}
+	return url, nil
+}
+
+func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error) {
+	url, err := c.buildRequestURL(params)
+	if err != nil {
+		return nil, err
 	}
 
 	var attestations []*Attestation
@@ -139,13 +139,11 @@ func (c *LiveClient) getAttestations(params FetchParams) ([]*Attestation, error)
 	for url != "" && len(attestations) < params.Limit {
 		err := backoff.Retry(func() error {
 			newURL, restErr := c.githubAPI.RESTWithNext(c.host, http.MethodGet, url, nil, &resp)
-
 			if restErr != nil {
 				if shouldRetry(restErr) {
 					return restErr
-				} else {
-					return backoff.Permanent(restErr)
 				}
+				return backoff.Permanent(restErr)
 			}
 
 			url = newURL
