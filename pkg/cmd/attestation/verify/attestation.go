@@ -10,6 +10,8 @@ import (
 )
 
 func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestation, string, error) {
+	// Fetch attestations from GitHub API within this if block since predicate type
+	// filter is done when the API is called
 	if o.FetchAttestationsFromGitHubAPI() {
 		params := api.FetchParams{
 			Digest:        a.DigestWithAlg(),
@@ -29,6 +31,8 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 		return attestations, msg, nil
 	}
 
+	// Fetch attestations from local bundle or OCI registry
+	// Predicate type filtering is done after the attestations are fetched
 	var attestations []*api.Attestation
 	var err error
 	var errMsg string
