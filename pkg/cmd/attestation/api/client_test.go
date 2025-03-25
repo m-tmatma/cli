@@ -60,7 +60,6 @@ type getByTestCase struct {
 	params               FetchParams
 	limit                int
 	expectedAttestations int
-	expectedError        error
 	hasNextPage          bool
 }
 
@@ -69,27 +68,22 @@ var getByTestCases = []getByTestCase{
 		name:                 "get by digest with owner",
 		params:               testFetchParamsWithOwner,
 		expectedAttestations: 5,
-		expectedError:        nil,
 	},
 	{
 		name:                 "get by digest with repo",
 		params:               testFetchParamsWithRepo,
 		expectedAttestations: 5,
-		expectedError:        nil,
 	},
 	{
 		name:                 "get by digest with attestations greater than limit",
 		params:               testFetchParamsWithRepo,
 		limit:                3,
 		expectedAttestations: 3,
-		expectedError:        nil,
 	},
 	{
 		name:                 "get by digest with next page",
 		params:               testFetchParamsWithRepo,
-		limit:                30,
 		expectedAttestations: 10,
-		expectedError:        nil,
 		hasNextPage:          true,
 	},
 	{
@@ -97,7 +91,6 @@ var getByTestCases = []getByTestCase{
 		params:               testFetchParamsWithRepo,
 		limit:                7,
 		expectedAttestations: 7,
-		expectedError:        nil,
 		hasNextPage:          true,
 	},
 }
