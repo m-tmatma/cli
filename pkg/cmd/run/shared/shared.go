@@ -452,6 +452,8 @@ func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run)
 			// look it up directly without receiving a 404, but it is nonetheless
 			// in the workflow run list. To handle this, we set the workflow name
 			// to an empty string.
+			// Deciding to put this here instead of in GetWorkflow to allow
+			// the caller to decide what a 404 means.
 			if httpErr, ok := err.(api.HTTPError); ok && httpErr.StatusCode == 404 {
 				workflowMap[run.WorkflowID] = ""
 				continue
