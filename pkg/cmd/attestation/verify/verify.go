@@ -50,7 +50,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 
 			This identity is then validated against the attestation's certificate's
 			SourceRepository, SourceRepositoryOwner, and SubjectAlternativeName
-			(SAN) fields.
+			(SAN) fields, among others.
 
 			It is up to you to decide how precisely you want to enforce this identity.
 
