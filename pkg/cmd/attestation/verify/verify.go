@@ -30,13 +30,16 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			Verify the integrity and provenance of an artifact using its associated
 			cryptographically signed attestations.
 
-			## Verification
+			## Understanding Verification
+
+			An attestation is a claim (i.e. a provenance statement) made by an actor
+			(i.e. a GitHub Actions workflow) regarding a subject (i.e. an artifact).
 
 			In order to verify an attestation, you must provide an artifact and validate:
 			* the identity of the actor that produced the attestation
-			* the expected attestation predicate type
+			* the expected attestation predicate type (the nature of the claim)
 
-			By default, this command enforces the "%[2]s"
+			By default, this command enforces the %[1]s%[2]s%[1]s
 			predicate type. To verify other attestation predicate types use the
 			%[1]s--predicate-type%[1]s flag.
 
@@ -52,8 +55,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 			It is up to you to decide how precisely you want to enforce this identity.
 
 			At a minimum, this command requires either:
-			* the %[1]s--repo%[1]s flag (e.g. --repo github/example), or
-			* the %[1]s--owner%[1]s flag (e.g. --owner github)
+			* the %[1]s--owner%[1]s flag (e.g. --owner github), or
+			* the %[1]s--repo%[1]s flag (e.g. --repo github/example)
+
+			The more precisely you specify the identity, the more control you will
+			have over the security guarantees offered by the verification process.
 
 			Ideally, the path of the signer workflow is also validated using the
 			%[1]s--signer-workflow%[1]s or %[1]s--cert-identity%[1]s flags.
@@ -224,23 +230,23 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 	verifyCmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Repository name in the format <owner>/<repo>")
 	verifyCmd.MarkFlagsMutuallyExclusive("owner", "repo")
 	verifyCmd.MarkFlagsOneRequired("owner", "repo")
-	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", verification.SLSAPredicateV1, "Filter attestations by provided predicate type")
 	verifyCmd.Flags().BoolVarP(&opts.NoPublicGood, "no-public-good", "", false, "Do not verify attestations signed with Sigstore public good instance")
 	verifyCmd.Flags().StringVarP(&opts.TrustedRoot, "custom-trusted-root", "", "", "Path to a trusted_root.jsonl file; likely for offline verification")
 	verifyCmd.Flags().IntVarP(&opts.Limit, "limit", "L", api.DefaultLimit, "Maximum number of attestations to fetch")
 	cmdutil.AddFormatFlags(verifyCmd, &opts.exporter)
-	// policy enforcement flags
-	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners")
-	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's subject alternative name matches the provided value exactly")
-	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's subject alternative name matches the provided regex")
-	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Repository of reusable workflow that signed attestation in the format <owner>/<repo>")
-	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Workflow that signed attestation in the format [host/]<owner>/<repo>/<path>/<to>/<workflow>")
-	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
-	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verification.GitHubOIDCIssuer, "Issuer of the OIDC token")
 	verifyCmd.Flags().StringVarP(&opts.Hostname, "hostname", "", "", "Configure host to use")
-	verifyCmd.Flags().StringVarP(&opts.SignerDigest, "signer-digest", "", "", "Digest associated with the signer workflow")
-	verifyCmd.Flags().StringVarP(&opts.SourceRef, "source-ref", "", "", "Ref associated with the source workflow")
-	verifyCmd.Flags().StringVarP(&opts.SourceDigest, "source-digest", "", "", "Digest associated with the source workflow")
+	// policy enforcement flags
+	verifyCmd.Flags().StringVarP(&opts.PredicateType, "predicate-type", "", verification.SLSAPredicateV1, "Enforce that verified attestations' predicate type matches the provided value")
+	verifyCmd.Flags().BoolVarP(&opts.DenySelfHostedRunner, "deny-self-hosted-runners", "", false, "Fail verification for attestations generated on self-hosted runners")
+	verifyCmd.Flags().StringVarP(&opts.SAN, "cert-identity", "", "", "Enforce that the certificate's SubjectAlternativeName matches the provided value exactly")
+	verifyCmd.Flags().StringVarP(&opts.SANRegex, "cert-identity-regex", "i", "", "Enforce that the certificate's SubjectAlternativeName matches the provided regex")
+	verifyCmd.Flags().StringVarP(&opts.SignerRepo, "signer-repo", "", "", "Enforce that the workflow that signed the attestation's repository matches the provided value (<owner>/<repo>)")
+	verifyCmd.Flags().StringVarP(&opts.SignerWorkflow, "signer-workflow", "", "", "Enforce that the workflow that signed the attestation matches the provided value ([host/]<owner>/<repo>/<path>/<to>/<workflow>)")
+	verifyCmd.MarkFlagsMutuallyExclusive("cert-identity", "cert-identity-regex", "signer-repo", "signer-workflow")
+	verifyCmd.Flags().StringVarP(&opts.OIDCIssuer, "cert-oidc-issuer", "", verification.GitHubOIDCIssuer, "Enforce that the issuer of the OIDC token matches the provided value")
+	verifyCmd.Flags().StringVarP(&opts.SignerDigest, "signer-digest", "", "", "Enforce that the digest associated with the signer workflow matches the provided value")
+	verifyCmd.Flags().StringVarP(&opts.SourceRef, "source-ref", "", "", "Enforce that the git ref associated with the source repository matches the provided value")
+	verifyCmd.Flags().StringVarP(&opts.SourceDigest, "source-digest", "", "", "Enforce that the digest associated with the source repository matches the provided value")
 
 	return verifyCmd
 }
