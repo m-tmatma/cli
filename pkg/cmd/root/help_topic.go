@@ -152,10 +152,10 @@ var HelpTopics = []helpTopic{
 			- %[1]shyperlink <url> <text>%[1]s: renders a terminal hyperlink
 
 			The following Sprig template library functions can also be used with this formatting directive:
-			- %[1]scontains%[1]s: returns true if the input contains the argument
-			- %[1]shasPrefix%[1]s: returns true if the input has the argument as a prefix
-			- %[1]shasSuffix%[1]s: returns true if the input has the argument as a suffix
-			- %[1]sregexMatch%[1]s:	returns true if the input matches the argument
+			- %[1]scontains <arg> <string>%[1]s: checks if %[1]sstring%[1]s contains %[1]sarg%[1]s
+			- %[1]shasPrefix <prefix> <string>%[1]s: checks if %[1]sstring%[1]s starts with %[1]sprefix%[1]s
+			- %[1]shasSuffix <suffix> <string>%[1]s: checks if %[1]sstring%[1]s ends with %[1]ssuffix%[1]s
+			- %[1]sregexMatch <regex> <string>%[1]s: checks if %[1]sstring%[1]s has any matches for %[1]sregex%[1]s
 			For more information about the Sprig library, see <https://masterminds.github.io/sprig/>.
 
 			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
