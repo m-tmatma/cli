@@ -15,24 +15,24 @@ const (
 	highlightStyle = "black:yellow"
 )
 
-// Special cases like darkTableHeader / lightTableHeader are necessary when using color and modifiers
+// Special cases like darkThemeTableHeader / lightThemeTableHeader are necessary when using color and modifiers
 // (bold, underline, dim) because ansi.ColorFunc requires a foreground color and resets formats.
 var (
-	magenta          = ansi.ColorFunc("magenta")
-	cyan             = ansi.ColorFunc("cyan")
-	red              = ansi.ColorFunc("red")
-	yellow           = ansi.ColorFunc("yellow")
-	blue             = ansi.ColorFunc("blue")
-	green            = ansi.ColorFunc("green")
-	gray             = ansi.ColorFunc("black+h")
-	bold             = ansi.ColorFunc("default+b")
-	cyanBold         = ansi.ColorFunc("cyan+b")
-	greenBold        = ansi.ColorFunc("green+b")
-	highlightStart   = ansi.ColorCode(highlightStyle)
-	highlight        = ansi.ColorFunc(highlightStyle)
-	darkTableHeader  = ansi.ColorFunc("white+du")
-	lightTableHeader = ansi.ColorFunc("black+hu")
-	noneTableHeader  = ansi.ColorFunc("default+u")
+	magenta               = ansi.ColorFunc("magenta")
+	cyan                  = ansi.ColorFunc("cyan")
+	red                   = ansi.ColorFunc("red")
+	yellow                = ansi.ColorFunc("yellow")
+	blue                  = ansi.ColorFunc("blue")
+	green                 = ansi.ColorFunc("green")
+	gray                  = ansi.ColorFunc("black+h")
+	bold                  = ansi.ColorFunc("default+b")
+	cyanBold              = ansi.ColorFunc("cyan+b")
+	greenBold             = ansi.ColorFunc("green+b")
+	highlightStart        = ansi.ColorCode(highlightStyle)
+	highlight             = ansi.ColorFunc(highlightStyle)
+	darkThemeTableHeader  = ansi.ColorFunc("white+du")
+	lightThemeTableHeader = ansi.ColorFunc("black+hu")
+	noThemeTableHeader    = ansi.ColorFunc("default+u")
 
 	gray256 = func(t string) string {
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
@@ -268,10 +268,10 @@ func (c *ColorScheme) TableHeader(t string) string {
 
 	switch c.theme {
 	case DarkTheme:
-		return darkTableHeader(t)
+		return darkThemeTableHeader(t)
 	case LightTheme:
-		return lightTableHeader(t)
+		return lightThemeTableHeader(t)
 	default:
-		return noneTableHeader(t)
+		return noThemeTableHeader(t)
 	}
 }
