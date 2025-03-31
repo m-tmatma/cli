@@ -37,7 +37,7 @@ var (
 	noThemeTableHeader    = ansi.ColorFunc("default+u")
 
 	gray256 = func(t string) string {
-		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
+		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[0m", 38, 242, t)
 	}
 )
 
@@ -91,8 +91,10 @@ func (c *ColorScheme) Muted(t string) string {
 	switch c.theme {
 	case LightTheme:
 		return lightThemeMuted(t)
-	default:
+	case DarkTheme:
 		return darkThemeMuted(t)
+	default:
+		return t
 	}
 }
 
