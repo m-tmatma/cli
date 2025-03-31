@@ -30,7 +30,9 @@ var (
 	greenBold             = ansi.ColorFunc("green+b")
 	highlightStart        = ansi.ColorCode(highlightStyle)
 	highlight             = ansi.ColorFunc(highlightStyle)
+	darkThemeMuted        = ansi.ColorFunc("white+d")
 	darkThemeTableHeader  = ansi.ColorFunc("white+du")
+	lightThemeMuted       = ansi.ColorFunc("black+h")
 	lightThemeTableHeader = ansi.ColorFunc("black+hu")
 	noThemeTableHeader    = ansi.ColorFunc("default+u")
 
@@ -42,20 +44,22 @@ var (
 // NewColorScheme initializes color logic based on provided terminal capabilities.
 // Logic dealing with terminal theme detected, such as whether color is enabled, 8-bit color supported, true color supported,
 // and terminal theme detected.
-func NewColorScheme(enabled, is256enabled, trueColor bool, theme string) *ColorScheme {
+func NewColorScheme(enabled, is256enabled, trueColor, accessibleColors bool, theme string) *ColorScheme {
 	return &ColorScheme{
-		enabled:      enabled,
-		is256enabled: is256enabled,
-		hasTrueColor: trueColor,
-		theme:        theme,
+		enabled:          enabled,
+		is256enabled:     is256enabled,
+		hasTrueColor:     trueColor,
+		accessibleColors: accessibleColors,
+		theme:            theme,
 	}
 }
 
 type ColorScheme struct {
-	enabled      bool
-	is256enabled bool
-	hasTrueColor bool
-	theme        string
+	enabled          bool
+	is256enabled     bool
+	hasTrueColor     bool
+	accessibleColors bool
+	theme            string
 }
 
 func (c *ColorScheme) Enabled() bool {
@@ -71,6 +75,29 @@ func (c *ColorScheme) Bold(t string) string {
 
 func (c *ColorScheme) Boldf(t string, args ...interface{}) string {
 	return c.Bold(fmt.Sprintf(t, args...))
+}
+
+func (c *ColorScheme) Muted(t string) string {
+	// Fallback to previous logic if accessible colors preview is disabled.
+	if !c.accessibleColors {
+		return c.Gray(t)
+	}
+
+	// Muted text is only stylized if color is enabled.
+	if !c.enabled {
+		return t
+	}
+
+	switch c.theme {
+	case LightTheme:
+		return lightThemeMuted(t)
+	default:
+		return darkThemeMuted(t)
+	}
+}
+
+func (c *ColorScheme) Mutedf(t string, args ...interface{}) string {
+	return c.Muted(fmt.Sprintf(t, args...))
 }
 
 func (c *ColorScheme) Red(t string) string {
@@ -113,6 +140,7 @@ func (c *ColorScheme) GreenBold(t string) string {
 	return greenBold(t)
 }
 
+// Deprecated: Use Muted instead for thematically contrasting color.
 func (c *ColorScheme) Gray(t string) string {
 	if !c.enabled {
 		return t
@@ -123,6 +151,7 @@ func (c *ColorScheme) Gray(t string) string {
 	return gray(t)
 }
 
+// Deprecated: Use Mutedf instead for thematically contrasting color.
 func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
 }

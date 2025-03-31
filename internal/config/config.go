@@ -12,9 +12,11 @@ import (
 	o "github.com/cli/cli/v2/pkg/option"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
+	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 )
 
 const (
+	accessibleColorsKey   = xcolor.AccessibleColorsSetting
 	aliasesKey            = "aliases"
 	browserKey            = "browser"
 	editorKey             = "editor"
@@ -106,6 +108,11 @@ func (c *cfg) Aliases() gh.AliasConfig {
 
 func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
+}
+
+func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, accessibleColorsKey).Unwrap()
 }
 
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
@@ -532,6 +539,8 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
+# Preference for accessible colors that can be customized. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
+accessible_colors: disabled
 `
 
 type ConfigOption struct {
@@ -600,6 +609,15 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
+		},
+	},
+	{
+		Key:           accessibleColorsKey,
+		Description:   "toggle preference for accessible colors that can be customized",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.AccessibleColors(hostname).Value
 		},
 	},
 }
