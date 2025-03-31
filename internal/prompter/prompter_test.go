@@ -15,7 +15,6 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	stderr := ios.ErrOut
 
 	t.Run("returns accessible huhPrompter when GH_SCREENREADER_FRIENDLY is set to true", func(t *testing.T) {
-		t.Parallel()
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "true")
 
 		p := New(editorCmd, stdin, stdout, stderr)
@@ -25,7 +24,6 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	})
 
 	t.Run("returns accessible huhPrompter when GH_SCREENREADER_FRIENDLY is set to 1", func(t *testing.T) {
-		t.Parallel()
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "1")
 
 		p := New(editorCmd, stdin, stdout, stderr)
@@ -35,7 +33,6 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is set to false", func(t *testing.T) {
-		t.Parallel()
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "false")
 
 		p := New(editorCmd, stdin, stdout, stderr)
@@ -44,7 +41,6 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is set to 0", func(t *testing.T) {
-		t.Parallel()
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "0")
 
 		p := New(editorCmd, stdin, stdout, stderr)
@@ -53,7 +49,6 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is unset", func(t *testing.T) {
-		t.Parallel()
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "")
 
 		p := New(editorCmd, stdin, stdout, stderr)
