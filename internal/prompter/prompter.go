@@ -253,11 +253,6 @@ func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed b
 		return "", err
 	}
 
-	// TODO: blank not allowed
-	if !blankAllowed && defaultValue == "" {
-		panic("blank not allowed and no default value")
-	}
-
 	return text, nil
 }
 
