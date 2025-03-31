@@ -534,8 +534,6 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
-# Preference for accessible colors that can be customized. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
-accessible_colors: disabled
 `
 
 type ConfigOption struct {
