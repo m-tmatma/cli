@@ -221,23 +221,27 @@ func (p *huhPrompter) InputHostname() (string, error) {
 
 func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
 	var result string
+	options := []huh.Option[string]{
+		huh.NewOption("Open Editor", "open"),
+	}
+	if blankAllowed {
+		options = append(options, huh.NewOption("Skip", "skip"))
+	}
+
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title(prompt).
-				Options(
-					huh.NewOption("Open Editor", "open"),
-					huh.NewOption("Skip", "skip"),
-				).
+				Options(options...).
 				Value(&result),
 		),
 	)
+
 	if err := form.Run(); err != nil {
 		return "", err
 	}
 
 	if result == "skip" {
-		// TODO: loop if blank not allowed
 		if !blankAllowed && defaultValue == "" {
 			panic("blank not allowed and no default value")
 		}
