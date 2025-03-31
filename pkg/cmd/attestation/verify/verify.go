@@ -66,7 +66,7 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 
 			Please note: if your attestation was generated via a reusable workflow then
 			that reusable workflow is the signer whose identity needs to be validated.
-			In this situation, you must also use either the %[1]s--signer-workflow%[1]s or
+			In this situation, you must use either the %[1]s--signer-workflow%[1]s or
 			the %[1]s--signer-repo%[1]s flag.
 
 			For more options, see the other available flags.
