@@ -110,11 +110,6 @@ func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
-func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
-	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
-	return c.GetOrDefault(hostname, accessibleColorsKey).Unwrap()
-}
-
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
 	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
 	return c.GetOrDefault(hostname, browserKey).Unwrap()
@@ -609,15 +604,6 @@ var Options = []ConfigOption{
 		DefaultValue: "",
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.Browser(hostname).Value
-		},
-	},
-	{
-		Key:           accessibleColorsKey,
-		Description:   "toggle preference for accessible colors that can be customized",
-		DefaultValue:  "disabled",
-		AllowedValues: []string{"enabled", "disabled"},
-		CurrentValue: func(c gh.Config, hostname string) string {
-			return c.AccessibleColors(hostname).Value
 		},
 	},
 }
