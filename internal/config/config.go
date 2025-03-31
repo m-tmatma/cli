@@ -12,11 +12,9 @@ import (
 	o "github.com/cli/cli/v2/pkg/option"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
-	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 )
 
 const (
-	accessibleColorsKey   = xcolor.AccessibleColorsSetting
 	aliasesKey            = "aliases"
 	browserKey            = "browser"
 	editorKey             = "editor"
