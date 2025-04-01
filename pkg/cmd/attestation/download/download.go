@@ -127,6 +127,9 @@ func runDownload(opts *Options) error {
 
 	opts.Logger.VerbosePrintf("Downloading trusted metadata for artifact %s\n\n", opts.ArtifactPath)
 
+	if opts.APIClient == nil {
+		return fmt.Errorf("no APIClient provided")
+	}
 	params := api.FetchParams{
 		Digest: artifact.DigestWithAlg(),
 		Limit:  opts.Limit,
