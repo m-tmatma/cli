@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/text"
@@ -13,6 +14,11 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 	// Fetch attestations from GitHub API within this if block since predicate type
 	// filter is done when the API is called
 	if o.FetchAttestationsFromGitHubAPI() {
+		if o.APIClient == nil {
+			errMsg := "✗ No APIClient provided"
+			return nil, errMsg, errors.New(errMsg)
+		}
+
 		params := api.FetchParams{
 			Digest:        a.DigestWithAlg(),
 			Limit:         o.Limit,

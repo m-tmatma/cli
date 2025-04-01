@@ -31,9 +31,9 @@ func OnGetByDigestSuccess(params FetchParams) ([]*Attestation, error) {
 
 func OnGetByDigestFailure(params FetchParams) ([]*Attestation, error) {
 	if params.Repo != "" {
-		return nil, fmt.Errorf("failed to fetch by repo and digest")
+		return nil, fmt.Errorf("failed to fetch attestations from %s", params.Repo)
 	}
-	return nil, fmt.Errorf("failed to fetch by owner and digest")
+	return nil, fmt.Errorf("failed to fetch attestations from %s", params.Owner)
 }
 
 func NewTestClient() *MockClient {

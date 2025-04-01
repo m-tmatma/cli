@@ -162,6 +162,6 @@ func TestFilterAttestations(t *testing.T) {
 	require.NoError(t, err)
 
 	filtered, err = FilterAttestations("NonExistentPredicate", attestations)
-	require.Len(t, filtered, 0)
-	require.NoError(t, err)
+	require.Nil(t, filtered)
+	require.Error(t, err)
 }
