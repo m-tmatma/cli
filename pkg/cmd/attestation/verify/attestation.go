@@ -41,30 +41,32 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 	// Predicate type filtering is done after the attestations are fetched
 	var attestations []*api.Attestation
 	var err error
-	var errMsg string
+	var msg string
 	if o.BundlePath != "" {
 		attestations, err = verification.GetLocalAttestations(o.BundlePath)
 		if err != nil {
-			errMsg = fmt.Sprintf("✗ Loading attestations from %s failed", a.URL)
+			pluralAttestation := text.Pluralize(len(attestations), "attestation")
+			msg = fmt.Sprintf("Loaded %s from %s", pluralAttestation, o.BundlePath)
+		} else {
+			msg = fmt.Sprintf("Loaded %d attestations from %s", len(attestations), o.BundlePath)
 		}
 	} else if o.UseBundleFromRegistry {
 		attestations, err = verification.GetOCIAttestations(o.OCIClient, a)
 		if err != nil {
-			errMsg = "✗ Loading attestations from OCI registry failed"
+			msg = "✗ Loading attestations from OCI registry failed"
+		} else {
+			pluralAttestation := text.Pluralize(len(attestations), "attestation")
+			msg = fmt.Sprintf("Loaded %s from OCI registry", pluralAttestation)
 		}
 	}
-
 	if err != nil {
-		return nil, errMsg, err
+		return nil, msg, err
 	}
 
 	filtered, err := verification.FilterAttestations(o.PredicateType, attestations)
 	if err != nil {
 		return nil, err.Error(), err
 	}
-
-	pluralAttestation := text.Pluralize(len(filtered), "attestation")
-	msg := fmt.Sprintf("Loaded %s from %s", pluralAttestation, o.BundlePath)
 	return filtered, msg, nil
 }
 
