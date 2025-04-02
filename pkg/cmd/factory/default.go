@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 )
 
 var ssoHeader string
@@ -291,6 +292,8 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	} else if pager := cfg.Pager(""); pager.Value != "" {
 		io.SetPager(pager.Value)
 	}
+
+	io.SetAccessibleColorsEnabled(xcolor.IsAccessibleColorsEnabled())
 
 	return io
 }
