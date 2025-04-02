@@ -233,7 +233,6 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	})
 
 	t.Run("InputHostname", func(t *testing.T) {
-		var inputValue string
 		hostname := "somethingdoesnotmatter.com"
 		go func() {
 			// Wait for prompt to appear
