@@ -32,7 +32,7 @@ type Prompter interface {
 func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWriter, stderr ghPrompter.FileWriter) Prompter {
 	accessiblePrompterValue := os.Getenv("GH_SCREENREADER_FRIENDLY")
 	switch accessiblePrompterValue {
-	case "", "false", "0":
+	case "", "false", "0", "no":
 		return &surveyPrompter{
 			prompter:  ghPrompter.New(stdin, stdout, stderr),
 			stdin:     stdin,
