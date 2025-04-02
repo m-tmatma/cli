@@ -432,6 +432,49 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
+func Test_ioStreams_colorLabels(t *testing.T) {
+	tests := []struct {
+		name               string
+		config             gh.Config
+		colorLabelsEnabled bool
+		env                map[string]string
+	}{
+		{
+			name:               "default config",
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "config with colorLabels enabled",
+			config:             enableColorLabelsConfig(),
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "1"},
+			colorLabelsEnabled: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					t.Setenv(k, v)
+				}
+			}
+			f := New("1")
+			f.Config = func() (gh.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			io := ioStreams(f)
+			assert.Equal(t, tt.colorLabelsEnabled, io.ColorLabels())
+		})
+	}
+}
+
 func TestSSOURL(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -536,4 +579,8 @@ func pagerConfig() gh.Config {
 
 func disablePromptConfig() gh.Config {
 	return config.NewFromString("prompt: disabled")
+}
+
+func enableColorLabelsConfig() gh.Config {
+	return config.NewFromString("color_labels: enabled")
 }

@@ -41,12 +41,13 @@ var (
 
 // NewColorScheme initializes color logic based on provided terminal capabilities.
 // Logic dealing with terminal theme detected, such as whether color is enabled, 8-bit color supported, true color supported,
-// and terminal theme detected.
-func NewColorScheme(enabled, is256enabled, trueColor bool, theme string) *ColorScheme {
+// labels are colored, and terminal theme detected.
+func NewColorScheme(enabled, is256enabled, trueColor, colorLabels bool, theme string) *ColorScheme {
 	return &ColorScheme{
 		enabled:      enabled,
 		is256enabled: is256enabled,
 		hasTrueColor: trueColor,
+		colorLabels:  colorLabels,
 		theme:        theme,
 	}
 }
@@ -55,6 +56,7 @@ type ColorScheme struct {
 	enabled      bool
 	is256enabled bool
 	hasTrueColor bool
+	colorLabels  bool
 	theme        string
 }
 
@@ -240,17 +242,9 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	return fn
 }
 
-// ColorFromRGB returns a function suitable for TablePrinter.AddField
-// that calls HexToRGB, coloring text if supported by the terminal.
-func (c *ColorScheme) ColorFromRGB(hex string) func(string) string {
-	return func(s string) string {
-		return c.HexToRGB(hex, s)
-	}
-}
-
-// HexToRGB uses the given hex to color x if supported by the terminal.
-func (c *ColorScheme) HexToRGB(hex string, x string) string {
-	if !c.enabled || !c.hasTrueColor || len(hex) != 6 {
+// Label stylizes text based on label's RGB hex color.
+func (c *ColorScheme) Label(hex string, x string) string {
+	if !c.enabled || !c.hasTrueColor || !c.colorLabels || len(hex) != 6 {
 		return x
 	}
 

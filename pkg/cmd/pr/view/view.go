@@ -423,7 +423,7 @@ func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
-		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+		labelNames = append(labelNames, cs.Label(label.Color, label.Name))
 	}
 
 	list := strings.Join(labelNames, ", ")

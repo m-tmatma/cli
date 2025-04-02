@@ -72,6 +72,7 @@ type IOStreams struct {
 
 	colorOverride bool
 	colorEnabled  bool
+	colorLabels   bool
 
 	pagerCommand string
 	pagerProcess *os.Process
@@ -100,6 +101,10 @@ func (s *IOStreams) HasTrueColor() bool {
 		return s.colorEnabled
 	}
 	return s.term.IsTrueColorSupported()
+}
+
+func (s *IOStreams) ColorLabels() bool {
+	return s.colorLabels
 }
 
 // DetectTerminalTheme is a utility to call before starting the output pager so that the terminal background
@@ -132,6 +137,10 @@ func (s *IOStreams) TerminalTheme() string {
 func (s *IOStreams) SetColorEnabled(colorEnabled bool) {
 	s.colorOverride = true
 	s.colorEnabled = colorEnabled
+}
+
+func (s *IOStreams) SetColorLabels(colorLabels bool) {
+	s.colorLabels = colorLabels
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
@@ -366,7 +375,7 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor(), s.TerminalTheme())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor(), s.ColorLabels(), s.TerminalTheme())
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
