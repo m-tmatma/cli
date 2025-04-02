@@ -28,8 +28,8 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &huhPrompter{}, p, "expected huhPrompter to be returned")
-		assert.Equal(t, p.(*huhPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
+		assert.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
+		assert.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
 	})
 
 	t.Run("returns accessible huhPrompter when GH_SCREENREADER_FRIENDLY is set to 1", func(t *testing.T) {
@@ -37,8 +37,8 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &huhPrompter{}, p, "expected huhPrompter to be returned")
-		assert.Equal(t, p.(*huhPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
+		assert.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
+		assert.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is set to false", func(t *testing.T) {
@@ -87,7 +87,7 @@ func TestAccessibleHuhprompter(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { testCloser(t, console) })
 
-	p := &huhPrompter{
+	p := &SpeechSynthesizerFriendlyPrompter{
 		editorCmd:  "", // intentionally empty to cause a failure.
 		accessible: true,
 	}
