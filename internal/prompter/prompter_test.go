@@ -23,22 +23,22 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	stdout := ios.Out
 	stderr := ios.ErrOut
 
-	t.Run("returns accessible huhPrompter when GH_SCREENREADER_FRIENDLY is set to true", func(t *testing.T) {
+	t.Run("returns SpeechSynthesizerFriendlyPrompter when GH_SCREENREADER_FRIENDLY is set to true", func(t *testing.T) {
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "true")
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		require.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
-		require.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
+		require.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected SpeechSynthesizerFriendlyPrompter to be returned")
+		require.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected SpeechSynthesizerFriendlyPrompter to be accessible")
 	})
 
-	t.Run("returns accessible huhPrompter when GH_SCREENREADER_FRIENDLY is set to 1", func(t *testing.T) {
+	t.Run("returns SpeechSynthesizerFriendlyPrompter when GH_SCREENREADER_FRIENDLY is set to 1", func(t *testing.T) {
 		t.Setenv("GH_SCREENREADER_FRIENDLY", "1")
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		require.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
-		require.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
+		require.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected SpeechSynthesizerFriendlyPrompter to be returned")
+		require.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected SpeechSynthesizerFriendlyPrompter to be accessible")
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is set to false", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 	})
 }
 
-func TestAccessibleHuhprompter(t *testing.T) {
+func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	// Create a PTY and hook up a virtual terminal emulator
 	ptm, pts, err := pty.Open()
 	require.NoError(t, err)
