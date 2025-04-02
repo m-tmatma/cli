@@ -28,8 +28,8 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
-		assert.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
+		require.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
+		require.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
 	})
 
 	t.Run("returns accessible huhPrompter when GH_SCREENREADER_FRIENDLY is set to 1", func(t *testing.T) {
@@ -37,8 +37,8 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
-		assert.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
+		require.IsType(t, &SpeechSynthesizerFriendlyPrompter{}, p, "expected huhPrompter to be returned")
+		require.Equal(t, p.(*SpeechSynthesizerFriendlyPrompter).IsAccessible(), true, "expected huhPrompter to be accessible")
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is set to false", func(t *testing.T) {
@@ -46,7 +46,7 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &surveyPrompter{}, p, "expected surveyPrompter to be returned")
+		require.IsType(t, &surveyPrompter{}, p, "expected surveyPrompter to be returned")
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is set to 0", func(t *testing.T) {
@@ -54,7 +54,7 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &surveyPrompter{}, p, "expected surveyPrompter to be returned")
+		require.IsType(t, &surveyPrompter{}, p, "expected surveyPrompter to be returned")
 	})
 
 	t.Run("returns surveyPrompter when GH_SCREENREADER_FRIENDLY is unset", func(t *testing.T) {
@@ -62,7 +62,7 @@ func TestNewReturnsAccessiblePrompter(t *testing.T) {
 
 		p := New(editorCmd, stdin, stdout, stderr)
 
-		assert.IsType(t, &surveyPrompter{}, p, "expected surveyPrompter to be returned")
+		require.IsType(t, &surveyPrompter{}, p, "expected surveyPrompter to be returned")
 	})
 }
 
