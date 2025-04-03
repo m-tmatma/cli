@@ -1,6 +1,6 @@
 //go:build !windows
 
-package prompter
+package prompter_test
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Netflix/go-expect"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/creack/pty"
 	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
@@ -38,13 +39,6 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { testCloser(t, console) })
 
-	p := &speechSynthesizerFriendlyPrompter{
-		editorCmd:  "", // intentionally empty to cause a failure.
-		accessible: true,
-	}
-
-	// Using OS here because huh currently ignores configured iostreams
-	// See https://github.com/charmbracelet/huh/issues/612
 	stdIn := os.Stdin
 	stdOut := os.Stdout
 	stdErr := os.Stderr
@@ -58,6 +52,11 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	os.Stdin = console.Tty()
 	os.Stdout = console.Tty()
 	os.Stderr = console.Tty()
+
+	// Using OS here because huh currently ignores configured iostreams
+	// See https://github.com/charmbracelet/huh/issues/612
+	t.Setenv("GH_SCREENREADER_FRIENDLY", "true")
+	p := prompter.New("", nil, nil, nil)
 
 	t.Run("Select", func(t *testing.T) {
 		go func() {
@@ -150,6 +149,7 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		require.Equal(t, true, confirmValue)
 	})
 
+	// Need one that enters invalid input
 	t.Run("AuthToken", func(t *testing.T) {
 		go func() {
 			// Wait for prompt to appear

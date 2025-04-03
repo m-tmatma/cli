@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/surveyext"
@@ -42,33 +41,27 @@ func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWr
 		}
 	default:
 		return &speechSynthesizerFriendlyPrompter{
-			stdin:      stdin,
-			stdout:     stdout,
-			stderr:     stderr,
-			editorCmd:  editorCmd,
-			accessible: true,
+			stdin:     stdin,
+			stdout:    stdout,
+			stderr:    stderr,
+			editorCmd: editorCmd,
 		}
 	}
 }
 
 type speechSynthesizerFriendlyPrompter struct {
-	stdin      ghPrompter.FileReader
-	stdout     ghPrompter.FileWriter
-	stderr     ghPrompter.FileWriter
-	editorCmd  string
-	accessible bool
-}
-
-// IsAccessible returns true if the huhPrompter was created in accessible mode.
-func (p *speechSynthesizerFriendlyPrompter) IsAccessible() bool {
-	return p.accessible
+	stdin     ghPrompter.FileReader
+	stdout    ghPrompter.FileWriter
+	stderr    ghPrompter.FileWriter
+	editorCmd string
 }
 
 func (p *speechSynthesizerFriendlyPrompter) newForm(groups ...*huh.Group) *huh.Form {
 	return huh.NewForm(groups...).
 		WithTheme(huh.ThemeBase16()).
-		WithAccessible(p.accessible).
-		WithProgramOptions(tea.WithOutput(p.stdout), tea.WithInput(p.stdin))
+		WithAccessible(true)
+	// Commented out because https://github.com/charmbracelet/huh/issues/612
+	// WithProgramOptions(tea.WithOutput(p.stdout), tea.WithInput(p.stdin))
 }
 
 func (p *speechSynthesizerFriendlyPrompter) Select(prompt, _ string, options []string) (int, error) {
