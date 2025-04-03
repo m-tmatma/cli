@@ -63,7 +63,7 @@ func getAttestations(o *Options, a artifact.DigestedArtifact) ([]*api.Attestatio
 		return nil, msg, err
 	}
 
-	filtered, err := verification.FilterAttestations(o.PredicateType, attestations)
+	filtered, err := api.FilterAttestations(o.PredicateType, attestations)
 	if err != nil {
 		return nil, err.Error(), err
 	}

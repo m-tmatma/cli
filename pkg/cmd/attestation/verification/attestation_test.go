@@ -157,11 +157,11 @@ func TestFilterAttestations(t *testing.T) {
 		},
 	}
 
-	filtered, err := FilterAttestations("https://slsa.dev/provenance/v1", attestations)
+	filtered, err := api.FilterAttestations("https://slsa.dev/provenance/v1", attestations)
 	require.Len(t, filtered, 1)
 	require.NoError(t, err)
 
-	filtered, err = FilterAttestations("NonExistentPredicate", attestations)
+	filtered, err = api.FilterAttestations("NonExistentPredicate", attestations)
 	require.Nil(t, filtered)
 	require.Error(t, err)
 }

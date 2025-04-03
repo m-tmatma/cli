@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
@@ -147,7 +146,7 @@ func runDownload(opts *Options) error {
 
 	// Apply predicate type filter to returned attestations
 	if opts.PredicateType != "" {
-		filteredAttestations, err := verification.FilterAttestations(opts.PredicateType, attestations)
+		filteredAttestations, err := api.FilterAttestations(opts.PredicateType, attestations)
 		if err != nil {
 			return fmt.Errorf("failed to filter attestations: %v", err)
 		}

@@ -26,7 +26,12 @@ func (m MockClient) GetTrustDomain() (string, error) {
 func OnGetByDigestSuccess(params FetchParams) ([]*Attestation, error) {
 	att1 := makeTestAttestation()
 	att2 := makeTestAttestation()
-	return []*Attestation{&att1, &att2}, nil
+	attestations := []*Attestation{&att1, &att2}
+	if params.PredicateType != "" {
+		return FilterAttestations(params.PredicateType, attestations)
+	}
+
+	return attestations, nil
 }
 
 func OnGetByDigestFailure(params FetchParams) ([]*Attestation, error) {
