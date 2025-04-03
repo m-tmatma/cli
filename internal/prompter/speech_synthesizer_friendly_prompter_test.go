@@ -39,6 +39,8 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { testCloser(t, console) })
 
+	// Using OS here because huh currently ignores configured iostreams
+	// See https://github.com/charmbracelet/huh/issues/612
 	stdIn := os.Stdin
 	stdOut := os.Stdout
 	stdErr := os.Stderr
@@ -53,9 +55,7 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	os.Stdout = console.Tty()
 	os.Stderr = console.Tty()
 
-	// Using OS here because huh currently ignores configured iostreams
-	// See https://github.com/charmbracelet/huh/issues/612
-	t.Setenv("GH_SCREENREADER_FRIENDLY", "true")
+	t.Setenv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER", "true")
 	p := prompter.New("", nil, nil, nil)
 
 	t.Run("Select", func(t *testing.T) {
