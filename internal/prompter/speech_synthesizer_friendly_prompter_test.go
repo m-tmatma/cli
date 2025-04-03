@@ -149,7 +149,8 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		require.Equal(t, true, confirmValue)
 	})
 
-	// Need one that enters invalid input
+	// TODO: Need one that enters invalid input
+	// TODO: write tests for control-c
 	t.Run("AuthToken", func(t *testing.T) {
 		go func() {
 			// Wait for prompt to appear
