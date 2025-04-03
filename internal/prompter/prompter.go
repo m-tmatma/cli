@@ -15,17 +15,31 @@ import (
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	// generic prompts from go-gh
-	Select(string, string, []string) (int, error)
+
+	// Select prompts the user to select an option from a list of options.
+	Select(prompt string, defaultValue string, options []string) (int, error)
+	// MultiSelect prompts the user to select one or more options from a list of options.
 	MultiSelect(prompt string, defaults []string, options []string) ([]int, error)
-	Input(string, string) (string, error)
-	Password(string) (string, error)
-	Confirm(string, bool) (bool, error)
+	// Input prompts the user to enter a string value.
+	Input(prompt string, defaultValue string) (string, error)
+	// Password prompts the user to enter a password.
+	Password(prompt string) (string, error)
+	// Confirm prompts the user to confirm an action.
+	Confirm(prompt string, defaultValue bool) (bool, error)
 
 	// gh specific prompts
+
+	// AuthToken prompts the user to enter an authentication token.
 	AuthToken() (string, error)
-	ConfirmDeletion(string) error
+	// ConfirmDeletion prompts the user to confirm deletion of a resource by
+	// typing the requiredValue.
+	ConfirmDeletion(requiredValue string) error
+	// InputHostname prompts the user to enter a hostname.
 	InputHostname() (string, error)
-	MarkdownEditor(string, string, bool) (string, error)
+	// MarkdownEditor prompts the user to edit a markdown document in an editor.
+	// If blankAllowed is true, the user can skip the editor and an empty string
+	// will be returned.
+	MarkdownEditor(prompt string, defaultValue string, blankAllowed bool) (string, error)
 }
 
 func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWriter, stderr ghPrompter.FileWriter) Prompter {
