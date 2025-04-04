@@ -152,19 +152,45 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	// TODO: Need one that enters invalid input
 	// TODO: write tests for control-c
 	t.Run("AuthToken", func(t *testing.T) {
+		dummyAuthToken := "12345abcdefg"
 		go func() {
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
-			// Enter a number
-			_, err = console.SendLine("12345abcdefg")
+			// Enter some dummy auth token
+			_, err = console.SendLine(dummyAuthToken)
 			require.NoError(t, err)
 		}()
 
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
-		require.Equal(t, "12345abcdefg", authValue)
+		require.Equal(t, dummyAuthToken, authValue)
+	})
+
+	t.Run("AuthToken - blank input returns error", func(t *testing.T) {
+		dummyAuthTokenForAfterFailure := "12345abcdefg"
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Paste your authentication token:")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+
+			// Expect an error message
+			_, err = console.ExpectString("token is required")
+			require.NoError(t, err)
+
+			// Now enter some dummy auth token to return control back to the test
+			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
+			require.NoError(t, err)
+		}()
+
+		authValue, err := p.AuthToken()
+		require.NoError(t, err)
+		require.Equal(t, dummyAuthTokenForAfterFailure, authValue)
 	})
 
 	t.Run("ConfirmDeletion", func(t *testing.T) {
@@ -175,6 +201,32 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Confirm
+			_, err = console.SendLine(requiredValue)
+			require.NoError(t, err)
+		}()
+
+		// An err indicates that the confirmation text sent did not match
+		err := p.ConfirmDeletion(requiredValue)
+		require.NoError(t, err)
+	})
+
+	t.Run("ConfirmDeletion - bad input", func(t *testing.T) {
+		requiredValue := "test"
+		badInputValue := "garbage"
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString(fmt.Sprintf("Type %q to confirm deletion", requiredValue))
+			require.NoError(t, err)
+
+			// Confirm with bad input
+			_, err = console.SendLine(badInputValue)
+			require.NoError(t, err)
+
+			// Expect an error message and loop back to the prompt
+			_, err = console.ExpectString(fmt.Sprintf("You entered: %q", badInputValue))
+			require.NoError(t, err)
+
+			// Confirm with the correct input to return control back to the test
 			_, err = console.SendLine(requiredValue)
 			require.NoError(t, err)
 		}()

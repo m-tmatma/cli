@@ -174,6 +174,7 @@ func (p *speechSynthesizerFriendlyPrompter) AuthToken() (string, error) {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Paste your authentication token:").
+				// Note: if this validation fails, the prompt loops.
 				Validate(func(input string) error {
 					if input == "" {
 						return fmt.Errorf("token is required")
@@ -229,7 +230,7 @@ func (p *speechSynthesizerFriendlyPrompter) InputHostname() (string, error) {
 func (p *speechSynthesizerFriendlyPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
 	var result string
 	options := []huh.Option[string]{
-		huh.NewOption("Open Editor", "open"),
+		huh.NewOption(fmt.Sprintf("Open Editor: %s", p.editorCmd), "open"),
 	}
 	if blankAllowed {
 		options = append(options, huh.NewOption("Skip", "skip"))
