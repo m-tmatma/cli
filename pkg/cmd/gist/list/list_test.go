@@ -487,8 +487,8 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: heredoc.Docf(`
 				%[1]s[0;4;39mID  %[1]s[0m  %[1]s[0;4;39mDESCRIPTION                  %[1]s[0m  %[1]s[0;4;39mFILES  %[1]s[0m  %[1]s[0;4;39mVISIBILITY%[1]s[0m  %[1]s[0;4;39mUPDATED          %[1]s[0m
-				1234  %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;1;39m match in the description%[1]s[0m  1 file   %[1]s[0;32mpublic    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[m
-				2345  %[1]s[0;1;39mmatch in the file name       %[1]s[0m  %[1]s[0;30;43m2 files%[1]s[0m  %[1]s[0;31msecret    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[m
+				1234  %[1]s[0;30;43mocto%[1]s[0m%[1]s[0;1;39m match in the description%[1]s[0m  1 file   %[1]s[0;32mpublic    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[0m
+				2345  %[1]s[0;1;39mmatch in the file name       %[1]s[0m  %[1]s[0;30;43m2 files%[1]s[0m  %[1]s[0;31msecret    %[1]s[0m  %[1]s[38;5;242mabout 6 hours ago%[1]s[0m
 			`, "\x1b"),
 		},
 		{
@@ -694,7 +694,7 @@ func Test_highlightMatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs := iostreams.NewColorScheme(tt.color, false, false, false, iostreams.NoTheme)
+			cs := iostreams.NewColorScheme(tt.color, false, false, false, false, iostreams.NoTheme)
 
 			matched := false
 			got, err := highlightMatch(tt.input, regex, &matched, cs.Blue, cs.Highlight)
