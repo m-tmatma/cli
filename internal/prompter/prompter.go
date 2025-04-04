@@ -158,8 +158,11 @@ func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, err
 	return result, err
 }
 
-func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, _ bool) (bool, error) {
-	var result bool
+func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
+	// This is currently an inneffectual assignment because the value is
+	// not respected as the default in accessible mode.
+	// See https://github.com/charmbracelet/huh/issues/615
+	result := defaultValue
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewConfirm().
