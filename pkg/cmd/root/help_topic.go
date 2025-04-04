@@ -81,6 +81,9 @@ var HelpTopics = []helpTopic{
 			%[1]sCLICOLOR_FORCE%[1]s: set to a value other than %[1]s0%[1]s to keep ANSI colors in output
 			even when the output is piped.
 
+			%[1]sGH_COLOR_LABELS%[1]s: set to any value to display labels using their RGB hex color codes in terminals that
+			support truecolor.
+
 			%[1]sGH_FORCE_TTY%[1]s: set to any value to force terminal-style output even when the output is
 			redirected. When the value is a number, it is interpreted as the number of columns
 			available in the viewport. When the value is a percentage, it will be applied against
