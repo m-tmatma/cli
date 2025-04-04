@@ -245,7 +245,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	}
 
 	var pr *api.PullRequest
-	if f.prNumber > 0 {
+	if f.prNumber > 0 || f.branchName == "" {
 		if numberFieldOnly {
 			// avoid hitting the API if we already have all the information
 			return &api.PullRequest{Number: f.prNumber}, f.baseRefRepo, nil
