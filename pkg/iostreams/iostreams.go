@@ -376,7 +376,14 @@ func (s *IOStreams) TerminalWidth() int {
 }
 
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor(), s.AccessibleColorsEnabled(), s.ColorLabels(), s.TerminalTheme())
+	return &ColorScheme{
+		Enabled:       s.ColorEnabled(),
+		EightBitColor: s.ColorSupport256(),
+		TrueColor:     s.HasTrueColor(),
+		Accessible:    s.AccessibleColorsEnabled(),
+		ColorLabels:   s.ColorLabels(),
+		Theme:         s.TerminalTheme(),
+	}
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {

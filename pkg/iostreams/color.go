@@ -41,35 +41,24 @@ var (
 	}
 )
 
-// NewColorScheme initializes color logic based on provided terminal capabilities.
-// Logic dealing with terminal theme detected, such as whether color is enabled, 8-bit color supported, true color supported,
-// labels are colored, and terminal theme detected.
-func NewColorScheme(enabled, is256enabled, trueColor, accessibleColors, colorLabels bool, theme string) *ColorScheme {
-	return &ColorScheme{
-		enabled:          enabled,
-		is256enabled:     is256enabled,
-		hasTrueColor:     trueColor,
-		accessibleColors: accessibleColors,
-		colorLabels:      colorLabels,
-		theme:            theme,
-	}
-}
-
+// ColorScheme controls how text is colored based upon terminal capabilities and user preferences.
 type ColorScheme struct {
-	enabled          bool
-	is256enabled     bool
-	hasTrueColor     bool
-	accessibleColors bool
-	colorLabels      bool
-	theme            string
-}
-
-func (c *ColorScheme) Enabled() bool {
-	return c.enabled
+	// Enabled is whether color is used at all.
+	Enabled bool
+	// EightBitColor is whether the terminal supports 8-bit, 256 colors.
+	EightBitColor bool
+	// TrueColor is whether the terminal supports 24-bit, 16 million colors.
+	TrueColor bool
+	// Accessible is whether colors must be base 16 colors that users can customize in terminal preferences.
+	Accessible bool
+	// ColorLabels is whether labels are colored based on their truecolor RGB hex color.
+	ColorLabels bool
+	// Theme is the terminal background color theme used to contextually color text for light, dark, or none at all.
+	Theme string
 }
 
 func (c *ColorScheme) Bold(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return bold(t)
@@ -81,16 +70,16 @@ func (c *ColorScheme) Boldf(t string, args ...interface{}) string {
 
 func (c *ColorScheme) Muted(t string) string {
 	// Fallback to previous logic if accessible colors preview is disabled.
-	if !c.accessibleColors {
+	if !c.Accessible {
 		return c.Gray(t)
 	}
 
 	// Muted text is only stylized if color is enabled.
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 
-	switch c.theme {
+	switch c.Theme {
 	case LightTheme:
 		return lightThemeMuted(t)
 	case DarkTheme:
@@ -105,7 +94,7 @@ func (c *ColorScheme) Mutedf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) Red(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return red(t)
@@ -116,7 +105,7 @@ func (c *ColorScheme) Redf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) Yellow(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return yellow(t)
@@ -127,7 +116,7 @@ func (c *ColorScheme) Yellowf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) Green(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return green(t)
@@ -138,7 +127,7 @@ func (c *ColorScheme) Greenf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) GreenBold(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return greenBold(t)
@@ -146,10 +135,10 @@ func (c *ColorScheme) GreenBold(t string) string {
 
 // Use Muted instead for thematically contrasting color.
 func (c *ColorScheme) Gray(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
-	if c.is256enabled {
+	if c.EightBitColor {
 		return gray256(t)
 	}
 	return gray(t)
@@ -161,7 +150,7 @@ func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) Magenta(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return magenta(t)
@@ -172,7 +161,7 @@ func (c *ColorScheme) Magentaf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) Cyan(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return cyan(t)
@@ -183,14 +172,14 @@ func (c *ColorScheme) Cyanf(t string, args ...interface{}) string {
 }
 
 func (c *ColorScheme) CyanBold(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return cyanBold(t)
 }
 
 func (c *ColorScheme) Blue(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 	return blue(t)
@@ -221,7 +210,7 @@ func (c *ColorScheme) FailureIconWithColor(colo func(string) string) string {
 }
 
 func (c *ColorScheme) HighlightStart() string {
-	if !c.enabled {
+	if !c.Enabled {
 		return ""
 	}
 
@@ -229,7 +218,7 @@ func (c *ColorScheme) HighlightStart() string {
 }
 
 func (c *ColorScheme) Highlight(t string) string {
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 
@@ -237,7 +226,7 @@ func (c *ColorScheme) Highlight(t string) string {
 }
 
 func (c *ColorScheme) Reset() string {
-	if !c.enabled {
+	if !c.Enabled {
 		return ""
 	}
 
@@ -275,7 +264,7 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 
 // Label stylizes text based on label's RGB hex color.
 func (c *ColorScheme) Label(hex string, x string) string {
-	if !c.enabled || !c.hasTrueColor || !c.colorLabels || len(hex) != 6 {
+	if !c.Enabled || !c.TrueColor || !c.ColorLabels || len(hex) != 6 {
 		return x
 	}
 
@@ -287,11 +276,11 @@ func (c *ColorScheme) Label(hex string, x string) string {
 
 func (c *ColorScheme) TableHeader(t string) string {
 	// Table headers are only stylized if color is enabled including underline modifier.
-	if !c.enabled {
+	if !c.Enabled {
 		return t
 	}
 
-	switch c.theme {
+	switch c.Theme {
 	case DarkTheme:
 		return darkThemeTableHeader(t)
 	case LightTheme:
