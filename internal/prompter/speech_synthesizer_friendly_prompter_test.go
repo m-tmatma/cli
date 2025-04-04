@@ -116,6 +116,28 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		assert.Equal(t, dummyText, inputValue)
 	})
 
+	t.Run("Input - blank input returns default value", func(t *testing.T) {
+		dummyDefaultValue := "12345abcdefg"
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Enter some characters")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+
+			// Expect the default value to be returned
+			_, err = console.ExpectString(dummyDefaultValue)
+			require.NoError(t, err)
+		}()
+
+		inputValue, err := p.Input("Enter some characters", dummyDefaultValue)
+		require.NoError(t, err)
+
+		assert.Equal(t, dummyDefaultValue, inputValue)
+	})
+
 	t.Run("Password", func(t *testing.T) {
 		dummyPassword := "12345abcdefg"
 		go func() {

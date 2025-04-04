@@ -125,6 +125,7 @@ func (p *speechSynthesizerFriendlyPrompter) MultiSelect(prompt string, defaults 
 
 func (p *speechSynthesizerFriendlyPrompter) Input(prompt, defaultValue string) (string, error) {
 	result := defaultValue
+	prompt = fmt.Sprintf("%s (%s)", prompt, defaultValue)
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -134,6 +135,10 @@ func (p *speechSynthesizerFriendlyPrompter) Input(prompt, defaultValue string) (
 	)
 
 	err := form.Run()
+
+	if result == "" {
+		return defaultValue, nil
+	}
 	return result, err
 }
 
