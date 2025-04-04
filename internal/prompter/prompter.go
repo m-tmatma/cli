@@ -258,9 +258,6 @@ func (p *speechSynthesizerFriendlyPrompter) MarkdownEditor(prompt, defaultValue 
 	}
 
 	if result == "skip" {
-		if !blankAllowed && defaultValue == "" {
-			panic("blank not allowed and no default value")
-		}
 		return "", nil
 	}
 
