@@ -237,11 +237,13 @@ func (p *speechSynthesizerFriendlyPrompter) InputHostname() (string, error) {
 
 func (p *speechSynthesizerFriendlyPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
 	var result string
+	skipOption := "skip"
+	openOption := "open"
 	options := []huh.Option[string]{
-		huh.NewOption(fmt.Sprintf("Open Editor: %s", p.editorCmd), "open"),
+		huh.NewOption(fmt.Sprintf("Open Editor: %s", p.editorCmd), openOption),
 	}
 	if blankAllowed {
-		options = append(options, huh.NewOption("Skip", "skip"))
+		options = append(options, huh.NewOption("Skip", skipOption))
 	}
 
 	form := p.newForm(
@@ -257,10 +259,11 @@ func (p *speechSynthesizerFriendlyPrompter) MarkdownEditor(prompt, defaultValue 
 		return "", err
 	}
 
-	if result == "skip" {
+	if result == skipOption {
 		return "", nil
 	}
 
+	// openOption was selected
 	text, err := surveyext.Edit(p.editorCmd, "*.md", defaultValue, p.stdin, p.stdout, p.stderr)
 	if err != nil {
 		return "", err
