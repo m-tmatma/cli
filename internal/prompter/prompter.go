@@ -160,7 +160,8 @@ func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, err
 
 func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
 	// This is currently an inneffectual assignment because the value is
-	// not respected as the default in accessible mode.
+	// not respected as the default in accessible mode. Leaving this in here
+	// because it may change in the future.
 	// See https://github.com/charmbracelet/huh/issues/615
 	result := defaultValue
 	form := p.newForm(
