@@ -142,7 +142,7 @@ func (c *ColorScheme) GreenBold(t string) string {
 	return greenBold(t)
 }
 
-// Use Muted instead for thematically contrasting color.
+// Deprecated: Use Muted instead for thematically contrasting color.
 func (c *ColorScheme) Gray(t string) string {
 	if !c.enabled {
 		return t
@@ -153,7 +153,7 @@ func (c *ColorScheme) Gray(t string) string {
 	return gray(t)
 }
 
-// Use Mutedf instead for thematically contrasting color.
+// Deprecated: Use Mutedf instead for thematically contrasting color.
 func (c *ColorScheme) Grayf(t string, args ...interface{}) string {
 	return c.Gray(fmt.Sprintf(t, args...))
 }
@@ -255,7 +255,7 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	case "green":
 		fn = c.Green
 	case "gray":
-		fn = c.Gray
+		fn = c.Muted
 	case "magenta":
 		fn = c.Magenta
 	case "cyan":

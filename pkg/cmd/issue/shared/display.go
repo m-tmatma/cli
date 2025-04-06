@@ -38,13 +38,13 @@ func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCou
 		}
 		table.AddField(text.RemoveExcessiveWhitespace(issue.Title))
 		table.AddField(issueLabelList(&issue, cs, isTTY))
-		table.AddTimeField(now, issue.UpdatedAt, cs.Gray)
+		table.AddTimeField(now, issue.UpdatedAt, cs.Muted)
 		table.EndRow()
 	}
 	_ = table.Render()
 	remaining := totalCount - len(issues)
 	if remaining > 0 {
-		fmt.Fprintf(io.Out, cs.Gray("%sAnd %d more\n"), prefix, remaining)
+		fmt.Fprintf(io.Out, cs.Muted("%sAnd %d more\n"), prefix, remaining)
 	}
 }
 
