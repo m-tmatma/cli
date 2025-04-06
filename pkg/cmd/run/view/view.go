@@ -533,7 +533,7 @@ func promptForJob(prompter shared.Prompter, cs *iostreams.ColorScheme, jobs []sh
 
 const JOB_NAME_MAX_LENGTH = 90
 
-func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
+func getJobNameForLogFilename(name string) string {
 	// As described in https://github.com/cli/cli/issues/5011#issuecomment-1570713070, there are a number of steps
 	// the server can take when producing the downloaded zip file that can result in a mismatch between the job name
 	// and the filename in the zip including:
@@ -545,9 +545,14 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	// * Strip `/` which occur when composite action job names are constructed of the form `<JOB_NAME`> / <ACTION_NAME>`
 	// * Truncate long job names
 	//
-	sanitizedJobName := strings.ReplaceAll(job.Name, "/", "")
+	sanitizedJobName := strings.ReplaceAll(name, "/", "")
 	sanitizedJobName = strings.ReplaceAll(sanitizedJobName, ":", "")
 	sanitizedJobName = truncateAsUTF16(sanitizedJobName, JOB_NAME_MAX_LENGTH)
+	return sanitizedJobName
+}
+
+func stepLogFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
 	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
@@ -637,7 +642,7 @@ func truncateAsUTF16(str string, max int) string {
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
 		for j, step := range job.Steps {
-			re := logFilenameRegexp(job, step)
+			re := stepLogFilenameRegexp(job, step)
 			for _, file := range rlz.File {
 				if re.MatchString(file.Name) {
 					jobs[i].Steps[j].Log = file
