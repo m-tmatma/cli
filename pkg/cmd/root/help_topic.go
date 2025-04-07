@@ -108,6 +108,9 @@ var HelpTopics = []helpTopic{
 			%[1]sGH_MDWIDTH%[1]s: default maximum width for markdown render wrapping.  The max width of lines
 			wrapped on the terminal will be taken as the lesser of the terminal width, this value, or 120 if
 			not specified.  This value is used, for example, with %[1]spr view%[1]s subcommand.
+
+			%[1]sGH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER%[1]s: set to a truthy value to enable prompts that are
+			more compatible with speech synthesis based screen readers.
 		`, "`"),
 	},
 	{
