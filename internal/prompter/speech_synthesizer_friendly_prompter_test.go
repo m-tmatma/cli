@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -56,10 +57,17 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	os.Stderr = console.Tty()
 
 	t.Setenv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER", "true")
-	p := prompter.New("", nil, nil, nil)
+	// Using echo as the editor command here because it will immediately exit
+	// and return no input.
+	p := prompter.New("echo", nil, nil, nil)
+
+	var wg sync.WaitGroup
 
 	t.Run("Select", func(t *testing.T) {
+		wg.Add(1)
+
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Choose:")
 			require.NoError(t, err)
@@ -71,12 +79,16 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 
 		selectValue, err := p.Select("Select a number", "", []string{"1", "2", "3"})
 		require.NoError(t, err)
-
 		assert.Equal(t, 0, selectValue)
+
+		wg.Wait()
 	})
 
 	t.Run("MultiSelect", func(t *testing.T) {
+		wg.Add(1)
+
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Select a number")
 			require.NoError(t, err)
@@ -94,13 +106,17 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 
 		multiSelectValue, err := p.MultiSelect("Select a number", []string{}, []string{"1", "2", "3"})
 		require.NoError(t, err)
-
 		assert.Equal(t, []int{0, 1}, multiSelectValue)
+
+		wg.Wait()
 	})
 
 	t.Run("Input", func(t *testing.T) {
+		wg.Add(1)
+
 		dummyText := "12345abcdefg"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Enter some characters")
 			require.NoError(t, err)
@@ -112,13 +128,17 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 
 		inputValue, err := p.Input("Enter some characters", "")
 		require.NoError(t, err)
-
 		assert.Equal(t, dummyText, inputValue)
+
+		wg.Wait()
 	})
 
 	t.Run("Input - blank input returns default value", func(t *testing.T) {
+		wg.Add(1)
+
 		dummyDefaultValue := "12345abcdefg"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Enter some characters")
 			require.NoError(t, err)
@@ -134,13 +154,17 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 
 		inputValue, err := p.Input("Enter some characters", dummyDefaultValue)
 		require.NoError(t, err)
-
 		assert.Equal(t, dummyDefaultValue, inputValue)
+
+		wg.Wait()
 	})
 
 	t.Run("Password", func(t *testing.T) {
+		wg.Add(1)
+
 		dummyPassword := "12345abcdefg"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Enter password")
 			require.NoError(t, err)
@@ -153,10 +177,15 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		passwordValue, err := p.Password("Enter password")
 		require.NoError(t, err)
 		require.Equal(t, dummyPassword, passwordValue)
+
+		wg.Wait()
 	})
 
 	t.Run("Confirm", func(t *testing.T) {
+		wg.Add(1)
+
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Are you sure")
 			require.NoError(t, err)
@@ -169,30 +198,16 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		confirmValue, err := p.Confirm("Are you sure", false)
 		require.NoError(t, err)
 		require.Equal(t, true, confirmValue)
+
+		wg.Wait()
 	})
 
-	// This test currently fails because the value is
-	// not respected as the default in accessible mode.
-	// See https://github.com/charmbracelet/huh/issues/615
-	// t.Run("Confirm - blank input returns default", func(t *testing.T) {
-	// 	go func() {
-	// 		// Wait for prompt to appear
-	// 		_, err := console.ExpectString("Are you sure")
-	// 		require.NoError(t, err)
-
-	// 		// Enter nothing
-	// 		_, err = console.SendLine("")
-	// 		require.NoError(t, err)
-	// 	}()
-
-	// 	confirmValue, err := p.Confirm("Are you sure", false)
-	// 	require.NoError(t, err)
-	// 	require.Equal(t, false, confirmValue)
-	// })
-
 	t.Run("AuthToken", func(t *testing.T) {
+		wg.Add(1)
+
 		dummyAuthToken := "12345abcdefg"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
@@ -205,11 +220,16 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
 		require.Equal(t, dummyAuthToken, authValue)
+
+		wg.Wait()
 	})
 
 	t.Run("AuthToken - blank input returns error", func(t *testing.T) {
+		wg.Add(1)
+
 		dummyAuthTokenForAfterFailure := "12345abcdefg"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
@@ -230,11 +250,16 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
 		require.Equal(t, dummyAuthTokenForAfterFailure, authValue)
+
+		wg.Wait()
 	})
 
 	t.Run("ConfirmDeletion", func(t *testing.T) {
+		wg.Add(1)
+
 		requiredValue := "test"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString(fmt.Sprintf("Type %q to confirm deletion", requiredValue))
 			require.NoError(t, err)
@@ -247,12 +272,17 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		// An err indicates that the confirmation text sent did not match
 		err := p.ConfirmDeletion(requiredValue)
 		require.NoError(t, err)
+
+		wg.Wait()
 	})
 
 	t.Run("ConfirmDeletion - bad input", func(t *testing.T) {
+		wg.Add(1)
+
 		requiredValue := "test"
 		badInputValue := "garbage"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString(fmt.Sprintf("Type %q to confirm deletion", requiredValue))
 			require.NoError(t, err)
@@ -273,11 +303,16 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		// An err indicates that the confirmation text sent did not match
 		err := p.ConfirmDeletion(requiredValue)
 		require.NoError(t, err)
+
+		wg.Wait()
 	})
 
 	t.Run("InputHostname", func(t *testing.T) {
+		wg.Add(1)
+
 		hostname := "somethingdoesnotmatter.com"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Hostname:")
 			require.NoError(t, err)
@@ -290,10 +325,15 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		inputValue, err := p.InputHostname()
 		require.NoError(t, err)
 		require.Equal(t, hostname, inputValue)
+
+		wg.Wait()
 	})
 
-	t.Run("MarkdownEditor - blank allowed", func(t *testing.T) {
+	t.Run("MarkdownEditor - blank allowed with blank input returns blank", func(t *testing.T) {
+		wg.Add(1)
+
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("How to edit?")
 			require.NoError(t, err)
@@ -306,15 +346,21 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		inputValue, err := p.MarkdownEditor("How to edit?", "", true)
 		require.NoError(t, err)
 		require.Equal(t, "", inputValue)
+
+		wg.Wait()
 	})
 
-	t.Run("MarkdownEditor - blank disallowed", func(t *testing.T) {
+	t.Run("MarkdownEditor - blank disallowed with default value returns default value", func(t *testing.T) {
+		wg.Add(1)
+
+		defaultValue := "12345abcdefg"
 		go func() {
+			defer wg.Done()
 			// Wait for prompt to appear
 			_, err := console.ExpectString("How to edit?")
 			require.NoError(t, err)
 
-			// Enter number 2 to select "skip". This shoudln't be allowed.
+			// Enter number 2 to select "skip". This shouldn't be allowed.
 			_, err = console.SendLine("2")
 			require.NoError(t, err)
 
@@ -322,18 +368,46 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 			_, err = console.ExpectString("invalid input. please try again")
 			require.NoError(t, err)
 
-			// Send a 1 to select to open the editor.
-			// Sending the input won't fail, so we expect no error here.
-			// See below though, since we expect the editor to fail to open.
+			// Send a 1 to select to open the editor. This will immediately exit
 			_, err = console.SendLine("1")
 			require.NoError(t, err)
 		}()
 
-		// However, here we do expect an error because the editor program
-		// is intentionally empty and will fail.
+		inputValue, err := p.MarkdownEditor("How to edit?", defaultValue, false)
+		require.NoError(t, err)
+		require.Equal(t, defaultValue, inputValue)
+
+		wg.Wait()
+	})
+
+	t.Run("MarkdownEditor - blank disallowed no default value returns error", func(t *testing.T) {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			// Wait for prompt to appear
+			_, err := console.ExpectString("How to edit?")
+			require.NoError(t, err)
+
+			// Enter number 2 to select "skip". This shouldn't be allowed.
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// Expect a notice to enter something valid since blank is disallowed.
+			_, err = console.ExpectString("invalid input. please try again")
+			require.NoError(t, err)
+
+			// Send a 1 to select to open the editor since skip is invalid and
+			// we need to return control back to the test.
+			_, err = console.SendLine("1")
+			require.NoError(t, err)
+		}()
+
 		inputValue, err := p.MarkdownEditor("How to edit?", "", false)
-		require.Error(t, err)
+		require.NoError(t, err)
 		require.Equal(t, "", inputValue)
+
+		wg.Wait()
 	})
 }
 
