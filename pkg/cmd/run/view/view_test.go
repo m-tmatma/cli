@@ -1419,14 +1419,23 @@ func TestViewRun(t *testing.T) {
 //	├── sad job/
 //	│   ├── 1_barf the quux.txt
 //	│   └── 2_quux the barf.txt
-//	└── ad job/
-//	    └── 1_barf the quux.txt
+//	├── ad job/
+//	|   └── 1_barf the quux.txt
+//	├── 0_cool job.txt
+//	├── 1_sad job.txt
+//	├── 2_cool job with no step logs.txt
+//	├── 3_sad job with no step logs.txt
+//	├── -9999999999_legacy cool job with no step logs.txt
+//	└── -9999999999_legacy sad job with no step logs.txt
+
 func Test_attachRunLog(t *testing.T) {
 	tests := []struct {
-		name         string
-		job          shared.Job
-		wantMatch    bool
-		wantFilename string
+		name             string
+		job              shared.Job
+		wantJobMatch     bool
+		wantJobFilename  string
+		wantStepMatch    bool
+		wantStepFilename string
 	}{
 		{
 			name: "matching job name and step number 1",
@@ -1437,8 +1446,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job/1_fob the barz.txt",
+			wantJobMatch:     true,
+			wantJobFilename:  "0_cool job.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "cool job/1_fob the barz.txt",
 		},
 		{
 			name: "matching job name and step number 2",
@@ -1449,8 +1460,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 2,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job/2_barz the fob.txt",
+			wantJobMatch:     true,
+			wantJobFilename:  "0_cool job.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "cool job/2_barz the fob.txt",
 		},
 		{
 			name: "matching job name and step number and mismatch step name",
@@ -1461,8 +1474,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job/1_fob the barz.txt",
+			wantJobMatch:     true,
+			wantJobFilename:  "0_cool job.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "cool job/1_fob the barz.txt",
 		},
 		{
 			name: "matching job name and mismatch step number",
@@ -1473,7 +1488,53 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 3,
 				}},
 			},
-			wantMatch: false,
+			wantJobMatch:    true,
+			wantJobFilename: "0_cool job.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with no step logs",
+			job: shared.Job{
+				Name: "cool job with no step logs",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "2_cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with no step data",
+			job: shared.Job{
+				Name: "cool job with no step logs",
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "2_cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with legacy filename and no step logs",
+			job: shared.Job{
+				Name: "legacy cool job with no step logs",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "-9999999999_legacy cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with legacy filename and no step data",
+			job: shared.Job{
+				Name: "legacy cool job with no step logs",
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "-9999999999_legacy cool job with no step logs.txt",
+			wantStepMatch:   false,
 		},
 		{
 			name: "one job name is a suffix of another",
@@ -1484,8 +1545,8 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "ad job/1_barf the quux.txt",
+			wantStepMatch:    true,
+			wantStepFilename: "ad job/1_barf the quux.txt",
 		},
 		{
 			name: "escape metacharacters in job name",
@@ -1496,7 +1557,8 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 0,
 				}},
 			},
-			wantMatch: false,
+			wantJobMatch:  false,
+			wantStepMatch: false,
 		},
 		{
 			name: "mismatching job name",
@@ -1507,7 +1569,8 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch: false,
+			wantJobMatch:  false,
+			wantStepMatch: false,
 		},
 		{
 			name: "job name with forward slash matches dir with slash removed",
@@ -1518,9 +1581,10 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch: true,
+			wantJobMatch:  false,
+			wantStepMatch: true,
 			// not the double space in the dir name, as the slash has been removed
-			wantFilename: "cool job  with slash/1_fob the barz.txt",
+			wantStepFilename: "cool job  with slash/1_fob the barz.txt",
 		},
 		{
 			name: "job name with colon matches dir with colon removed",
@@ -1531,8 +1595,9 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "cool job  with colon/1_fob the barz.txt",
+			wantJobMatch:     false,
+			wantStepMatch:    true,
+			wantStepFilename: "cool job  with colon/1_fob the barz.txt",
 		},
 		{
 			name: "Job name with really long name (over the ZIP limit)",
@@ -1543,8 +1608,9 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
+			wantJobMatch:     false,
+			wantStepMatch:    true,
+			wantStepFilename: "thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnineteenchars_thisisnine/1_Long Name Job.txt",
 		},
 		{
 			name: "Job name that would be truncated by the C# server to split a grapheme",
@@ -1555,8 +1621,9 @@ func Test_attachRunLog(t *testing.T) {
 					Number: 1,
 				}},
 			},
-			wantMatch:    true,
-			wantFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
+			wantJobMatch:     false,
+			wantStepMatch:    true,
+			wantStepFilename: "Emoji Test 😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅😅�/1_Emoji Job.txt",
 		},
 	}
 
@@ -1566,17 +1633,27 @@ func Test_attachRunLog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			jobs := []shared.Job{tt.job}
 
-			attachRunLog(&run_log_zip_reader.Reader, []shared.Job{tt.job})
+			attachRunLog(&run_log_zip_reader.Reader, jobs)
 
 			t.Logf("Job details: ")
 
-			for _, step := range tt.job.Steps {
-				log := step.Log
-				logPresent := log != nil
-				require.Equal(t, tt.wantMatch, logPresent, "log not present")
-				if logPresent {
-					require.Equal(t, tt.wantFilename, log.Name, "Filename mismatch")
+			job := jobs[0]
+
+			jobLog := job.Log
+			jobLogPresent := jobLog != nil
+			require.Equal(t, tt.wantJobMatch, jobLogPresent, "job log not present")
+			if jobLogPresent {
+				require.Equal(t, tt.wantJobFilename, jobLog.Name, "job log filename mismatch")
+			}
+
+			for _, step := range job.Steps {
+				stepLog := step.Log
+				stepLogPresent := stepLog != nil
+				require.Equal(t, tt.wantStepMatch, stepLogPresent, "step log not present")
+				if stepLogPresent {
+					require.Equal(t, tt.wantStepFilename, stepLog.Name, "step log filename mismatch")
 				}
 			}
 		})
