@@ -411,6 +411,63 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	})
 }
 
+func TestSurveyPrompter(t *testing.T) {
+	// Create a PTY and hook up a virtual terminal emulator
+	ptm, pts, err := pty.Open()
+	require.NoError(t, err)
+
+	term := vt10x.New(vt10x.WithWriter(pts))
+
+	// Create a console via Expect that allows scripting against the terminal
+	consoleOpts := []expect.ConsoleOpt{
+		expect.WithStdin(ptm),
+		expect.WithStdout(term),
+		expect.WithCloser(ptm, pts),
+		failOnExpectError(t),
+		failOnSendError(t),
+		expect.WithDefaultTimeout(time.Second * 600),
+	}
+
+	console, err := expect.NewConsole(consoleOpts...)
+	require.NoError(t, err)
+	t.Cleanup(func() { testCloser(t, console) })
+
+	t.Setenv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER", "")
+	t.Setenv("NO_COLOR", "1")
+	// Using echo as the editor command here because it will immediately exit
+	// and return no input.
+	p := prompter.New("echo", console.Tty(), console.Tty(), console.Tty())
+
+	var wg sync.WaitGroup
+
+	// This not a comprehensive test of the survey prompter, but it does
+	// demonstrate that the survey prompter is used when the speech
+	// synthesizer friendly prompter is disabled.
+	t.Run("Select uses survey prompter when speech synthesizer friendly prompter is disabled", func(t *testing.T) {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number")
+			require.NoError(t, err)
+
+			// Send a newline to select the first option
+			// Note: This would not work with the speech synthesizer friendly prompter
+			// because it would requires sending a 1 to select the first option.
+			// So it proves we are seeing a survey prompter.
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", "", []string{"1", "2", "3"})
+		require.NoError(t, err)
+		assert.Equal(t, 0, selectValue)
+
+		wg.Wait()
+	})
+}
+
 // failOnExpectError adds an observer that will fail the test in a standardised way
 // if any expectation on the command output fails, without requiring an explicit
 // assertion.
