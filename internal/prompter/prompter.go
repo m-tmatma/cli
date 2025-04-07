@@ -144,13 +144,12 @@ func (p *speechSynthesizerFriendlyPrompter) Input(prompt, defaultValue string) (
 
 func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, error) {
 	var result string
+	// EchoMode(huh.EchoModePassword) doesn't have any effect in accessible mode.
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title(prompt).
 				Value(&result),
-			// This doesn't have any effect in accessible mode.
-			// EchoMode(huh.EchoModePassword),
 		),
 	)
 
@@ -159,7 +158,7 @@ func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, err
 }
 
 func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
-	// This is currently an inneffectual assignment because the value is
+	// This is currently an ineffectual assignment because the value is
 	// not respected as the default in accessible mode. Leaving this in here
 	// because it may change in the future.
 	// See https://github.com/charmbracelet/huh/issues/615
@@ -202,6 +201,7 @@ func (p *speechSynthesizerFriendlyPrompter) AuthToken() (string, error) {
 
 func (p *speechSynthesizerFriendlyPrompter) ConfirmDeletion(requiredValue string) error {
 	var result string
+	// EchoMode(huh.EchoModePassword) doesn't have any effect in accessible mode.
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -213,8 +213,6 @@ func (p *speechSynthesizerFriendlyPrompter) ConfirmDeletion(requiredValue string
 					return nil
 				}).
 				Value(&result),
-			// This doesn't have any effect in accessible mode.
-			// EchoMode(huh.EchoModePassword),
 		),
 	)
 
