@@ -90,6 +90,19 @@ func TestFind(t *testing.T) {
 			wantRepo: "https://github.com/ORIGINOWNER/REPO",
 		},
 		{
+			name: "PR number 0 is invalid",
+			args: args{
+				selector:   "0",
+				fields:     []string{"id", "number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+				branchFn: func() (string, error) {
+					return "blueberries", nil
+				},
+				branchConfig: stubBranchConfig(git.BranchConfig{}, nil),
+			},
+			wantErr: true,
+		},
+		{
 			name: "number argument with base branch",
 			args: args{
 				selector:   "13",
