@@ -638,15 +638,31 @@ func truncateAsUTF16(str string, max int) string {
 //	│   ├── 2_anotherstepname.txt
 //	│   ├── 3_stepstepname.txt
 //	│   └── 4_laststepname.txt
-//	└── jobname2/
-//	    ├── 1_stepname.txt
-//	    └── 2_somestepname.txt
+//	├── jobname2/
+//	|   ├── 1_stepname.txt
+//	|   └── 2_somestepname.txt
+//	├── 0_jobname1.txt
+//	├── 1_jobname2.txt
+//	└── -9999999999_jobname3.txt
 //
 // It iterates through the list of jobs and tries to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.
+//
+// The top-level .txt files include the logs for an entire job run. Note that
+// the prefixed number is either:
+//   - An ordinal and cannot be mapped to the corresponding job's ID.
+//   - A negative integer which is the ID of the job in the old Actions service.
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
+		re := jobLogFilenameRegexp(job)
+		for _, file := range rlz.File {
+			if re.MatchString(file.Name) {
+				jobs[i].Log = file
+				break
+			}
+		}
+
 		for j, step := range job.Steps {
 			re := stepLogFilenameRegexp(job, step)
 			for _, file := range rlz.File {
@@ -661,6 +677,8 @@ func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 
 func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 	for _, job := range jobs {
+		var hasStepLogs bool
+
 		steps := job.Steps
 		sort.Sort(steps)
 		for _, step := range steps {
@@ -670,18 +688,44 @@ func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 			if step.Log == nil {
 				continue
 			}
+			hasStepLogs = true
 			prefix := fmt.Sprintf("%s\t%s\t", job.Name, step.Name)
-			f, err := step.Log.Open()
-			if err != nil {
+			if err := printZIPFile(w, step.Log, prefix); err != nil {
 				return err
 			}
-			scanner := bufio.NewScanner(f)
-			for scanner.Scan() {
-				fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
-			}
-			f.Close()
+		}
+
+		if hasStepLogs {
+			continue
+		}
+
+		if failed && !shared.IsFailureState(job.Conclusion) {
+			continue
+		}
+
+		if job.Log == nil {
+			continue
+		}
+
+		prefix := fmt.Sprintf("%s\tUNKNOWN\t", job.Name)
+		if err := printZIPFile(w, job.Log, prefix); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func printZIPFile(w io.Writer, file *zip.File, prefix string) error {
+	f, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
+	}
 	return nil
 }
