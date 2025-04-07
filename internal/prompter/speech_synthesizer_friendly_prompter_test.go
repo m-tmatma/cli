@@ -433,7 +433,6 @@ func TestSurveyPrompter(t *testing.T) {
 	t.Cleanup(func() { testCloser(t, console) })
 
 	t.Setenv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER", "")
-	t.Setenv("NO_COLOR", "1")
 	// Using echo as the editor command here because it will immediately exit
 	// and return no input.
 	p := prompter.New("echo", console.Tty(), console.Tty(), console.Tty())
