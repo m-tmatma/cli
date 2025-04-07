@@ -551,6 +551,12 @@ func getJobNameForLogFilename(name string) string {
 	return sanitizedJobName
 }
 
+func jobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
+	re := fmt.Sprintf(`^-?\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
+	return regexp.MustCompile(re)
+}
+
 func stepLogFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
 	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
