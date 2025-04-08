@@ -44,7 +44,7 @@ type Prompter interface {
 }
 
 func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWriter, stderr ghPrompter.FileWriter) Prompter {
-	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER")
+	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_ACCESSIBLE_PROMPTER")
 	falseyValues := []string{"false", "0", "no", ""}
 
 	if accessiblePrompterIsSet && !slices.Contains(falseyValues, accessiblePrompterValue) {

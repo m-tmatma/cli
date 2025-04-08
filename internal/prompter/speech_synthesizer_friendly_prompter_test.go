@@ -56,7 +56,7 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 	os.Stdout = console.Tty()
 	os.Stderr = console.Tty()
 
-	t.Setenv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER", "true")
+	t.Setenv("GH_ACCESSIBLE_PROMPTER", "true")
 	// Using echo as the editor command here because it will immediately exit
 	// and return no input.
 	p := prompter.New("echo", nil, nil, nil)
