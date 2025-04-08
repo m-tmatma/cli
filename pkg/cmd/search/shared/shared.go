@@ -132,7 +132,7 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 		}
 		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title))
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()))
-		tp.AddTimeField(now, issue.UpdatedAt, cs.Gray)
+		tp.AddTimeField(now, issue.UpdatedAt, cs.Muted)
 		tp.EndRow()
 	}
 
