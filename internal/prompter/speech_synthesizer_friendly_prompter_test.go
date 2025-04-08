@@ -202,6 +202,26 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		wg.Wait()
 	})
 
+	// This test currently fails because the value is
+	// not respected as the default in accessible mode.
+	// See https://github.com/charmbracelet/huh/issues/615
+	t.Run("Confirm - blank input returns default", func(t *testing.T) {
+		t.Skip("Skipped due to https://github.com/charmbracelet/huh/issues/615")
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Are you sure")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		confirmValue, err := p.Confirm("Are you sure", false)
+		require.NoError(t, err)
+		require.Equal(t, false, confirmValue)
+	})
+
 	t.Run("AuthToken", func(t *testing.T) {
 		wg.Add(1)
 
