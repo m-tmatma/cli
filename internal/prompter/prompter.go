@@ -156,7 +156,11 @@ func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, err
 	)
 
 	err := form.Run()
-	return result, err
+	if err != nil {
+		return "", err
+	}
+
+	return result, nil
 }
 
 func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
@@ -230,7 +234,10 @@ func (p *speechSynthesizerFriendlyPrompter) InputHostname() (string, error) {
 	)
 
 	err := form.Run()
-	return result, err
+	if err != nil {
+		return "", err
+	}
+	return result, nil
 }
 
 func (p *speechSynthesizerFriendlyPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
