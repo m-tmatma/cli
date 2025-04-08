@@ -49,6 +49,7 @@ type LiveSigstoreVerifier struct {
 	NoPublicGood       bool
 	PublicGoodVerifier *verify.SignedEntityVerifier
 	GitHubVerifier     *verify.SignedEntityVerifier
+	CustomVerifiers    map[string]*verify.SignedEntityVerifier
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain    string
 	TUFMetadataDir o.Option[string]
@@ -59,14 +60,111 @@ var ErrNoAttestationsVerified = errors.New("no attestations were verified")
 // NewLiveSigstoreVerifier creates a new LiveSigstoreVerifier struct
 // that is used to verify artifacts and attestations against the
 // Public Good, GitHub, or a custom trusted root.
-func NewLiveSigstoreVerifier(config SigstoreConfig) *LiveSigstoreVerifier {
-	return &LiveSigstoreVerifier{
+func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, error) {
+	liveVerifier := &LiveSigstoreVerifier{
 		TrustedRoot:    config.TrustedRoot,
 		Logger:         config.Logger,
 		NoPublicGood:   config.NoPublicGood,
 		TrustDomain:    config.TrustDomain,
 		TUFMetadataDir: config.TUFMetadataDir,
 	}
+	// if a custom trusted root is set, configure custom verifiers
+	if config.TrustedRoot != "" {
+		customVerifiers, err := createCustomVerifiers(config.TrustedRoot, config.NoPublicGood)
+		if err != nil {
+			return nil, err
+		}
+		liveVerifier.CustomVerifiers = customVerifiers
+		return liveVerifier, nil
+	}
+
+	return liveVerifier, nil
+}
+
+func createCustomVerifiers(trustedRoot string, noPublicGood bool) (map[string]*verify.SignedEntityVerifier, error) {
+	verifiers := make(map[string]*verify.SignedEntityVerifier)
+
+	customTrustRoots, err := os.ReadFile(trustedRoot)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file %s: %v", trustedRoot, err)
+	}
+
+	reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
+	var line []byte
+	var readError error
+	line, readError = reader.ReadBytes('\n')
+	for readError == nil {
+		// Load each trusted root
+		trustedRoot, err := root.NewTrustedRootFromJSON(line)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create custom verifier: %v", err)
+		}
+
+		// Compare bundle leafCert issuer with trusted root cert authority
+		certAuthorities := trustedRoot.FulcioCertificateAuthorities()
+		for _, certAuthority := range certAuthorities {
+			fulcioCertAuthority, ok := certAuthority.(*root.FulcioCertificateAuthority)
+			if !ok {
+				return nil, fmt.Errorf("trusted root cert authority is not a FulcioCertificateAuthority")
+			}
+			lowestCert, err := getLowestCertInChain(fulcioCertAuthority)
+			if err != nil {
+				return nil, err
+			}
+
+			// if the custom trusted root issuer is not set, skip it
+			if len(lowestCert.Issuer.Organization) == 0 {
+				continue
+			}
+			issuer := lowestCert.Issuer.Organization[0]
+
+			// Determine what policy to use with this trusted root.
+			//
+			// Note that we are *only* inferring the policy with the
+			// issuer. We *must* use the trusted root provided.
+			switch issuer {
+			case PublicGoodIssuerOrg:
+				if noPublicGood {
+					return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
+				}
+				if _, ok := verifiers[PublicGoodIssuerOrg]; ok {
+					// we have already created a public good verifier with this custom trusted root
+					// so we skip it
+					continue
+				}
+				publicGood, err := newPublicGoodVerifierWithTrustedRoot(trustedRoot)
+				if err != nil {
+					return nil, err
+				}
+				verifiers[PublicGoodIssuerOrg] = publicGood
+			case GitHubIssuerOrg:
+				if _, ok := verifiers[GitHubIssuerOrg]; ok {
+					// we have already created a github verifier with this custom trusted root
+					// so we skip it
+					continue
+				}
+				github, err := newGitHubVerifierWithTrustedRoot(trustedRoot)
+				if err != nil {
+					return nil, err
+				}
+				verifiers[GitHubIssuerOrg] = github
+			default:
+				if _, ok := verifiers[issuer]; ok {
+					// we have already created a custom verifier with this custom trusted root
+					// so we skip it
+					continue
+				}
+				// Make best guess at reasonable policy
+				custom, err := newCustomVerifier(trustedRoot)
+				if err != nil {
+					return nil, err
+				}
+				verifiers[issuer] = custom
+			}
+		}
+		line, readError = reader.ReadBytes('\n')
+	}
+	return verifiers, nil
 }
 
 func getBundleIssuer(b *bundle.Bundle) (string, error) {
@@ -90,7 +188,7 @@ func getBundleIssuer(b *bundle.Bundle) (string, error) {
 func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEntityVerifier, error) {
 	// if no custom trusted root is set, return either the Public Good or GitHub verifier
 	// If the chosen verifier has not yet been created, create it as a LiveSigstoreVerifier field for use in future calls
-	if v.TrustedRoot == "" {
+	if v.CustomVerifiers == nil {
 		switch issuer {
 		case PublicGoodIssuerOrg:
 			if v.NoPublicGood {
@@ -118,60 +216,12 @@ func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEnti
 		}
 	}
 
-	customTrustRoots, err := os.ReadFile(v.TrustedRoot)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read file %s: %v", v.TrustedRoot, err)
+	custom, ok := v.CustomVerifiers[issuer]
+	if !ok {
+		return nil, fmt.Errorf("no custom verifier found for issuer \"%s\"", issuer)
+		//return nil, fmt.Errorf("unable to use provided trusted roots")
 	}
-
-	reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
-	var line []byte
-	var readError error
-	line, readError = reader.ReadBytes('\n')
-	for readError == nil {
-		// Load each trusted root
-		trustedRoot, err := root.NewTrustedRootFromJSON(line)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create custom verifier: %v", err)
-		}
-
-		// Compare bundle leafCert issuer with trusted root cert authority
-		certAuthorities := trustedRoot.FulcioCertificateAuthorities()
-		for _, certAuthority := range certAuthorities {
-			fulcioCertAuthority, ok := certAuthority.(*root.FulcioCertificateAuthority)
-			if !ok {
-				return nil, fmt.Errorf("trusted root cert authority is not a FulcioCertificateAuthority")
-			}
-			lowestCert, err := getLowestCertInChain(fulcioCertAuthority)
-			if err != nil {
-				return nil, err
-			}
-
-			// if the custom trusted root issuer is not set or doesn't match the given issuer, skip it
-			if len(lowestCert.Issuer.Organization) == 0 || lowestCert.Issuer.Organization[0] != issuer {
-				continue
-			}
-
-			// Determine what policy to use with this trusted root.
-			//
-			// Note that we are *only* inferring the policy with the
-			// issuer. We *must* use the trusted root provided.
-			switch issuer {
-			case PublicGoodIssuerOrg:
-				if v.NoPublicGood {
-					return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
-				}
-				return newPublicGoodVerifierWithTrustedRoot(trustedRoot)
-			case GitHubIssuerOrg:
-				return newGitHubVerifierWithTrustedRoot(trustedRoot)
-			default:
-				// Make best guess at reasonable policy
-				return newCustomVerifier(trustedRoot)
-			}
-		}
-		line, readError = reader.ReadBytes('\n')
-	}
-
-	return nil, fmt.Errorf("unable to use provided trusted roots")
+	return custom, nil
 }
 
 func getLowestCertInChain(ca *root.FulcioCertificateAuthority) (*x509.Certificate, error) {

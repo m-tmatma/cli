@@ -211,7 +211,11 @@ func NewVerifyCmd(f *cmdutil.Factory, runF func(*Options) error) *cobra.Command 
 				return runF(opts)
 			}
 
-			opts.SigstoreVerifier = verification.NewLiveSigstoreVerifier(config)
+			sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
+			if err != nil {
+				return fmt.Errorf("error creating Sigstore verifier: %w", err)
+			}
+			opts.SigstoreVerifier = sigstoreVerifier
 			opts.Config = f.Config
 
 			if err := runVerify(opts); err != nil {
