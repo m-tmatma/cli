@@ -139,9 +139,9 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprintf(w, "%s • ", cs.Yellow("Pre-release"))
 	}
 	if release.IsDraft {
-		fmt.Fprintf(w, "%s\n", cs.Mutedf("%s created this %s", release.Author.Login, text.FuzzyAgo(time.Now(), release.CreatedAt)))
+		fmt.Fprintln(w, cs.Mutedf("%s created this %s", release.Author.Login, text.FuzzyAgo(time.Now(), release.CreatedAt)))
 	} else {
-		fmt.Fprintf(w, "%s\n", cs.Mutedf("%s released this %s", release.Author.Login, text.FuzzyAgo(time.Now(), *release.PublishedAt)))
+		fmt.Fprintln(w, cs.Mutedf("%s released this %s", release.Author.Login, text.FuzzyAgo(time.Now(), *release.PublishedAt)))
 	}
 
 	renderedDescription, err := markdown.Render(release.Body,
@@ -153,7 +153,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	fmt.Fprintln(w, renderedDescription)
 
 	if len(release.Assets) > 0 {
-		fmt.Fprintf(w, "%s\n", cs.Bold("Assets"))
+		fmt.Fprintln(w, cs.Bold("Assets"))
 		//nolint:staticcheck // SA1019: Showing NAME|SIZE headers adds nothing to table.
 		table := tableprinter.New(io, tableprinter.NoHeader)
 		for _, a := range release.Assets {
