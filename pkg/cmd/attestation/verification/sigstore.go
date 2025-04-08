@@ -87,13 +87,12 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, erro
 }
 
 func createCustomVerifiers(trustedRoot string, noPublicGood bool) (map[string]*verify.SignedEntityVerifier, error) {
-	verifiers := make(map[string]*verify.SignedEntityVerifier)
-
 	customTrustRoots, err := os.ReadFile(trustedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read file %s: %v", trustedRoot, err)
 	}
 
+	verifiers := make(map[string]*verify.SignedEntityVerifier)
 	reader := bufio.NewReader(bytes.NewReader(customTrustRoots))
 	var line []byte
 	var readError error
