@@ -397,7 +397,7 @@ func runView(opts *ViewOptions) error {
 			for _, a := range artifacts {
 				expiredBadge := ""
 				if a.Expired {
-					expiredBadge = cs.Gray(" (expired)")
+					expiredBadge = cs.Muted(" (expired)")
 				}
 				fmt.Fprintf(out, "%s%s\n", a.Name, expiredBadge)
 			}
@@ -411,7 +411,7 @@ func runView(opts *ViewOptions) error {
 		} else {
 			fmt.Fprintf(out, "For more information about a job, try: gh run view --job=<job-id>\n")
 		}
-		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
+		fmt.Fprintln(out, cs.Mutedf("View this run on GitHub: %s", run.URL))
 
 		if opts.ExitStatus && shared.IsFailureState(run.Conclusion) {
 			return cmdutil.SilentError
@@ -423,7 +423,7 @@ func runView(opts *ViewOptions) error {
 		} else {
 			fmt.Fprintf(out, "To see the full job log, try: gh run view --log --job=%d\n", selectedJob.ID)
 		}
-		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
+		fmt.Fprintln(out, cs.Mutedf("View this run on GitHub: %s", run.URL))
 
 		if opts.ExitStatus && shared.IsFailureState(selectedJob.Conclusion) {
 			return cmdutil.SilentError
