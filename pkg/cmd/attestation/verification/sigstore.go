@@ -177,7 +177,7 @@ func (v *LiveSigstoreVerifier) verify(attestation *api.Attestation, policy verif
 	// determine which verifier should attempt verification against the bundle
 	verifier, err := v.chooseVerifier(issuer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find recognized issuer from bundle content: %v", err)
+		return nil, fmt.Errorf("failed to choose verifier based on provided bundle issuer: %v", err)
 	}
 
 	v.Logger.VerbosePrintf("Attempting verification against issuer \"%s\"\n", issuer)
