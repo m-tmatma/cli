@@ -449,9 +449,39 @@ func Test_ioStreams_colorLabels(t *testing.T) {
 			colorLabelsEnabled: true,
 		},
 		{
-			name:               "colorLabels enabled via GH_COLOR_LABELS env var",
+			name:               "colorLabels enabled via `1` in GH_COLOR_LABELS env var",
 			env:                map[string]string{"GH_COLOR_LABELS": "1"},
 			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via `true` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "true"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels enabled via `yes` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "yes"},
+			colorLabelsEnabled: true,
+		},
+		{
+			name:               "colorLabels disable via empty string in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": ""},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `0` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "0"},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `false` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "false"},
+			colorLabelsEnabled: false,
+		},
+		{
+			name:               "colorLabels disabled via `no` in GH_COLOR_LABELS env var",
+			env:                map[string]string{"GH_COLOR_LABELS": "no"},
+			colorLabelsEnabled: false,
 		},
 	}
 	for _, tt := range tests {
