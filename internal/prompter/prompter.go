@@ -202,7 +202,6 @@ func (p *speechSynthesizerFriendlyPrompter) AuthToken() (string, error) {
 }
 
 func (p *speechSynthesizerFriendlyPrompter) ConfirmDeletion(requiredValue string) error {
-	var result string
 	// EchoMode(huh.EchoModePassword) doesn't have any effect in accessible mode.
 	form := p.newForm(
 		huh.NewGroup(
@@ -213,8 +212,7 @@ func (p *speechSynthesizerFriendlyPrompter) ConfirmDeletion(requiredValue string
 						return fmt.Errorf("You entered: %q", input)
 					}
 					return nil
-				}).
-				Value(&result),
+				}),
 		),
 	)
 
