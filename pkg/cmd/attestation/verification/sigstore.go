@@ -44,9 +44,11 @@ type SigstoreVerifier interface {
 }
 
 type LiveSigstoreVerifier struct {
-	TrustedRoot  string
-	Logger       *io.Handler
-	NoPublicGood bool
+	TrustedRoot        string
+	Logger             *io.Handler
+	NoPublicGood       bool
+	PublicGoodVerifier *verify.SignedEntityVerifier
+	GitHubVerifier     *verify.SignedEntityVerifier
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain    string
 	TUFMetadataDir o.Option[string]
@@ -86,17 +88,31 @@ func getBundleIssuer(b *bundle.Bundle) (string, error) {
 }
 
 func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEntityVerifier, error) {
-	// if no custom trusted root is set, attempt to create a Public Good or
-	// GitHub Sigstore verifier
+	// if no custom trusted root is set, return either the Public Good or GitHub verifier
+	// If the chosen verifier has not yet been created, create it as a LiveSigstoreVerifier field for use in future calls
 	if v.TrustedRoot == "" {
 		switch issuer {
 		case PublicGoodIssuerOrg:
 			if v.NoPublicGood {
 				return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
 			}
-			return newPublicGoodVerifier(v.TUFMetadataDir)
+			if v.PublicGoodVerifier == nil {
+				publicGood, err := newPublicGoodVerifier(v.TUFMetadataDir)
+				if err != nil {
+					return nil, err
+				}
+				v.PublicGoodVerifier = publicGood
+			}
+			return v.PublicGoodVerifier, nil
 		case GitHubIssuerOrg:
-			return newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
+			if v.GitHubVerifier == nil {
+				github, err := newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
+				if err != nil {
+					return nil, err
+				}
+				v.GitHubVerifier = github
+			}
+			return v.GitHubVerifier, nil
 		default:
 			return nil, fmt.Errorf("leaf certificate issuer is not recognized")
 		}
