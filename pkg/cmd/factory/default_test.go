@@ -449,6 +449,11 @@ func Test_ioStreams_colorLabels(t *testing.T) {
 			colorLabelsEnabled: true,
 		},
 		{
+			name:               "config with colorLabels disabled",
+			config:             disableColorLabelsConfig(),
+			colorLabelsEnabled: false,
+		},
+		{
 			name:               "colorLabels enabled via `1` in GH_COLOR_LABELS env var",
 			env:                map[string]string{"GH_COLOR_LABELS": "1"},
 			colorLabelsEnabled: true,
@@ -609,6 +614,10 @@ func pagerConfig() gh.Config {
 
 func disablePromptConfig() gh.Config {
 	return config.NewFromString("prompt: disabled")
+}
+
+func disableColorLabelsConfig() gh.Config {
+	return config.NewFromString("color_labels: disabled")
 }
 
 func enableColorLabelsConfig() gh.Config {
