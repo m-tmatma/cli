@@ -3,6 +3,7 @@ package prompter
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -43,23 +44,24 @@ type Prompter interface {
 }
 
 func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWriter, stderr ghPrompter.FileWriter) Prompter {
-	accessiblePrompterValue := os.Getenv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER")
-	switch accessiblePrompterValue {
-	case "", "false", "0", "no":
-		return &surveyPrompter{
-			prompter:  ghPrompter.New(stdin, stdout, stderr),
-			stdin:     stdin,
-			stdout:    stdout,
-			stderr:    stderr,
-			editorCmd: editorCmd,
-		}
-	default:
+	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_SPEECH_SYNTHESIZER_FRIENDLY_PROMPTER")
+	falseyValues := []string{"false", "0", "no", ""}
+
+	if accessiblePrompterIsSet && !slices.Contains(falseyValues, accessiblePrompterValue) {
 		return &speechSynthesizerFriendlyPrompter{
 			stdin:     stdin,
 			stdout:    stdout,
 			stderr:    stderr,
 			editorCmd: editorCmd,
 		}
+	}
+
+	return &surveyPrompter{
+		prompter:  ghPrompter.New(stdin, stdout, stderr),
+		stdin:     stdin,
+		stdout:    stdout,
+		stderr:    stderr,
+		editorCmd: editorCmd,
 	}
 }
 
