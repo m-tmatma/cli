@@ -33,7 +33,7 @@ func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
 		expect.WithCloser(ptm, pts),
 		failOnExpectError(t),
 		failOnSendError(t),
-		expect.WithDefaultTimeout(time.Second * 600),
+		expect.WithDefaultTimeout(time.Second),
 	}
 
 	console, err := expect.NewConsole(consoleOpts...)
