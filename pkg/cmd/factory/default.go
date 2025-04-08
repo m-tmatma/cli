@@ -293,6 +293,17 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		io.SetPager(pager.Value)
 	}
 
+	if ghColorLabels, ghColorLabelsExists := os.LookupEnv("GH_COLOR_LABELS"); ghColorLabelsExists {
+		switch ghColorLabels {
+		case "", "0", "false", "no":
+			io.SetColorLabels(false)
+		default:
+			io.SetColorLabels(true)
+		}
+	} else if prompt := cfg.ColorLabels(""); prompt.Value == "enabled" {
+		io.SetColorLabels(true)
+	}
+
 	io.SetAccessibleColorsEnabled(xcolor.IsAccessibleColorsEnabled())
 
 	return io

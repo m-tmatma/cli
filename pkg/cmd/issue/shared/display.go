@@ -56,7 +56,7 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme, colorize bool) 
 	labelNames := make([]string, 0, len(issue.Labels.Nodes))
 	for _, label := range issue.Labels.Nodes {
 		if colorize {
-			labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
+			labelNames = append(labelNames, cs.Label(label.Color, label.Name))
 		} else {
 			labelNames = append(labelNames, label.Name)
 		}

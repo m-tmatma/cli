@@ -317,7 +317,7 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
 		if cs == nil {
 			labelNames[i] = label.Name
 		} else {
-			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
+			labelNames[i] = cs.Label(label.Color, label.Name)
 		}
 	}
 
