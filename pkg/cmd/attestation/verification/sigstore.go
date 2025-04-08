@@ -188,40 +188,38 @@ func getBundleIssuer(b *bundle.Bundle) (string, error) {
 func (v *LiveSigstoreVerifier) chooseVerifier(issuer string) (*verify.SignedEntityVerifier, error) {
 	// if no custom trusted root is set, return either the Public Good or GitHub verifier
 	// If the chosen verifier has not yet been created, create it as a LiveSigstoreVerifier field for use in future calls
-	if v.CustomVerifiers == nil {
-		switch issuer {
-		case PublicGoodIssuerOrg:
-			if v.NoPublicGood {
-				return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
-			}
-			if v.PublicGoodVerifier == nil {
-				publicGood, err := newPublicGoodVerifier(v.TUFMetadataDir)
-				if err != nil {
-					return nil, err
-				}
-				v.PublicGoodVerifier = publicGood
-			}
-			return v.PublicGoodVerifier, nil
-		case GitHubIssuerOrg:
-			if v.GitHubVerifier == nil {
-				github, err := newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
-				if err != nil {
-					return nil, err
-				}
-				v.GitHubVerifier = github
-			}
-			return v.GitHubVerifier, nil
-		default:
-			return nil, fmt.Errorf("leaf certificate issuer is not recognized")
+	if v.CustomVerifiers != nil {
+		custom, ok := v.CustomVerifiers[issuer]
+		if !ok {
+			return nil, fmt.Errorf("no custom verifier found for issuer \"%s\"", issuer)
 		}
+		return custom, nil
 	}
-
-	custom, ok := v.CustomVerifiers[issuer]
-	if !ok {
-		return nil, fmt.Errorf("no custom verifier found for issuer \"%s\"", issuer)
-		//return nil, fmt.Errorf("unable to use provided trusted roots")
+	switch issuer {
+	case PublicGoodIssuerOrg:
+		if v.NoPublicGood {
+			return nil, fmt.Errorf("detected public good instance but requested verification without public good instance")
+		}
+		if v.PublicGoodVerifier == nil {
+			publicGood, err := newPublicGoodVerifier(v.TUFMetadataDir)
+			if err != nil {
+				return nil, err
+			}
+			v.PublicGoodVerifier = publicGood
+		}
+		return v.PublicGoodVerifier, nil
+	case GitHubIssuerOrg:
+		if v.GitHubVerifier == nil {
+			github, err := newGitHubVerifier(v.TrustDomain, v.TUFMetadataDir)
+			if err != nil {
+				return nil, err
+			}
+			v.GitHubVerifier = github
+		}
+		return v.GitHubVerifier, nil
+	default:
+		return nil, fmt.Errorf("leaf certificate issuer is not recognized")
 	}
-	return custom, nil
 }
 
 func getLowestCertInChain(ca *root.FulcioCertificateAuthority) (*x509.Certificate, error) {
