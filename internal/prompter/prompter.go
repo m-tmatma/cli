@@ -75,9 +75,9 @@ type accessiblePrompter struct {
 func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 	return huh.NewForm(groups...).
 		WithTheme(huh.ThemeBase16()).
-		WithAccessible(true)
-	// Commented out because https://github.com/charmbracelet/huh/issues/612
-	// WithProgramOptions(tea.WithOutput(p.stdout), tea.WithInput(p.stdin))
+		WithAccessible(true).
+		WithInput(p.stdin).
+		WithOutput(p.stdout)
 }
 
 func (p *accessiblePrompter) Select(prompt, _ string, options []string) (int, error) {
