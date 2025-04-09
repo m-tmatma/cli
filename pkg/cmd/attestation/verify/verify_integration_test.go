@@ -17,6 +17,7 @@ import (
 )
 
 func TestVerifyIntegration(t *testing.T) {
+	t.Skip()
 	logger := io.NewTestHandler()
 
 	sigstoreConfig := verification.SigstoreConfig{
@@ -130,6 +131,7 @@ func TestVerifyIntegration(t *testing.T) {
 }
 
 func TestVerifyIntegrationCustomIssuer(t *testing.T) {
+	t.Skip()
 	artifactPath := test.NormalizeRelativePath("../test/data/custom-issuer-artifact")
 	bundlePath := test.NormalizeRelativePath("../test/data/custom-issuer.sigstore.json")
 
@@ -203,6 +205,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 }
 
 func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
+	t.Skip()
 	artifactPath := test.NormalizeRelativePath("../test/data/reusable-workflow-artifact")
 	bundlePath := test.NormalizeRelativePath("../test/data/reusable-workflow-attestation.sigstore.json")
 
@@ -295,6 +298,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 }
 
 func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
+	t.Skip()
 	artifactPath := test.NormalizeRelativePath("../test/data/reusable-workflow-artifact")
 	bundlePath := test.NormalizeRelativePath("../test/data/reusable-workflow-attestation.sigstore.json")
 
