@@ -202,11 +202,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		wg.Wait()
 	})
 
-	// This test currently fails because the value is
-	// not respected as the default in accessible mode.
-	// See https://github.com/charmbracelet/huh/issues/615
 	t.Run("Confirm - blank input returns default", func(t *testing.T) {
-		t.Skip("Skipped due to https://github.com/charmbracelet/huh/issues/615")
 		go func() {
 			// Wait for prompt to appear
 			_, err := console.ExpectString("Are you sure")

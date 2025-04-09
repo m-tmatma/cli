@@ -121,8 +121,7 @@ func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, optio
 		return nil, err
 	}
 
-	mid := len(result) / 2
-	return result[:mid], nil
+	return result, nil
 }
 
 func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) {
@@ -164,10 +163,6 @@ func (p *accessiblePrompter) Password(prompt string) (string, error) {
 }
 
 func (p *accessiblePrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
-	// This is currently an ineffectual assignment because the value is
-	// not respected as the default in accessible mode. Leaving this in here
-	// because it may change in the future.
-	// See https://github.com/charmbracelet/huh/issues/615
 	result := defaultValue
 	form := p.newForm(
 		huh.NewGroup(
