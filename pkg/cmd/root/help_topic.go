@@ -113,7 +113,7 @@ var HelpTopics = []helpTopic{
 			not specified.  This value is used, for example, with %[1]spr view%[1]s subcommand.
 
 			%[1]sGH_ACCESSIBLE_PROMPTER%[1]s (preview): set to a truthy value to enable prompts that are
-			more compatible with speech synthesis based screen readers.
+			more compatible with speech synthesis and braille screen readers.
 		`, "`"),
 	},
 	{
