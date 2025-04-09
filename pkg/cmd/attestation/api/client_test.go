@@ -43,7 +43,6 @@ func NewClientWithMockGHClient(hasNextPage bool) Client {
 }
 
 func TestGetByDigest(t *testing.T) {
-	t.Skip()
 	c := NewClientWithMockGHClient(false)
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
@@ -61,7 +60,6 @@ func TestGetByDigest(t *testing.T) {
 }
 
 func TestGetByDigestGreaterThanLimit(t *testing.T) {
-	t.Skip()
 	c := NewClientWithMockGHClient(false)
 
 	limit := 3
@@ -82,7 +80,6 @@ func TestGetByDigestGreaterThanLimit(t *testing.T) {
 }
 
 func TestGetByDigestWithNextPage(t *testing.T) {
-	t.Skip()
 	c := NewClientWithMockGHClient(true)
 	attestations, err := c.GetByRepoAndDigest(testRepo, testDigest, DefaultLimit)
 	require.NoError(t, err)
@@ -100,7 +97,6 @@ func TestGetByDigestWithNextPage(t *testing.T) {
 }
 
 func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
-	t.Skip()
 	c := NewClientWithMockGHClient(true)
 
 	limit := 7
@@ -121,7 +117,6 @@ func TestGetByDigestGreaterThanLimitWithNextPage(t *testing.T) {
 }
 
 func TestGetByDigest_NoAttestationsFound(t *testing.T) {
-	t.Skip()
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
@@ -147,7 +142,6 @@ func TestGetByDigest_NoAttestationsFound(t *testing.T) {
 }
 
 func TestGetByDigest_Error(t *testing.T) {
-	t.Skip()
 	fetcher := mockDataGenerator{
 		NumAttestations: 5,
 	}
@@ -169,7 +163,6 @@ func TestGetByDigest_Error(t *testing.T) {
 }
 
 func TestFetchBundleFromAttestations_BundleURL(t *testing.T) {
-	t.Skip()
 	httpClient := &mockHttpClient{}
 	client := LiveClient{
 		httpClient: httpClient,
@@ -187,7 +180,6 @@ func TestFetchBundleFromAttestations_BundleURL(t *testing.T) {
 }
 
 func TestFetchBundleFromAttestations_MissingBundleAndBundleURLFields(t *testing.T) {
-	t.Skip()
 	httpClient := &mockHttpClient{}
 	client := LiveClient{
 		httpClient: httpClient,
@@ -204,7 +196,6 @@ func TestFetchBundleFromAttestations_MissingBundleAndBundleURLFields(t *testing.
 }
 
 func TestFetchBundleFromAttestations_FailOnTheSecondAttestation(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &failAfterNCallsHttpClient{
 		// the initial HTTP request will succeed, which returns a bundle for the first attestation
 		// all following HTTP requests will fail, which means the function fails to fetch a bundle
@@ -227,7 +218,6 @@ func TestFetchBundleFromAttestations_FailOnTheSecondAttestation(t *testing.T) {
 }
 
 func TestFetchBundleFromAttestations_FailAfterRetrying(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &reqFailHttpClient{}
 
 	c := &LiveClient{
@@ -244,7 +234,6 @@ func TestFetchBundleFromAttestations_FailAfterRetrying(t *testing.T) {
 }
 
 func TestFetchBundleFromAttestations_FallbackToBundleField(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &mockHttpClient{}
 
 	c := &LiveClient{
@@ -263,7 +252,6 @@ func TestFetchBundleFromAttestations_FallbackToBundleField(t *testing.T) {
 
 // getBundle successfully fetches a bundle on the first HTTP request attempt
 func TestGetBundle(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &mockHttpClient{}
 
 	c := &LiveClient{
@@ -280,7 +268,6 @@ func TestGetBundle(t *testing.T) {
 // getBundle retries successfully when the initial HTTP request returns
 // a 5XX status code
 func TestGetBundle_SuccessfulRetry(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &failAfterNCallsHttpClient{
 		FailOnCallN:              1,
 		FailOnAllSubsequentCalls: false,
@@ -299,7 +286,6 @@ func TestGetBundle_SuccessfulRetry(t *testing.T) {
 
 // getBundle does not retry when the function fails with a permanent backoff error condition
 func TestGetBundle_PermanentBackoffFail(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &invalidBundleClient{}
 	c := &LiveClient{
 		httpClient: mockHTTPClient,
@@ -316,7 +302,6 @@ func TestGetBundle_PermanentBackoffFail(t *testing.T) {
 
 // getBundle retries when the HTTP request fails
 func TestGetBundle_RequestFail(t *testing.T) {
-	t.Skip()
 	mockHTTPClient := &reqFailHttpClient{}
 
 	c := &LiveClient{
@@ -331,7 +316,6 @@ func TestGetBundle_RequestFail(t *testing.T) {
 }
 
 func TestGetTrustDomain(t *testing.T) {
-	t.Skip()
 	fetcher := mockMetaGenerator{
 		TrustDomain: "foo",
 	}
@@ -364,7 +348,6 @@ func TestGetTrustDomain(t *testing.T) {
 }
 
 func TestGetAttestationsRetries(t *testing.T) {
-	t.Skip()
 	getAttestationRetryInterval = 0
 
 	fetcher := mockDataGenerator{
@@ -405,7 +388,6 @@ func TestGetAttestationsRetries(t *testing.T) {
 
 // test total retries
 func TestGetAttestationsMaxRetries(t *testing.T) {
-	t.Skip()
 	getAttestationRetryInterval = 0
 
 	fetcher := mockDataGenerator{

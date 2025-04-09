@@ -9,7 +9,6 @@ import (
 )
 
 func TestDigestContainerImageArtifact(t *testing.T) {
-	t.Skip()
 	expectedDigest := "1234567890abcdef"
 	client := oci.MockClient{}
 	url := "example.com/repo:tag"
@@ -21,7 +20,6 @@ func TestDigestContainerImageArtifact(t *testing.T) {
 }
 
 func TestParseImageRefFailure(t *testing.T) {
-	t.Skip()
 	client := oci.ReferenceFailClient{}
 	url := "example.com/repo:tag"
 	_, err := digestContainerImageArtifact(url, client)
@@ -29,7 +27,6 @@ func TestParseImageRefFailure(t *testing.T) {
 }
 
 func TestFetchImageFailure(t *testing.T) {
-	t.Skip()
 	testcase := []struct {
 		name        string
 		client      oci.Client

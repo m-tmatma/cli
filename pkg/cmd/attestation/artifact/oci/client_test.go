@@ -13,7 +13,6 @@ import (
 )
 
 func TestGetImageDigest_Success(t *testing.T) {
-	t.Skip()
 	expectedDigest := v1.Hash{
 		Hex:       "1234567890abcdef",
 		Algorithm: "sha256",
@@ -38,7 +37,6 @@ func TestGetImageDigest_Success(t *testing.T) {
 }
 
 func TestGetImageDigest_ReferenceFail(t *testing.T) {
-	t.Skip()
 	c := LiveClient{
 		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return nil, fmt.Errorf("failed to parse reference")
@@ -55,7 +53,6 @@ func TestGetImageDigest_ReferenceFail(t *testing.T) {
 }
 
 func TestGetImageDigest_AuthFail(t *testing.T) {
-	t.Skip()
 	c := LiveClient{
 		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil
@@ -73,7 +70,6 @@ func TestGetImageDigest_AuthFail(t *testing.T) {
 }
 
 func TestGetImageDigest_Denied(t *testing.T) {
-	t.Skip()
 	c := LiveClient{
 		parseReference: func(string, ...name.Option) (name.Reference, error) {
 			return name.Tag{}, nil

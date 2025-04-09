@@ -22,7 +22,6 @@ import (
 )
 
 func TestNewTrustedRootCmd(t *testing.T) {
-	t.Skip()
 	testIO, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{
 		IOStreams: testIO,
@@ -83,7 +82,6 @@ func TestNewTrustedRootCmd(t *testing.T) {
 }
 
 func TestNewTrustedRootWithTenancy(t *testing.T) {
-	t.Skip()
 	testIO, _, _, _ := iostreams.Test()
 	var testReg httpmock.Registry
 	var metaResp = api.MetaResponse{
@@ -165,7 +163,6 @@ var newTUFErrClient tufClientInstantiator = func(o *tuf.Options) (*tuf.Client, e
 }
 
 func TestGetTrustedRoot(t *testing.T) {
-	t.Skip()
 	mirror := "https://tuf-repo.github.com"
 	root := test.NormalizeRelativePath("../verification/embed/tuf-repo.github.com/root.json")
 

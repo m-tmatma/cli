@@ -10,7 +10,6 @@ import (
 )
 
 func TestNormalizeReference(t *testing.T) {
-	t.Skip()
 	testCases := []struct {
 		name           string
 		reference      string

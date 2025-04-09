@@ -35,7 +35,6 @@ func expectedFilePath(tempDir string, digestWithAlg string) string {
 }
 
 func TestNewDownloadCmd(t *testing.T) {
-	t.Skip()
 	testIO, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{
 		IOStreams: testIO,
@@ -191,7 +190,6 @@ func TestNewDownloadCmd(t *testing.T) {
 }
 
 func TestRunDownload(t *testing.T) {
-	t.Skip()
 	tempDir := t.TempDir()
 	store := &LiveStore{
 		outputPath: tempDir,

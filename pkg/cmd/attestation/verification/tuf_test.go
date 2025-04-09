@@ -11,7 +11,6 @@ import (
 )
 
 func TestGitHubTUFOptionsNoMetadataDir(t *testing.T) {
-	t.Skip()
 	os.Setenv("CODESPACES", "true")
 	opts := GitHubTUFOptions(o.None[string]())
 

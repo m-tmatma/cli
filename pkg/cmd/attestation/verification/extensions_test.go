@@ -25,7 +25,6 @@ func createSampleResult() *AttestationProcessingResult {
 }
 
 func TestVerifyCertExtensions(t *testing.T) {
-	t.Skip()
 	results := []*AttestationProcessingResult{createSampleResult()}
 
 	certSummary := certificate.Summary{}

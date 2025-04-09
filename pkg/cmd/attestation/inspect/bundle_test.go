@@ -10,7 +10,6 @@ import (
 )
 
 func TestGetOrgAndRepo(t *testing.T) {
-	t.Skip()
 	t.Run("with valid source URL", func(t *testing.T) {
 		sourceURL := "https://github.com/github/gh-attestation"
 		org, repo, err := getOrgAndRepo("", sourceURL)
@@ -37,7 +36,6 @@ func TestGetOrgAndRepo(t *testing.T) {
 }
 
 func TestGetAttestationDetail(t *testing.T) {
-	t.Skip()
 	bundlePath := test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
 
 	attestations, err := verification.GetLocalAttestations(bundlePath)

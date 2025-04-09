@@ -34,7 +34,6 @@ var (
 )
 
 func TestNewVerifyCmd(t *testing.T) {
-	t.Skip()
 	testIO, _, _, _ := iostreams.Test()
 	var testReg httpmock.Registry
 	var metaResp = api.MetaResponse{
@@ -316,7 +315,6 @@ func TestNewVerifyCmd(t *testing.T) {
 }
 
 func TestVerifyCmdAuthChecks(t *testing.T) {
-	t.Skip()
 	f := &cmdutil.Factory{}
 
 	t.Run("by default auth check is required", func(t *testing.T) {
@@ -347,7 +345,6 @@ func TestVerifyCmdAuthChecks(t *testing.T) {
 }
 
 func TestJSONOutput(t *testing.T) {
-	t.Skip()
 	testIO, _, out, _ := iostreams.Test()
 	opts := Options{
 		ArtifactPath:     artifactPath,
@@ -371,7 +368,6 @@ func TestJSONOutput(t *testing.T) {
 }
 
 func TestRunVerify(t *testing.T) {
-	t.Skip()
 	logger := io.NewTestHandler()
 
 	publicGoodOpts := Options{
