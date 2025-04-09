@@ -575,7 +575,7 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
 		case Skipped, Neutral:
-			return "-", cs.Gray
+			return "-", cs.Muted
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}
