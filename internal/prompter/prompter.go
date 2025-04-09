@@ -48,7 +48,7 @@ func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWr
 	falseyValues := []string{"false", "0", "no", ""}
 
 	if accessiblePrompterIsSet && !slices.Contains(falseyValues, accessiblePrompterValue) {
-		return &speechSynthesizerFriendlyPrompter{
+		return &accessiblePrompter{
 			stdin:     stdin,
 			stdout:    stdout,
 			stderr:    stderr,
@@ -65,14 +65,14 @@ func New(editorCmd string, stdin ghPrompter.FileReader, stdout ghPrompter.FileWr
 	}
 }
 
-type speechSynthesizerFriendlyPrompter struct {
+type accessiblePrompter struct {
 	stdin     ghPrompter.FileReader
 	stdout    ghPrompter.FileWriter
 	stderr    ghPrompter.FileWriter
 	editorCmd string
 }
 
-func (p *speechSynthesizerFriendlyPrompter) newForm(groups ...*huh.Group) *huh.Form {
+func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 	return huh.NewForm(groups...).
 		WithTheme(huh.ThemeBase16()).
 		WithAccessible(true)
@@ -80,7 +80,7 @@ func (p *speechSynthesizerFriendlyPrompter) newForm(groups ...*huh.Group) *huh.F
 	// WithProgramOptions(tea.WithOutput(p.stdout), tea.WithInput(p.stdin))
 }
 
-func (p *speechSynthesizerFriendlyPrompter) Select(prompt, _ string, options []string) (int, error) {
+func (p *accessiblePrompter) Select(prompt, _ string, options []string) (int, error) {
 	var result int
 	formOptions := []huh.Option[int]{}
 	for i, o := range options {
@@ -100,7 +100,7 @@ func (p *speechSynthesizerFriendlyPrompter) Select(prompt, _ string, options []s
 	return result, err
 }
 
-func (p *speechSynthesizerFriendlyPrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
+func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
 	var result []int
 	formOptions := make([]huh.Option[int], len(options))
 	for i, o := range options {
@@ -125,7 +125,7 @@ func (p *speechSynthesizerFriendlyPrompter) MultiSelect(prompt string, defaults 
 	return result[:mid], nil
 }
 
-func (p *speechSynthesizerFriendlyPrompter) Input(prompt, defaultValue string) (string, error) {
+func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) {
 	result := defaultValue
 	prompt = fmt.Sprintf("%s (%s)", prompt, defaultValue)
 	form := p.newForm(
@@ -144,7 +144,7 @@ func (p *speechSynthesizerFriendlyPrompter) Input(prompt, defaultValue string) (
 	return result, err
 }
 
-func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, error) {
+func (p *accessiblePrompter) Password(prompt string) (string, error) {
 	var result string
 	// EchoMode(huh.EchoModePassword) doesn't have any effect in accessible mode.
 	form := p.newForm(
@@ -163,7 +163,7 @@ func (p *speechSynthesizerFriendlyPrompter) Password(prompt string) (string, err
 	return result, nil
 }
 
-func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
+func (p *accessiblePrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
 	// This is currently an ineffectual assignment because the value is
 	// not respected as the default in accessible mode. Leaving this in here
 	// because it may change in the future.
@@ -182,7 +182,7 @@ func (p *speechSynthesizerFriendlyPrompter) Confirm(prompt string, defaultValue 
 	return result, nil
 }
 
-func (p *speechSynthesizerFriendlyPrompter) AuthToken() (string, error) {
+func (p *accessiblePrompter) AuthToken() (string, error) {
 	var result string
 	form := p.newForm(
 		huh.NewGroup(
@@ -205,7 +205,7 @@ func (p *speechSynthesizerFriendlyPrompter) AuthToken() (string, error) {
 	return result, err
 }
 
-func (p *speechSynthesizerFriendlyPrompter) ConfirmDeletion(requiredValue string) error {
+func (p *accessiblePrompter) ConfirmDeletion(requiredValue string) error {
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -222,7 +222,7 @@ func (p *speechSynthesizerFriendlyPrompter) ConfirmDeletion(requiredValue string
 	return form.Run()
 }
 
-func (p *speechSynthesizerFriendlyPrompter) InputHostname() (string, error) {
+func (p *accessiblePrompter) InputHostname() (string, error) {
 	var result string
 	form := p.newForm(
 		huh.NewGroup(
@@ -240,7 +240,7 @@ func (p *speechSynthesizerFriendlyPrompter) InputHostname() (string, error) {
 	return result, nil
 }
 
-func (p *speechSynthesizerFriendlyPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
+func (p *accessiblePrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
 	var result string
 	skipOption := "skip"
 	openOption := "open"

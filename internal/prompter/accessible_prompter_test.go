@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSpeechSynthesizerFriendlyPrompter(t *testing.T) {
+func TestAccessiblePrompter(t *testing.T) {
 	// Create a PTY and hook up a virtual terminal emulator
 	ptm, pts, err := pty.Open()
 	require.NoError(t, err)
@@ -459,9 +459,9 @@ func TestSurveyPrompter(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// This not a comprehensive test of the survey prompter, but it does
-	// demonstrate that the survey prompter is used when the speech
-	// synthesizer friendly prompter is disabled.
-	t.Run("Select uses survey prompter when speech synthesizer friendly prompter is disabled", func(t *testing.T) {
+	// demonstrate that the survey prompter is used when the
+	// accessible prompter is disabled.
+	t.Run("Select uses survey prompter when accessible prompter is disabled", func(t *testing.T) {
 		wg.Add(1)
 
 		go func() {
@@ -471,7 +471,7 @@ func TestSurveyPrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Send a newline to select the first option
-			// Note: This would not work with the speech synthesizer friendly prompter
+			// Note: This would not work with the accessible prompter
 			// because it would requires sending a 1 to select the first option.
 			// So it proves we are seeing a survey prompter.
 			_, err = console.SendLine("")
