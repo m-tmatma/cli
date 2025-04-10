@@ -17,6 +17,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The following tests are broadly testing the accessible prompter, and NOT asserting
+// on the prompter's complete and exact output strings.
+//
+// These tests generally operate with this logic:
+// - Wait for a particular substring (a portion of the prompt) to appear
+// - Send input
+// - Wait for another substring to appear or for control to return to the test
+// - Assert that the input value was returned from the prompter function
+
+// In the future, expanding these tests to assert on the exact prompt strings
+// would help build confidence in `huh` upgrades, but for now these tests
+// are sufficient to ensure that the accessible prompter behaves roughly as expected
+// but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
