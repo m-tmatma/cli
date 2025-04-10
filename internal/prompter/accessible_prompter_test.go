@@ -414,6 +414,9 @@ func newTestAcessiblePrompter(t *testing.T, console *expect.Console) prompter.Pr
 	t.Helper()
 
 	t.Setenv("GH_ACCESSIBLE_PROMPTER", "true")
+	// `echo`` is chose as the editor command because it immediately returns
+	// a success exit code, returns an empty string, doesn't require any user input,
+	// and since this file is only built on Linux, it is near guaranteed to be available.
 	return prompter.New("echo", console.Tty(), console.Tty(), console.Tty())
 }
 
