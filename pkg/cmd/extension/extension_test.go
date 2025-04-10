@@ -152,6 +152,7 @@ func TestIsPinnedGitExtensionUnpinned(t *testing.T) {
 	}
 
 	assert.False(t, e.IsPinned())
+	gc.AssertExpectations(t)
 }
 
 func TestIsPinnedGitExtensionPinned(t *testing.T) {
@@ -168,6 +169,7 @@ func TestIsPinnedGitExtensionPinned(t *testing.T) {
 	}
 
 	assert.True(t, e.IsPinned())
+	gc.AssertExpectations(t)
 }
 
 func TestIsPinnedLocalExtension(t *testing.T) {
