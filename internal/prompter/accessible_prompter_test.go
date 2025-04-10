@@ -384,7 +384,7 @@ func TestSurveyPrompter(t *testing.T) {
 	})
 }
 
-func newTestVirtualTerminal(t testing.TB) *expect.Console {
+func newTestVirtualTerminal(t *testing.T) *expect.Console {
 	t.Helper()
 
 	// Create a PTY and hook up a virtual terminal emulator
@@ -410,14 +410,14 @@ func newTestVirtualTerminal(t testing.TB) *expect.Console {
 	return console
 }
 
-func newTestAcessiblePrompter(t testing.TB, console *expect.Console) prompter.Prompter {
+func newTestAcessiblePrompter(t *testing.T, console *expect.Console) prompter.Prompter {
 	t.Helper()
 
 	t.Setenv("GH_ACCESSIBLE_PROMPTER", "true")
 	return prompter.New("echo", console.Tty(), console.Tty(), console.Tty())
 }
 
-func newTestSurveyPrompter(t testing.TB, console *expect.Console) prompter.Prompter {
+func newTestSurveyPrompter(t *testing.T, console *expect.Console) prompter.Prompter {
 	t.Helper()
 
 	t.Setenv("GH_ACCESSIBLE_PROMPTER", "false")
@@ -429,7 +429,7 @@ func newTestSurveyPrompter(t testing.TB, console *expect.Console) prompter.Promp
 // assertion.
 //
 // Use WithRelaxedIO to disable this behaviour.
-func failOnExpectError(t testing.TB) expect.ConsoleOpt {
+func failOnExpectError(t *testing.T) expect.ConsoleOpt {
 	t.Helper()
 	return expect.WithExpectObserver(
 		func(matchers []expect.Matcher, buf string, err error) {
@@ -456,7 +456,7 @@ func failOnExpectError(t testing.TB) expect.ConsoleOpt {
 // if any sending of input fails, without requiring an explicit assertion.
 //
 // Use WithRelaxedIO to disable this behaviour.
-func failOnSendError(t testing.TB) expect.ConsoleOpt {
+func failOnSendError(t *testing.T) expect.ConsoleOpt {
 	t.Helper()
 	return expect.WithSendObserver(
 		func(msg string, n int, err error) {
@@ -473,7 +473,7 @@ func failOnSendError(t testing.TB) expect.ConsoleOpt {
 }
 
 // testCloser is a helper to fail the test if a Closer fails to close.
-func testCloser(t testing.TB, closer io.Closer) {
+func testCloser(t *testing.T, closer io.Closer) {
 	t.Helper()
 	if err := closer.Close(); err != nil {
 		t.Errorf("Close failed: %s", err)
