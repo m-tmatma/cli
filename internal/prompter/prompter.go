@@ -234,9 +234,9 @@ func (p *accessiblePrompter) InputHostname() (string, error) {
 func (p *accessiblePrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
 	var result string
 	skipOption := "skip"
-	openOption := "open"
+	launchOption := "launch"
 	options := []huh.Option[string]{
-		huh.NewOption(fmt.Sprintf("Open Editor: %s", p.editorCmd), openOption),
+		huh.NewOption(fmt.Sprintf("Launch %s", surveyext.EditorName(p.editorCmd)), launchOption),
 	}
 	if blankAllowed {
 		options = append(options, huh.NewOption("Skip", skipOption))
