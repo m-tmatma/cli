@@ -259,7 +259,7 @@ func (p *accessiblePrompter) MarkdownEditor(prompt, defaultValue string, blankAl
 		return "", nil
 	}
 
-	// openOption was selected
+	// launchOption was selected
 	text, err := surveyext.Edit(p.editorCmd, "*.md", defaultValue, p.stdin, p.stdout, p.stderr)
 	if err != nil {
 		return "", err
