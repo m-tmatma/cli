@@ -3,6 +3,7 @@ package search
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -24,6 +25,21 @@ func TestSearcherCode(t *testing.T) {
 		"page":     []string{"1"},
 		"per_page": []string{"30"},
 		"q":        []string{"keyword language:go"},
+	}
+
+	multiplePagesTotalItems := make([]Code, 0, 110)
+	multiplePagesFirstResItems := make([]Code, 0, 100)
+	multiplePagesSecondResItems := make([]Code, 0, 10)
+	for i := range 110 {
+		commit := Code{Name: "name" + strconv.Itoa(i) + ".go"}
+
+		multiplePagesTotalItems = append(multiplePagesTotalItems, commit)
+
+		if i < 100 {
+			multiplePagesFirstResItems = append(multiplePagesFirstResItems, commit)
+		} else {
+			multiplePagesSecondResItems = append(multiplePagesSecondResItems, commit)
+		}
 	}
 
 	tests := []struct {
@@ -87,20 +103,64 @@ func TestSearcherCode(t *testing.T) {
 				firstRes := httpmock.JSONResponse(CodeResult{
 					IncompleteResults: false,
 					Items:             []Code{{Name: "file.go"}},
-					Total:             2,
+					Total:             1,
 				},
 				)
-				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/code?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/code?page=2&per_page=30&q=org%3Agithub>; rel="next"`)
 				secondReq := httpmock.QueryMatcher("GET", "search/code", url.Values{
 					"page":     []string{"2"},
-					"per_page": []string{"29"},
+					"per_page": []string{"30"},
 					"q":        []string{"keyword language:go"},
 				},
 				)
 				secondRes := httpmock.JSONResponse(CodeResult{
 					IncompleteResults: false,
 					Items:             []Code{{Name: "file2.go"}},
-					Total:             2,
+					Total:             1,
+				},
+				)
+				reg.Register(firstReq, firstRes)
+				reg.Register(secondReq, secondRes)
+			},
+		},
+		{
+			name: "collects results for limit above one page",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     "code",
+				Limit:    110,
+				Qualifiers: Qualifiers{
+					Language: "go",
+				},
+			},
+			result: CodeResult{
+				IncompleteResults: false,
+				Items:             multiplePagesTotalItems,
+				Total:             110,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				firstReq := httpmock.QueryMatcher("GET", "search/code", url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"100"},
+					"q":        []string{"keyword language:go"},
+				})
+				firstRes := httpmock.JSONResponse(CodeResult{
+					IncompleteResults: false,
+					Items:             multiplePagesFirstResItems,
+					Total:             100,
+				},
+				)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/code?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				secondReq := httpmock.QueryMatcher("GET", "search/code", url.Values{
+					"page":     []string{"2"},
+					"per_page": []string{"100"},
+					"q":        []string{"keyword language:go"},
+				},
+				)
+				secondRes := httpmock.JSONResponse(CodeResult{
+					IncompleteResults: false,
+					Items:             multiplePagesSecondResItems,
+					Total:             10,
 				},
 				)
 				reg.Register(firstReq, firstRes)
@@ -181,6 +241,21 @@ func TestSearcherCommits(t *testing.T) {
 		"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
 	}
 
+	multiplePagesTotalItems := make([]Commit, 0, 110)
+	multiplePagesFirstResItems := make([]Commit, 0, 100)
+	multiplePagesSecondResItems := make([]Commit, 0, 10)
+	for i := range 110 {
+		commit := Commit{Sha: strconv.Itoa(i)}
+
+		multiplePagesTotalItems = append(multiplePagesTotalItems, commit)
+
+		if i < 100 {
+			multiplePagesFirstResItems = append(multiplePagesFirstResItems, commit)
+		} else {
+			multiplePagesSecondResItems = append(multiplePagesSecondResItems, commit)
+		}
+	}
+
 	tests := []struct {
 		name      string
 		host      string
@@ -242,13 +317,13 @@ func TestSearcherCommits(t *testing.T) {
 				firstRes := httpmock.JSONResponse(CommitsResult{
 					IncompleteResults: false,
 					Items:             []Commit{{Sha: "abc"}},
-					Total:             2,
+					Total:             1,
 				},
 				)
-				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/commits?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/commits?page=2&per_page=30&q=org%3Agithub>; rel="next"`)
 				secondReq := httpmock.QueryMatcher("GET", "search/commits", url.Values{
 					"page":     []string{"2"},
-					"per_page": []string{"29"},
+					"per_page": []string{"30"},
 					"order":    []string{"desc"},
 					"sort":     []string{"committer-date"},
 					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
@@ -257,7 +332,58 @@ func TestSearcherCommits(t *testing.T) {
 				secondRes := httpmock.JSONResponse(CommitsResult{
 					IncompleteResults: false,
 					Items:             []Commit{{Sha: "def"}},
-					Total:             2,
+					Total:             1,
+				},
+				)
+				reg.Register(firstReq, firstRes)
+				reg.Register(secondReq, secondRes)
+			},
+		},
+		{
+			name: "collects results for limit above one page",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     "commits",
+				Limit:    110,
+				Order:    "desc",
+				Sort:     "committer-date",
+				Qualifiers: Qualifiers{
+					Author:        "foobar",
+					CommitterDate: ">2021-02-28",
+				},
+			},
+			result: CommitsResult{
+				IncompleteResults: false,
+				Items:             multiplePagesTotalItems,
+				Total:             110,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				firstReq := httpmock.QueryMatcher("GET", "search/commits", url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"100"},
+					"order":    []string{"desc"},
+					"sort":     []string{"committer-date"},
+					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
+				})
+				firstRes := httpmock.JSONResponse(CommitsResult{
+					IncompleteResults: false,
+					Items:             multiplePagesFirstResItems,
+					Total:             100,
+				},
+				)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/commits?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				secondReq := httpmock.QueryMatcher("GET", "search/commits", url.Values{
+					"page":     []string{"2"},
+					"per_page": []string{"100"},
+					"order":    []string{"desc"},
+					"sort":     []string{"committer-date"},
+					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
+				},
+				)
+				secondRes := httpmock.JSONResponse(CommitsResult{
+					IncompleteResults: false,
+					Items:             multiplePagesSecondResItems,
+					Total:             10,
 				},
 				)
 				reg.Register(firstReq, firstRes)
@@ -338,6 +464,25 @@ func TestSearcherRepositories(t *testing.T) {
 		"q":        []string{"keyword stars:>=5 topic:topic"},
 	}
 
+	multiplePagesTotalItems := make([]Repository, 0, 110)
+	multiplePagesFirstResItems := make([]any, 0, 100)
+	multiplePagesSecondResItems := make([]any, 0, 10)
+	for i := range 110 {
+		num := strconv.Itoa(i)
+
+		multiplePagesTotalItems = append(multiplePagesTotalItems, Repository{Name: "name" + num})
+
+		if i < 100 {
+			multiplePagesFirstResItems = append(multiplePagesFirstResItems, map[string]any{
+				"name": "name" + num,
+			})
+		} else {
+			multiplePagesSecondResItems = append(multiplePagesSecondResItems, map[string]any{
+				"name": "name" + num,
+			})
+		}
+	}
+
 	tests := []struct {
 		name      string
 		host      string
@@ -406,17 +551,17 @@ func TestSearcherRepositories(t *testing.T) {
 				firstReq := httpmock.QueryMatcher("GET", "search/repositories", values)
 				firstRes := httpmock.JSONResponse(map[string]interface{}{
 					"incomplete_results": false,
-					"total_count":        2,
+					"total_count":        1,
 					"items": []interface{}{
 						map[string]interface{}{
 							"name": "test",
 						},
 					},
 				})
-				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/repositories?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/repositories?page=2&per_page=30&q=org%3Agithub>; rel="next"`)
 				secondReq := httpmock.QueryMatcher("GET", "search/repositories", url.Values{
 					"page":     []string{"2"},
-					"per_page": []string{"29"},
+					"per_page": []string{"30"},
 					"order":    []string{"desc"},
 					"sort":     []string{"stars"},
 					"q":        []string{"keyword stars:>=5 topic:topic"},
@@ -424,12 +569,60 @@ func TestSearcherRepositories(t *testing.T) {
 				)
 				secondRes := httpmock.JSONResponse(map[string]interface{}{
 					"incomplete_results": false,
-					"total_count":        2,
+					"total_count":        1,
 					"items": []interface{}{
 						map[string]interface{}{
 							"name": "cli",
 						},
 					},
+				})
+				reg.Register(firstReq, firstRes)
+				reg.Register(secondReq, secondRes)
+			},
+		},
+		{
+			name: "collects results for limit above one page",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     "repositories",
+				Limit:    110,
+				Order:    "desc",
+				Sort:     "stars",
+				Qualifiers: Qualifiers{
+					Stars: ">=5",
+					Topic: []string{"topic"},
+				},
+			},
+			result: RepositoriesResult{
+				IncompleteResults: false,
+				Items:             multiplePagesTotalItems,
+				Total:             110,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				firstReq := httpmock.QueryMatcher("GET", "search/repositories", url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"100"},
+					"order":    []string{"desc"},
+					"sort":     []string{"stars"},
+					"q":        []string{"keyword stars:>=5 topic:topic"},
+				})
+				firstRes := httpmock.JSONResponse(map[string]interface{}{
+					"incomplete_results": false,
+					"total_count":        100,
+					"items":              multiplePagesFirstResItems,
+				})
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/repositories?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				secondReq := httpmock.QueryMatcher("GET", "search/repositories", url.Values{
+					"page":     []string{"2"},
+					"per_page": []string{"100"},
+					"order":    []string{"desc"},
+					"sort":     []string{"stars"},
+					"q":        []string{"keyword stars:>=5 topic:topic"},
+				})
+				secondRes := httpmock.JSONResponse(map[string]interface{}{
+					"incomplete_results": false,
+					"total_count":        10,
+					"items":              multiplePagesSecondResItems,
 				})
 				reg.Register(firstReq, firstRes)
 				reg.Register(secondReq, secondRes)
@@ -509,6 +702,21 @@ func TestSearcherIssues(t *testing.T) {
 		"q":        []string{"keyword is:locked is:public language:go"},
 	}
 
+	multiplePagesTotalItems := make([]Issue, 0, 110)
+	multiplePagesFirstResItems := make([]Issue, 0, 100)
+	multiplePagesSecondResItems := make([]Issue, 0, 10)
+	for i := range 110 {
+		issue := Issue{Number: i}
+
+		multiplePagesTotalItems = append(multiplePagesTotalItems, issue)
+
+		if i < 100 {
+			multiplePagesFirstResItems = append(multiplePagesFirstResItems, issue)
+		} else {
+			multiplePagesSecondResItems = append(multiplePagesSecondResItems, issue)
+		}
+	}
+
 	tests := []struct {
 		name      string
 		host      string
@@ -570,13 +778,13 @@ func TestSearcherIssues(t *testing.T) {
 				firstRes := httpmock.JSONResponse(IssuesResult{
 					IncompleteResults: false,
 					Items:             []Issue{{Number: 1234}},
-					Total:             2,
+					Total:             1,
 				},
 				)
-				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/issues?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/issues?page=2&per_page=30&q=org%3Agithub>; rel="next"`)
 				secondReq := httpmock.QueryMatcher("GET", "search/issues", url.Values{
 					"page":     []string{"2"},
-					"per_page": []string{"29"},
+					"per_page": []string{"30"},
 					"order":    []string{"desc"},
 					"sort":     []string{"comments"},
 					"q":        []string{"keyword is:locked is:public language:go"},
@@ -585,7 +793,58 @@ func TestSearcherIssues(t *testing.T) {
 				secondRes := httpmock.JSONResponse(IssuesResult{
 					IncompleteResults: false,
 					Items:             []Issue{{Number: 5678}},
-					Total:             2,
+					Total:             1,
+				},
+				)
+				reg.Register(firstReq, firstRes)
+				reg.Register(secondReq, secondRes)
+			},
+		},
+		{
+			name: "collects results for limit above one page",
+			query: Query{
+				Keywords: []string{"keyword"},
+				Kind:     "issues",
+				Limit:    110,
+				Order:    "desc",
+				Sort:     "comments",
+				Qualifiers: Qualifiers{
+					Language: "go",
+					Is:       []string{"public", "locked"},
+				},
+			},
+			result: IssuesResult{
+				IncompleteResults: false,
+				Items:             multiplePagesTotalItems,
+				Total:             110,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				firstReq := httpmock.QueryMatcher("GET", "search/issues", url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"100"},
+					"order":    []string{"desc"},
+					"sort":     []string{"comments"},
+					"q":        []string{"keyword is:locked is:public language:go"},
+				})
+				firstRes := httpmock.JSONResponse(IssuesResult{
+					IncompleteResults: false,
+					Items:             multiplePagesFirstResItems,
+					Total:             100,
+				},
+				)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/issues?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				secondReq := httpmock.QueryMatcher("GET", "search/issues", url.Values{
+					"page":     []string{"2"},
+					"per_page": []string{"100"},
+					"order":    []string{"desc"},
+					"sort":     []string{"comments"},
+					"q":        []string{"keyword is:locked is:public language:go"},
+				},
+				)
+				secondRes := httpmock.JSONResponse(IssuesResult{
+					IncompleteResults: false,
+					Items:             multiplePagesSecondResItems,
+					Total:             10,
 				},
 				)
 				reg.Register(firstReq, firstRes)
