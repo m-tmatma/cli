@@ -136,10 +136,6 @@ func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) 
 	)
 
 	err := form.Run()
-
-	if result == "" {
-		return defaultValue, nil
-	}
 	return result, err
 }
 
