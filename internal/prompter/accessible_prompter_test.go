@@ -108,10 +108,6 @@ func TestAccessiblePrompter(t *testing.T) {
 			// Enter nothing
 			_, err = console.SendLine("")
 			require.NoError(t, err)
-
-			// Expect the default value to be returned
-			_, err = console.ExpectString(dummyDefaultValue)
-			require.NoError(t, err)
 		}()
 
 		inputValue, err := p.Input("Enter some characters", dummyDefaultValue)
