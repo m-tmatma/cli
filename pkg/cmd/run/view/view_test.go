@@ -2039,8 +2039,9 @@ func TestViewRun(t *testing.T) {
 //	├── 2_cool job with no step logs.txt
 //	├── 3_sad job with no step logs.txt
 //	├── -9999999999_legacy cool job with no step logs.txt
-//	└── -9999999999_legacy sad job with no step logs.txt
-
+//	├── -9999999999_legacy sad job with no step logs.txt
+//	├── 4_cool job with both legacy and new logs.txt
+//	└── -9999999999_cool job with both legacy and new logs.txt
 func Test_attachRunLog(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -2147,6 +2148,15 @@ func Test_attachRunLog(t *testing.T) {
 			},
 			wantJobMatch:    true,
 			wantJobFilename: "-9999999999_legacy cool job with no step logs.txt",
+			wantStepMatch:   false,
+		},
+		{
+			name: "matching job name with both normal and legacy filename",
+			job: shared.Job{
+				Name: "cool job with both legacy and new logs",
+			},
+			wantJobMatch:    true,
+			wantJobFilename: "4_cool job with both legacy and new logs.txt",
 			wantStepMatch:   false,
 		},
 		{
