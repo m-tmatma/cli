@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -294,9 +295,20 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 		return
 	}
 
-	// https://github.com/briandowns/spinner#available-character-sets
-	dotStyle := spinner.CharSets[11]
-	sp := spinner.New(dotStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
+	spinnerDisabledValue, spinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
+	falseyValues := []string{"false", "0", "no", ""}
+
+	var spinnerStyle []string
+	if spinnerDisabledIsSet && !slices.Contains(falseyValues, spinnerDisabledValue) {
+		// This progress indicator must be readable by screen readers
+		spinnerStyle = []string{"Working..."}
+	} else {
+		// https://github.com/briandowns/spinner#available-character-sets
+		// ⣾ ⣷ ⣽ ⣻ ⡿
+		spinnerStyle = spinner.CharSets[11]
+	}
+
+	sp := spinner.New(spinnerStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
 	if label != "" {
 		sp.Prefix = label + " "
 	}
