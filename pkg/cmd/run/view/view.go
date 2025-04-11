@@ -668,9 +668,10 @@ func truncateAsUTF16(str string, max int) string {
 //     where the ID can apparently be negative.
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
-		// the normal job run log file is preferred over the legacy one. So, we
-		// try to find the normal log file, and if we couldn't find it then we
-		// look for the legacy one, if any.
+		// As a highest priority, we try to use the step logs first. We have seen zips that surprisingly contain
+		// step logs, normal job logs and legacy job logs. In this case, both job logs would be ignored. We have
+		// never seen a zip containing both job logs and no step logs, however, it may be possible. In that case
+		// let's prioritise the normal log over the legacy one.
 		jobLog := matchFileInZIPArchive(rlz, jobLogFilenameRegexp(job))
 		if jobLog == nil {
 			jobLog = matchFileInZIPArchive(rlz, legacyJobLogFilenameRegexp(job))
