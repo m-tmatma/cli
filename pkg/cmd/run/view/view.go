@@ -555,7 +555,7 @@ func getJobNameForLogFilename(name string) string {
 // number; e.g., "0_jobname.txt".
 func jobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
-	re := fmt.Sprintf(`^\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
+	re := fmt.Sprintf(`^\d+_%s\.txt$`, regexp.QuoteMeta(sanitizedJobName))
 	return regexp.MustCompile(re)
 }
 
@@ -563,13 +563,13 @@ func jobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
 // negative number which is the ID of the run; e.g., "-2147483648_jobname.txt".
 func legacyJobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
-	re := fmt.Sprintf(`^-\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
+	re := fmt.Sprintf(`^-\d+_%s\.txt$`, regexp.QuoteMeta(sanitizedJobName))
 	return regexp.MustCompile(re)
 }
 
 func stepLogFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
-	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
+	re := fmt.Sprintf(`^%s\/%d_.*\.txt$`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
