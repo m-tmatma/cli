@@ -711,6 +711,11 @@ func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 			continue
 		}
 
+		// Here, we fall back to the job run log, which means we do not know
+		// the step name of lines. However, we want to keep the same line
+		// formatting to avoid breaking any code or script that rely on the
+		// tab-delimited formatting. So, an unknown-step placeholder is used
+		// instead of the actual step name.
 		prefix := fmt.Sprintf("%s\tUNKNOWN STEP\t", job.Name)
 		if err := printZIPFile(w, job.Log, prefix); err != nil {
 			return err
