@@ -711,7 +711,7 @@ func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 			continue
 		}
 
-		prefix := fmt.Sprintf("%s\tUNKNOWN\t", job.Name)
+		prefix := fmt.Sprintf("%s\tUNKNOWN STEP\t", job.Name)
 		if err := printZIPFile(w, job.Log, prefix); err != nil {
 			return err
 		}

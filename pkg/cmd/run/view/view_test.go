@@ -2298,27 +2298,27 @@ sad job	quux the barf	log line 3
 `)
 
 var coolJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
-cool job with no step logs	UNKNOWN	log line 1
-cool job with no step logs	UNKNOWN	log line 2
-cool job with no step logs	UNKNOWN	log line 3
+cool job with no step logs	UNKNOWN STEP	log line 1
+cool job with no step logs	UNKNOWN STEP	log line 2
+cool job with no step logs	UNKNOWN STEP	log line 3
 `)
 
 var legacyCoolJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
-legacy cool job with no step logs	UNKNOWN	log line 1
-legacy cool job with no step logs	UNKNOWN	log line 2
-legacy cool job with no step logs	UNKNOWN	log line 3
+legacy cool job with no step logs	UNKNOWN STEP	log line 1
+legacy cool job with no step logs	UNKNOWN STEP	log line 2
+legacy cool job with no step logs	UNKNOWN STEP	log line 3
 `)
 
 var sadJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
-sad job with no step logs	UNKNOWN	log line 1
-sad job with no step logs	UNKNOWN	log line 2
-sad job with no step logs	UNKNOWN	log line 3
+sad job with no step logs	UNKNOWN STEP	log line 1
+sad job with no step logs	UNKNOWN STEP	log line 2
+sad job with no step logs	UNKNOWN STEP	log line 3
 `)
 
 var legacySadJobRunWithNoStepLogsLogOutput = heredoc.Doc(`
-legacy sad job with no step logs	UNKNOWN	log line 1
-legacy sad job with no step logs	UNKNOWN	log line 2
-legacy sad job with no step logs	UNKNOWN	log line 3
+legacy sad job with no step logs	UNKNOWN STEP	log line 1
+legacy sad job with no step logs	UNKNOWN STEP	log line 2
+legacy sad job with no step logs	UNKNOWN STEP	log line 3
 `)
 
 var coolJobRunLogOutput = fmt.Sprintf("%s%s", fobTheBarzLogOutput, barfTheFobLogOutput)
