@@ -677,6 +677,10 @@ func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 
 func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 	for _, job := range jobs {
+		// To display a run log, we first try to compile it from individual step
+		// logs, because this way we can prepend lines with the corresponding
+		// step name. However, it's possible that we don't have the step logs,
+		// in which case we fall back to print the entire job run log.
 		var hasStepLogs bool
 
 		steps := job.Steps
