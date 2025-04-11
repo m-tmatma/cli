@@ -653,6 +653,9 @@ func truncateAsUTF16(str string, max int) string {
 // the prefixed number is either:
 //   - An ordinal and cannot be mapped to the corresponding job's ID.
 //   - A negative integer which is the ID of the job in the old Actions service.
+//     The service right now tries to get logs and use an ordinal in a loop.
+//     However, if it doesn't get the logs, it falls back to an old service
+//     where the ID can apparently be negative.
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
 		re := jobLogFilenameRegexp(job)
