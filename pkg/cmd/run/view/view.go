@@ -551,9 +551,19 @@ func getJobNameForLogFilename(name string) string {
 	return sanitizedJobName
 }
 
+// A job run log file is a top-level .txt file whose name starts with an ordinal
+// number; e.g., "0_jobname.txt".
 func jobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
-	re := fmt.Sprintf(`^-?\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
+	re := fmt.Sprintf(`^\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
+	return regexp.MustCompile(re)
+}
+
+// A legacy job run log file is a top-level .txt file whose name starts with a
+// negative number which is the ID of the run; e.g., "-2147483648_jobname.txt".
+func legacyJobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
+	re := fmt.Sprintf(`^-\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
 	return regexp.MustCompile(re)
 }
 
@@ -658,24 +668,28 @@ func truncateAsUTF16(str string, max int) string {
 //     where the ID can apparently be negative.
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
-		re := jobLogFilenameRegexp(job)
-		for _, file := range rlz.File {
-			if re.MatchString(file.Name) {
-				jobs[i].Log = file
-				break
-			}
+		// the normal job run log file is preferred over the legacy one. So, we
+		// try to find the normal log file, and if we couldn't find it then we
+		// look for the legacy one, if any.
+		jobLog := matchFileInZIPArchive(rlz, jobLogFilenameRegexp(job))
+		if jobLog == nil {
+			jobLog = matchFileInZIPArchive(rlz, legacyJobLogFilenameRegexp(job))
 		}
+		jobs[i].Log = jobLog
 
 		for j, step := range job.Steps {
-			re := stepLogFilenameRegexp(job, step)
-			for _, file := range rlz.File {
-				if re.MatchString(file.Name) {
-					jobs[i].Steps[j].Log = file
-					break
-				}
-			}
+			jobs[i].Steps[j].Log = matchFileInZIPArchive(rlz, stepLogFilenameRegexp(job, step))
 		}
 	}
+}
+
+func matchFileInZIPArchive(zr *zip.Reader, re *regexp.Regexp) *zip.File {
+	for _, file := range zr.File {
+		if re.MatchString(file.Name) {
+			return file
+		}
+	}
+	return nil
 }
 
 func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
