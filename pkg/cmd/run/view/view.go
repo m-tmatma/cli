@@ -555,15 +555,25 @@ func getJobNameForLogFilename(name string) string {
 	return sanitizedJobName
 }
 
+// A job run log file is a top-level .txt file whose name starts with an ordinal
+// number; e.g., "0_jobname.txt".
 func jobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
-	re := fmt.Sprintf(`^-?\d+_%s\.txt`, regexp.QuoteMeta(sanitizedJobName))
+	re := fmt.Sprintf(`^\d+_%s\.txt$`, regexp.QuoteMeta(sanitizedJobName))
+	return regexp.MustCompile(re)
+}
+
+// A legacy job run log file is a top-level .txt file whose name starts with a
+// negative number which is the ID of the run; e.g., "-2147483648_jobname.txt".
+func legacyJobLogFilenameRegexp(job shared.Job) *regexp.Regexp {
+	sanitizedJobName := getJobNameForLogFilename(job.Name)
+	re := fmt.Sprintf(`^-\d+_%s\.txt$`, regexp.QuoteMeta(sanitizedJobName))
 	return regexp.MustCompile(re)
 }
 
 func stepLogFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 	sanitizedJobName := getJobNameForLogFilename(job.Name)
-	re := fmt.Sprintf(`^%s\/%d_.*\.txt`, regexp.QuoteMeta(sanitizedJobName), step.Number)
+	re := fmt.Sprintf(`^%s\/%d_.*\.txt$`, regexp.QuoteMeta(sanitizedJobName), step.Number)
 	return regexp.MustCompile(re)
 }
 
@@ -662,24 +672,29 @@ func truncateAsUTF16(str string, max int) string {
 //     where the ID can apparently be negative.
 func attachRunLog(rlz *zip.Reader, jobs []shared.Job) {
 	for i, job := range jobs {
-		re := jobLogFilenameRegexp(job)
-		for _, file := range rlz.File {
-			if re.MatchString(file.Name) {
-				jobs[i].Log = file
-				break
-			}
+		// As a highest priority, we try to use the step logs first. We have seen zips that surprisingly contain
+		// step logs, normal job logs and legacy job logs. In this case, both job logs would be ignored. We have
+		// never seen a zip containing both job logs and no step logs, however, it may be possible. In that case
+		// let's prioritise the normal log over the legacy one.
+		jobLog := matchFileInZIPArchive(rlz, jobLogFilenameRegexp(job))
+		if jobLog == nil {
+			jobLog = matchFileInZIPArchive(rlz, legacyJobLogFilenameRegexp(job))
 		}
+		jobs[i].Log = jobLog
 
 		for j, step := range job.Steps {
-			re := stepLogFilenameRegexp(job, step)
-			for _, file := range rlz.File {
-				if re.MatchString(file.Name) {
-					jobs[i].Steps[j].Log = file
-					break
-				}
-			}
+			jobs[i].Steps[j].Log = matchFileInZIPArchive(rlz, stepLogFilenameRegexp(job, step))
 		}
 	}
+}
+
+func matchFileInZIPArchive(zr *zip.Reader, re *regexp.Regexp) *zip.File {
+	for _, file := range zr.File {
+		if re.MatchString(file.Name) {
+			return file
+		}
+	}
+	return nil
 }
 
 func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
