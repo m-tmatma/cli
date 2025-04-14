@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -79,7 +78,8 @@ type IOStreams struct {
 	pagerCommand string
 	pagerProcess *os.Process
 
-	neverPrompt bool
+	neverPrompt     bool
+	spinnerDisabled bool
 
 	TempFileOverride *os.File
 }
@@ -274,6 +274,14 @@ func (s *IOStreams) SetNeverPrompt(v bool) {
 	s.neverPrompt = v
 }
 
+func (s *IOStreams) GetSpinnerDisabled() bool {
+	return s.spinnerDisabled
+}
+
+func (s *IOStreams) SetSpinnerDisabled(v bool) {
+	s.spinnerDisabled = v
+}
+
 func (s *IOStreams) StartProgressIndicator() {
 	s.StartProgressIndicatorWithLabel("")
 }
@@ -295,13 +303,20 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 		return
 	}
 
-	spinnerDisabledValue, spinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
-	falseyValues := []string{"false", "0", "no", ""}
-
 	var spinnerStyle []string
-	if spinnerDisabledIsSet && !slices.Contains(falseyValues, spinnerDisabledValue) {
-		// This progress indicator must be readable by screen readers
-		spinnerStyle = []string{"Working..."}
+	if s.spinnerDisabled {
+		// Default label when spinner disabled is "Working..."
+		if label == "" {
+			label = "Working..."
+		}
+
+		// Add an ellipsis to the label if it doesn't already have one.
+		ellipsis := "..."
+		if !strings.HasSuffix(label, ellipsis) {
+			label = label + ellipsis
+		}
+
+		spinnerStyle = []string{label}
 	} else {
 		// https://github.com/briandowns/spinner#available-character-sets
 		// ⣾ ⣷ ⣽ ⣻ ⡿
@@ -309,7 +324,7 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 	}
 
 	sp := spinner.New(spinnerStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
-	if label != "" {
+	if label != "" && !s.spinnerDisabled {
 		sp.Prefix = label + " "
 	}
 

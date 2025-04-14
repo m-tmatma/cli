@@ -34,8 +34,7 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 	// from the console.
 	t.Run("progress indicator respects GH_SPINNER_DISABLED is true", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		io := newTestIOStreams(t, console)
-		t.Setenv("GH_SPINNER_DISABLED", "true")
+		io := newTestIOStreams(t, console, true)
 
 		done := make(chan error)
 
@@ -57,8 +56,7 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 
 	t.Run("progress indicator respects GH_SPINNER_DISABLED is false", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		io := newTestIOStreams(t, console)
-		t.Setenv("GH_SPINNER_DISABLED", "false")
+		io := newTestIOStreams(t, console, false)
 
 		done := make(chan error)
 
@@ -80,16 +78,13 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 
 	t.Run("progress indicator with GH_SPINNER_DISABLED shows label", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		io := newTestIOStreams(t, console)
-		t.Setenv("GH_SPINNER_DISABLED", "true")
+		io := newTestIOStreams(t, console, true)
 		progressIndicatorLabel := "downloading happiness"
 
 		done := make(chan error)
 
 		go func() {
-			_, err := console.ExpectString("Working...")
-			require.NoError(t, err)
-			_, err = console.ExpectString(progressIndicatorLabel)
+			_, err := console.ExpectString(progressIndicatorLabel + "...")
 			done <- err
 		}()
 
@@ -106,7 +101,7 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 
 	t.Run("progress indicator shows label and spinner", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		io := newTestIOStreams(t, console)
+		io := newTestIOStreams(t, console, false)
 		progressIndicatorLabel := "downloading happiness"
 
 		done := make(chan error)
@@ -156,7 +151,7 @@ func newTestVirtualTerminal(t *testing.T) *expect.Console {
 	return console
 }
 
-func newTestIOStreams(t *testing.T, console *expect.Console) *IOStreams {
+func newTestIOStreams(t *testing.T, console *expect.Console, spinnerDisabled bool) *IOStreams {
 	t.Helper()
 
 	in := console.Tty()
@@ -174,6 +169,7 @@ func newTestIOStreams(t *testing.T, console *expect.Console) *IOStreams {
 		term:   fakeTerm{},
 	}
 	io.progressIndicatorEnabled = true
+	io.SetSpinnerDisabled(spinnerDisabled)
 	return io
 }
 
