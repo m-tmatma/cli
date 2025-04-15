@@ -7,8 +7,10 @@ exec gh auth setup-git
 # Create a repository with a file so it has a default branch
 exec gh repo create ${ORG}/${REPO} --add-readme --private
 
-# Defer repo cleanup
+# Defer repo cleanup of repo
 defer gh repo delete --yes ${ORG}/${REPO}
+exec gh repo view ${ORG}/${REPO} --json id --jq '.id'
+stdout2env REPO_ID
 
 # Clone the repo
 exec gh repo clone ${ORG}/${REPO}
@@ -20,17 +22,13 @@ exec git config push.default simple
 # Prepare a branch where changes are pulled from the default branch instead of remote branch of same name
 exec git checkout -b feature-branch
 exec git branch --set-upstream-to origin/main
-
-# Create the PR
 exec git commit --allow-empty -m 'Empty Commit'
 exec git push origin feature-branch
-exec gh pr create -H feature-branch --title 'Feature Title' --body 'Feature Body'
 
-# View the PR
-exec gh pr view
-stdout 'Feature Title'
+# Create the PR
+exec gh pr create --title 'Feature Title' --body 'Feature Body'
+stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
 
-# Check the PR status
-env PR_STATUS_BRANCH=#1  Feature Title [feature-branch]
-exec gh pr status
-stdout $PR_STATUS_BRANCH
+# Assert that the PR was created with the correct head repository and refs
+exec gh pr view --json headRefName,headRepository,baseRefName,isCrossRepository
+stdout {"baseRefName":"main","headRefName":"feature-branch","headRepository":{"id":"${REPO_ID}","name":"${REPO}"},"isCrossRepository":false}

@@ -1,10 +1,8 @@
-# This test is the same as pr-create-basic, except that the git push doesn't include the -u argument
-# This causes a git config read to fail during gh pr create, but it should not be fatal
-
-env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
-
 # Use gh as a credential helper
 exec gh auth setup-git
+
+# Setup environment variables used for testscript
+env REPO=${SCRIPT_NAME}-${RANDOM_STRING}
 
 # Create a repository with a file so it has a default branch
 exec gh repo create ${ORG}/${REPO} --add-readme --private
@@ -19,11 +17,11 @@ exec gh repo clone ${ORG}/${REPO}
 cd ${REPO}
 exec git checkout -b feature-branch
 exec git commit --allow-empty -m 'Empty Commit'
-exec git push origin feature-branch
+exec git push -u origin feature-branch
+
+# Leave the repo so there's no local repo
+cd ${WORK}
 
 # Create the PR
-exec gh pr create --title 'Feature Title' --body 'Feature Body'
-
-# Check the PR is indeed created
-exec gh pr view
-stdout 'Feature Title'
+exec gh pr create --title 'Feature Title' --body 'Feature Body' --repo ${ORG}/${REPO} --head feature-branch
+stdout https://${GH_HOST}/${ORG}/${REPO}/pull/1
