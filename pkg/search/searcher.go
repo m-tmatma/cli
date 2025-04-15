@@ -87,13 +87,11 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 			return result, err
 		}
 
-		result.IncompleteResults = page.IncompleteResults
-
 		// If we're going to reach the requested limit, only add that many items,
 		// otherwise add all the results.
 		itemsToAdd := min(len(page.Items), toRetrieve)
-
-		result.Total += itemsToAdd
+		result.IncompleteResults = page.IncompleteResults
+		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
 		toRetrieve = toRetrieve - itemsToAdd
 	}
@@ -122,11 +120,9 @@ func (s searcher) Commits(query Query) (CommitsResult, error) {
 			return result, err
 		}
 
-		result.IncompleteResults = page.IncompleteResults
-
 		itemsToAdd := min(len(page.Items), toRetrieve)
-
-		result.Total += itemsToAdd
+		result.IncompleteResults = page.IncompleteResults
+		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
 		toRetrieve = toRetrieve - itemsToAdd
 	}
@@ -154,10 +150,8 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 			return result, err
 		}
 
-		result.IncompleteResults = page.IncompleteResults
-
 		itemsToAdd := min(len(page.Items), toRetrieve)
-
+		result.IncompleteResults = page.IncompleteResults
 		result.Total += itemsToAdd
 		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
 		toRetrieve = toRetrieve - itemsToAdd
@@ -186,10 +180,8 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 			return result, err
 		}
 
-		result.IncompleteResults = page.IncompleteResults
-
 		itemsToAdd := min(len(page.Items), toRetrieve)
-
+		result.IncompleteResults = page.IncompleteResults
 		result.Total += itemsToAdd
 		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
 		toRetrieve = toRetrieve - itemsToAdd
