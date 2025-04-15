@@ -291,6 +291,11 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 		return
 	}
 
+	if s.spinnerDisabled {
+		s.startTextualProgressIndicator(label)
+		return
+	}
+
 	s.progressIndicatorMu.Lock()
 	defer s.progressIndicatorMu.Unlock()
 
@@ -303,33 +308,35 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 		return
 	}
 
-	var spinnerStyle []string
-	if s.spinnerDisabled {
-		// Default label when spinner disabled is "Working..."
-		if label == "" {
-			label = "Working..."
-		}
-
-		// Add an ellipsis to the label if it doesn't already have one.
-		ellipsis := "..."
-		if !strings.HasSuffix(label, ellipsis) {
-			label = label + ellipsis
-		}
-
-		spinnerStyle = []string{label}
-	} else {
-		// https://github.com/briandowns/spinner#available-character-sets
-		// ⣾ ⣷ ⣽ ⣻ ⡿
-		spinnerStyle = spinner.CharSets[11]
-	}
+	// https://github.com/briandowns/spinner#available-character-sets
+	// ⣾ ⣷ ⣽ ⣻ ⡿
+	spinnerStyle := spinner.CharSets[11]
 
 	sp := spinner.New(spinnerStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
-	if label != "" && !s.spinnerDisabled {
+	if label != "" {
 		sp.Prefix = label + " "
 	}
 
 	sp.Start()
 	s.progressIndicator = sp
+}
+
+func (s *IOStreams) startTextualProgressIndicator(label string) {
+	s.progressIndicatorMu.Lock()
+	defer s.progressIndicatorMu.Unlock()
+
+	// Default label when spinner disabled is "Working..."
+	if label == "" {
+		label = "Working..."
+	}
+
+	// Add an ellipsis to the label if it doesn't already have one.
+	ellipsis := "..."
+	if !strings.HasSuffix(label, ellipsis) {
+		label = label + ellipsis
+	}
+
+	fmt.Fprintf(s.ErrOut, "%s%s", s.ColorScheme().Cyan(label), "\n")
 }
 
 func (s *IOStreams) StopProgressIndicator() {

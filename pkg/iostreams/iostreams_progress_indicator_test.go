@@ -123,6 +123,30 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 			t.Fatal("Test timed out waiting for progress indicator")
 		}
 	})
+
+	t.Run("multiple indicators with GH_SPINNER_DISABLED shows current label", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		io := newTestIOStreams(t, console, true)
+		progressIndicatorLabel1 := "downloading happiness"
+		progressIndicatorLabel2 := "downloading sadness"
+		done := make(chan error)
+		go func() {
+			_, err := console.ExpectString(progressIndicatorLabel1 + "...")
+			require.NoError(t, err)
+			_, err = console.ExpectString(progressIndicatorLabel2 + "...")
+			done <- err
+		}()
+		io.StartProgressIndicatorWithLabel(progressIndicatorLabel1)
+		defer io.StopProgressIndicator()
+		io.StartProgressIndicatorWithLabel(progressIndicatorLabel2)
+
+		select {
+		case err := <-done:
+			require.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("Test timed out waiting for progress indicator")
+		}
+	})
 }
 
 func newTestVirtualTerminal(t *testing.T) *expect.Console {
