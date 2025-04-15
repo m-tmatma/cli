@@ -152,7 +152,7 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 
 		itemsToAdd := min(len(page.Items), toRetrieve)
 		result.IncompleteResults = page.IncompleteResults
-		result.Total += itemsToAdd
+		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
 		toRetrieve = toRetrieve - itemsToAdd
 	}
@@ -182,7 +182,7 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 
 		itemsToAdd := min(len(page.Items), toRetrieve)
 		result.IncompleteResults = page.IncompleteResults
-		result.Total += itemsToAdd
+		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
 		toRetrieve = toRetrieve - itemsToAdd
 	}
