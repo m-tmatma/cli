@@ -12,6 +12,8 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -29,6 +31,7 @@ type ViewOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
+	Detector   fd.Detector
 
 	IssueNumber int
 	WebMode     bool
@@ -89,7 +92,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
-	"assignees", "labels", "projectCards", "reactionGroups", "lastComment", "stateReason",
+	"assignees", "labels", "reactionGroups", "lastComment", "stateReason",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -113,6 +116,18 @@ func viewRun(opts *ViewOptions) error {
 		if opts.Comments {
 			lookupFields.Add("comments")
 			lookupFields.Remove("lastComment")
+		}
+
+		// TODO projectsV1Deprecation
+		// Remove this section as we should no longer add projectCards
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		}
+
+		projectsV1Support := opts.Detector.ProjectsV1()
+		if projectsV1Support == gh.ProjectsV1Supported {
+			lookupFields.Add("projectCards")
 		}
 	}
 
