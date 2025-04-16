@@ -13,9 +13,88 @@ import (
 	"github.com/cli/cli/v2/api"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/cli/v2/pkg/set"
 	"golang.org/x/sync/errgroup"
 )
+
+func ParseIssuesFromArgs(args []string) ([]int, o.Option[ghrepo.Interface], error) {
+	var repo o.Option[ghrepo.Interface]
+	issueNumbers := make([]int, len(args))
+
+	for i, arg := range args {
+		// For each argument, parse the issue number and an optional repo
+		issueNumber, issueRepo, err := parseIssueFromArg(arg)
+		if err != nil {
+			return nil, o.None[ghrepo.Interface](), err
+		}
+
+		// if this is our first issue repo found, then we need to set it
+		if repo.IsNone() {
+			repo = issueRepo
+		}
+
+		// if there is an issue repo returned, then we need to check if it is the same as the previous one
+		if issueRepo.IsSome() && repo.IsSome() {
+			// Unwraps are safe because we've checked for presence above
+			if !ghrepo.IsSame(repo.Unwrap(), issueRepo.Unwrap()) {
+				return nil, o.None[ghrepo.Interface](), fmt.Errorf(
+					"multiple issues must be in same repo: found %q, expected %q",
+					ghrepo.FullName(issueRepo.Unwrap()),
+					ghrepo.FullName(repo.Unwrap()),
+				)
+			}
+		}
+
+		// add the issue number to the list
+		issueNumbers[i] = issueNumber
+	}
+
+	return issueNumbers, repo, nil
+}
+
+func parseIssueFromArg(arg string) (int, o.Option[ghrepo.Interface], error) {
+	issueLocator := tryParseIssueFromURL(arg)
+	if issueLocator, present := issueLocator.Value(); present {
+		return issueLocator.issueNumber, o.Some(issueLocator.repo), nil
+	}
+
+	issueNumber, err := strconv.Atoi(strings.TrimPrefix(arg, "#"))
+	if err != nil {
+		return 0, o.None[ghrepo.Interface](), fmt.Errorf("invalid issue format: %q", arg)
+	}
+
+	return issueNumber, o.None[ghrepo.Interface](), nil
+}
+
+type issueLocator struct {
+	issueNumber int
+	repo        ghrepo.Interface
+}
+
+// tryParseIssueFromURL tries to parse an issue number and repo from a URL.
+func tryParseIssueFromURL(maybeURL string) o.Option[issueLocator] {
+	u, err := url.Parse(maybeURL)
+	if err != nil {
+		return o.None[issueLocator]()
+	}
+
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return o.None[issueLocator]()
+	}
+
+	m := issueURLRE.FindStringSubmatch(u.Path)
+	if m == nil {
+		return o.None[issueLocator]()
+	}
+
+	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
+	issueNumber, _ := strconv.Atoi(m[3])
+	return o.Some(issueLocator{
+		issueNumber: issueNumber,
+		repo:        repo,
+	})
+}
 
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
@@ -34,70 +113,6 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 
 	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
-}
-
-// IssuesFromArgsWithFields loads 1 or more issues or pull requests with the specified fields. If some of the fields
-// could not be fetched by GraphQL, this returns non-nil issues and a *PartialLoadError.
-func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), args []string, fields []string) ([]*api.Issue, ghrepo.Interface, error) {
-	var issuesRepo ghrepo.Interface
-	issueNumbers := make([]int, 0, len(args))
-
-	for _, arg := range args {
-		issueNumber, baseRepo, err := IssueNumberAndRepoFromArg(arg)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		issueNumbers = append(issueNumbers, issueNumber)
-		if baseRepo == nil {
-			var err error
-			if baseRepo, err = baseRepoFn(); err != nil {
-				return nil, nil, err
-			}
-		}
-
-		if issuesRepo == nil {
-			issuesRepo = baseRepo
-			continue
-		}
-
-		if !ghrepo.IsSame(issuesRepo, baseRepo) {
-			return nil, nil, fmt.Errorf(
-				"multiple issues must be in same repo: found %q, expected %q",
-				ghrepo.FullName(baseRepo),
-				ghrepo.FullName(issuesRepo),
-			)
-		}
-	}
-
-	issuesChan := make(chan *api.Issue, len(args))
-	g := errgroup.Group{}
-	for _, num := range issueNumbers {
-		issueNumber := num
-		g.Go(func() error {
-			issue, err := findIssueOrPR(httpClient, issuesRepo, issueNumber, fields)
-			if err != nil {
-				return err
-			}
-
-			issuesChan <- issue
-			return nil
-		})
-	}
-
-	err := g.Wait()
-	close(issuesChan)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	issues := make([]*api.Issue, 0, len(args))
-	for issue := range issuesChan {
-		issues = append(issues, issue)
-	}
-
-	return issues, issuesRepo, nil
 }
 
 var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/(?:issues|pull)/(\d+)`)
@@ -140,6 +155,39 @@ func IssueNumberAndRepoFromArg(arg string) (int, ghrepo.Interface, error) {
 
 type PartialLoadError struct {
 	error
+}
+
+// FindIssuesOrPRs loads 1 or more issues or pull requests with the specified fields. If some of the fields
+// could not be fetched by GraphQL, this returns non-nil issues and a *PartialLoadError.
+func FindIssuesOrPRs(httpClient *http.Client, repo ghrepo.Interface, issueNumbers []int, fields []string) ([]*api.Issue, error) {
+	issuesChan := make(chan *api.Issue, len(issueNumbers))
+	g := errgroup.Group{}
+	for _, num := range issueNumbers {
+		issueNumber := num
+		g.Go(func() error {
+			issue, err := findIssueOrPR(httpClient, repo, issueNumber, fields)
+			if err != nil {
+				return err
+			}
+
+			issuesChan <- issue
+			return nil
+		})
+	}
+
+	err := g.Wait()
+	close(issuesChan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	issues := make([]*api.Issue, 0, len(issueNumbers))
+	for issue := range issuesChan {
+		issues = append(issues, issue)
+	}
+
+	return issues, nil
 }
 
 func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {

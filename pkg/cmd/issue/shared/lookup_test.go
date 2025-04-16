@@ -7,7 +7,9 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIssueFromArgWithFields(t *testing.T) {
@@ -214,53 +216,85 @@ func TestIssueFromArgWithFields(t *testing.T) {
 	}
 }
 
-func TestIssuesFromArgsWithFields(t *testing.T) {
-	type args struct {
-		baseRepoFn func() (ghrepo.Interface, error)
-		selectors  []string
-	}
+func TestParseIssuesFromArgs(t *testing.T) {
 	tests := []struct {
-		name       string
-		args       args
-		httpStub   func(*httpmock.Registry)
-		wantIssues []int
-		wantRepo   string
-		wantErr    bool
-		wantErrMsg string
+		behavior             string
+		args                 []string
+		expectedIssueNumbers []int
+		expectedRepo         o.Option[ghrepo.Interface]
+		expectedErr          bool
 	}{
 		{
-			name: "multiple repos",
-			args: args{
-				selectors: []string{"1", "https://github.com/OWNER/OTHERREPO/issues/2"},
-				baseRepoFn: func() (ghrepo.Interface, error) {
-					return ghrepo.New("OWNER", "REPO"), nil
-				},
-			},
-			httpStub: func(r *httpmock.Registry) {
-				r.Register(
-					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{
-						"hasIssuesEnabled": true,
-						"issue":{"number":1}
-					}}}`))
-				r.Register(
-					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{
-							"hasIssuesEnabled": true,
-							"issue":{"number":2}
-					}}}`))
-			},
-			wantErr:    true,
-			wantErrMsg: "multiple issues must be in same repo",
+			behavior:             "when given issue numbers, returns them with no repo",
+			args:                 []string{"1", "2"},
+			expectedIssueNumbers: []int{1, 2},
+			expectedRepo:         o.None[ghrepo.Interface](),
 		},
 		{
-			name: "multiple issues",
-			args: args{
-				selectors: []string{"1", "2"},
-				baseRepoFn: func() (ghrepo.Interface, error) {
-					return ghrepo.New("OWNER", "REPO"), nil
-				},
+			behavior:             "when given # prefixed issue numbers, returns them with no repo",
+			args:                 []string{"#1", "#2"},
+			expectedIssueNumbers: []int{1, 2},
+			expectedRepo:         o.None[ghrepo.Interface](),
+		},
+		{
+			behavior: "when given URLs, returns them with the repo",
+			args: []string{
+				"https://github.com/OWNER/REPO/issues/1",
+				"https://github.com/OWNER/REPO/issues/2",
 			},
+			expectedIssueNumbers: []int{1, 2},
+			expectedRepo:         o.Some(ghrepo.New("OWNER", "REPO")),
+		},
+		{
+			behavior: "when given URLs in different repos, errors",
+			args: []string{
+				"https://github.com/OWNER/REPO/issues/1",
+				"https://github.com/OWNER/OTHERREPO/issues/2",
+			},
+			expectedErr: true,
+		},
+		{
+			behavior:    "when given an unparseable argument, errors",
+			args:        []string{"://"},
+			expectedErr: true,
+		},
+		{
+			behavior:    "when given a URL that isn't an issue or PR url, errors",
+			args:        []string{"https://github.com"},
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.behavior, func(t *testing.T) {
+			issueNumbers, repo, err := ParseIssuesFromArgs(tc.args)
+
+			if tc.expectedErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedIssueNumbers, issueNumbers)
+			assert.Equal(t, tc.expectedRepo, repo)
+		})
+	}
+
+}
+
+func TestFindIssuesOrPRs(t *testing.T) {
+	tests := []struct {
+		name             string
+		issueNumbers     []int
+		baseRepo         ghrepo.Interface
+		httpStub         func(*httpmock.Registry)
+		wantIssueNumbers []int
+		wantErr          bool
+	}{
+		{
+			name:         "multiple issues",
+			issueNumbers: []int{1, 2},
+			baseRepo:     ghrepo.New("OWNER", "REPO"),
 			httpStub: func(r *httpmock.Registry) {
 				r.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
@@ -275,43 +309,48 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 							"issue":{"number":2}
 						}}}`))
 			},
-			wantIssues: []int{1, 2},
-			wantRepo:   "https://github.com/OWNER/REPO",
+			wantIssueNumbers: []int{1, 2},
+		},
+		{
+			name:         "any find error results in total error",
+			issueNumbers: []int{1, 2},
+			baseRepo:     ghrepo.New("OWNER", "REPO"),
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"hasIssuesEnabled": true,
+						"issue":{"number":1}
+					}}}`))
+				r.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StatusStringResponse(500, "internal server error"))
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
-		if !tt.wantErr && len(tt.args.selectors) != len(tt.wantIssues) {
-			t.Fatal("number of selectors and issues not equal")
-		}
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			if tt.httpStub != nil {
 				tt.httpStub(reg)
 			}
 			httpClient := &http.Client{Transport: reg}
-			issues, repo, err := IssuesFromArgsWithFields(httpClient, tt.args.baseRepoFn, tt.args.selectors, []string{"number"})
+			issues, err := FindIssuesOrPRs(httpClient, tt.baseRepo, tt.issueNumbers, []string{"number"})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("IssuesFromArgsWithFields() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FindIssuesOrPRs() error = %v, wantErr %v", err, tt.wantErr)
 				if issues == nil {
 					return
 				}
 			}
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.ErrorContains(t, err, tt.wantErrMsg)
+				require.Error(t, err)
 				return
 			}
-			assert.NoError(t, err)
+
+			require.NoError(t, err)
 			for i := range issues {
-				assert.Contains(t, tt.wantIssues, issues[i].Number)
-			}
-			if repo != nil {
-				repoURL := ghrepo.GenerateRepoURL(repo, "")
-				if repoURL != tt.wantRepo {
-					t.Errorf("want repo %s, got %s", tt.wantRepo, repoURL)
-				}
-			} else if tt.wantRepo != "" {
-				t.Errorf("want repo %sw, got nil", tt.wantRepo)
+				assert.Contains(t, tt.wantIssueNumbers, issues[i].Number)
 			}
 		})
 	}
