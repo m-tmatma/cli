@@ -124,7 +124,7 @@ func TestStartProgressIndicatorWithLabel(t *testing.T) {
 		}
 	})
 
-	t.Run("multiple indicators with GH_SPINNER_DISABLED shows current label", func(t *testing.T) {
+	t.Run("multiple calls to start progress indicator with GH_SPINNER_DISABLED prints additional labels", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		io := newTestIOStreams(t, console, true)
 		progressIndicatorLabel1 := "downloading happiness"
