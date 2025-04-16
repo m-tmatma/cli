@@ -24,7 +24,7 @@ func ParseIssuesFromArgs(args []string) ([]int, o.Option[ghrepo.Interface], erro
 
 	for i, arg := range args {
 		// For each argument, parse the issue number and an optional repo
-		issueNumber, issueRepo, err := parseIssueFromArg(arg)
+		issueNumber, issueRepo, err := ParseIssueFromArg(arg)
 		if err != nil {
 			return nil, o.None[ghrepo.Interface](), err
 		}
@@ -53,7 +53,7 @@ func ParseIssuesFromArgs(args []string) ([]int, o.Option[ghrepo.Interface], erro
 	return issueNumbers, repo, nil
 }
 
-func parseIssueFromArg(arg string) (int, o.Option[ghrepo.Interface], error) {
+func ParseIssueFromArg(arg string) (int, o.Option[ghrepo.Interface], error) {
 	issueLocator := tryParseIssueFromURL(arg)
 	if issueLocator, present := issueLocator.Value(); present {
 		return issueLocator.issueNumber, o.Some(issueLocator.repo), nil
@@ -111,7 +111,7 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 		}
 	}
 
-	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
+	issue, err := FindIssueOrPR(httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
 }
 
@@ -165,7 +165,7 @@ func FindIssuesOrPRs(httpClient *http.Client, repo ghrepo.Interface, issueNumber
 	for _, num := range issueNumbers {
 		issueNumber := num
 		g.Go(func() error {
-			issue, err := findIssueOrPR(httpClient, repo, issueNumber, fields)
+			issue, err := FindIssueOrPR(httpClient, repo, issueNumber, fields)
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,7 @@ func FindIssuesOrPRs(httpClient *http.Client, repo ghrepo.Interface, issueNumber
 	return issues, nil
 }
 
-func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
+func FindIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
 	if fieldSet.Contains("stateReason") {
