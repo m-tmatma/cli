@@ -470,10 +470,8 @@ func Test_ioStreams_spinnerDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.env != nil {
-				for k, v := range tt.env {
-					t.Setenv(k, v)
-				}
+			for k, v := range tt.env {
+				t.Setenv(k, v)
 			}
 			f := New("1")
 			io := ioStreams(f)
