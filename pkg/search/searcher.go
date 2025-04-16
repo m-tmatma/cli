@@ -91,6 +91,8 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 		// otherwise add all the results.
 		numItemsToAdd := min(len(page.Items), numItemsToRetrieve)
 		result.IncompleteResults = page.IncompleteResults
+		// The API returns how many items match the query in every response.
+		// With the example above, this would be 500.
 		result.Total = page.Total
 		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
 		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
