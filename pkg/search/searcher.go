@@ -65,7 +65,6 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 	var resp *http.Response
 	var err error
 
-	toRetrieve := query.Limit
 	// We will request either the query limit if it's less than 1 page, or our max page size.
 	// This number doesn't change to keep a valid offset.
 	//
@@ -73,9 +72,10 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 	// We request page #1 for 100 items and get items 0 to 99.
 	// Then we request page #2 for 100 items, we get items 100 to 199 and only keep 100 to 149.
 	// If we were to request page #2 for 50 items, we would instead get items 50 to 99.
-	query.Limit = min(toRetrieve, maxPerPage)
+	numItemsToRetrieve := query.Limit
+	query.Limit = min(numItemsToRetrieve, maxPerPage)
 
-	for toRetrieve > 0 {
+	for numItemsToRetrieve > 0 {
 		query.Page = nextPage(resp)
 		if query.Page == 0 {
 			break
@@ -89,11 +89,11 @@ func (s searcher) Code(query Query) (CodeResult, error) {
 
 		// If we're going to reach the requested limit, only add that many items,
 		// otherwise add all the results.
-		itemsToAdd := min(len(page.Items), toRetrieve)
+		numItemsToAdd := min(len(page.Items), numItemsToRetrieve)
 		result.IncompleteResults = page.IncompleteResults
 		result.Total = page.Total
-		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
-		toRetrieve = toRetrieve - itemsToAdd
+		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
+		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
 	}
 
 	return result, nil
@@ -105,10 +105,10 @@ func (s searcher) Commits(query Query) (CommitsResult, error) {
 	var resp *http.Response
 	var err error
 
-	toRetrieve := query.Limit
-	query.Limit = min(toRetrieve, maxPerPage)
+	numItemsToRetrieve := query.Limit
+	query.Limit = min(numItemsToRetrieve, maxPerPage)
 
-	for toRetrieve > 0 {
+	for numItemsToRetrieve > 0 {
 		query.Page = nextPage(resp)
 		if query.Page == 0 {
 			break
@@ -120,11 +120,11 @@ func (s searcher) Commits(query Query) (CommitsResult, error) {
 			return result, err
 		}
 
-		itemsToAdd := min(len(page.Items), toRetrieve)
+		numItemsToAdd := min(len(page.Items), numItemsToRetrieve)
 		result.IncompleteResults = page.IncompleteResults
 		result.Total = page.Total
-		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
-		toRetrieve = toRetrieve - itemsToAdd
+		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
+		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
 	}
 	return result, nil
 }
@@ -135,10 +135,10 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 	var resp *http.Response
 	var err error
 
-	toRetrieve := query.Limit
-	query.Limit = min(toRetrieve, maxPerPage)
+	numItemsToRetrieve := query.Limit
+	query.Limit = min(numItemsToRetrieve, maxPerPage)
 
-	for toRetrieve > 0 {
+	for numItemsToRetrieve > 0 {
 		query.Page = nextPage(resp)
 		if query.Page == 0 {
 			break
@@ -150,11 +150,11 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 			return result, err
 		}
 
-		itemsToAdd := min(len(page.Items), toRetrieve)
+		numItemsToAdd := min(len(page.Items), numItemsToRetrieve)
 		result.IncompleteResults = page.IncompleteResults
 		result.Total = page.Total
-		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
-		toRetrieve = toRetrieve - itemsToAdd
+		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
+		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
 	}
 	return result, nil
 }
@@ -165,10 +165,10 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 	var resp *http.Response
 	var err error
 
-	toRetrieve := query.Limit
-	query.Limit = min(toRetrieve, maxPerPage)
+	numItemsToRetrieve := query.Limit
+	query.Limit = min(numItemsToRetrieve, maxPerPage)
 
-	for toRetrieve > 0 {
+	for numItemsToRetrieve > 0 {
 		query.Page = nextPage(resp)
 		if query.Page == 0 {
 			break
@@ -180,15 +180,24 @@ func (s searcher) Issues(query Query) (IssuesResult, error) {
 			return result, err
 		}
 
-		itemsToAdd := min(len(page.Items), toRetrieve)
+		numItemsToAdd := min(len(page.Items), numItemsToRetrieve)
 		result.IncompleteResults = page.IncompleteResults
 		result.Total = page.Total
-		result.Items = append(result.Items, page.Items[:itemsToAdd]...)
-		toRetrieve = toRetrieve - itemsToAdd
+		result.Items = append(result.Items, page.Items[:numItemsToAdd]...)
+		numItemsToRetrieve = numItemsToRetrieve - numItemsToAdd
 	}
 	return result, nil
 }
 
+// search makes a single-page REST search request for code, commits, issues, prs, or repos.
+//
+// The result argument is populated with the following information:
+//
+// - Total: the number of search results matching the query, which may exceed the number of items returned
+// - IncompleteResults: whether the search request exceeded search time limit, potentially being incomplete
+// - Items: the actual matching search results, up to 100 max items per page
+//
+// For more information, see https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28.
 func (s searcher) search(query Query, result interface{}) (*http.Response, error) {
 	path := fmt.Sprintf("%ssearch/%s", ghinstance.RESTPrefix(s.host), query.Kind)
 	qs := url.Values{}
