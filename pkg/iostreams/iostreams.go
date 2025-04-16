@@ -292,6 +292,10 @@ func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 	}
 
 	if s.spinnerDisabled {
+		// If the spinner is disabled, simply print a
+		// textual progress indicator and return.
+		// This means that s.ProgressIndicator will be nil.
+		// See also: the comment on StopProgressIndicator()
 		s.startTextualProgressIndicator(label)
 		return
 	}
@@ -339,6 +343,9 @@ func (s *IOStreams) startTextualProgressIndicator(label string) {
 	fmt.Fprintf(s.ErrOut, "%s%s", s.ColorScheme().Cyan(label), "\n")
 }
 
+// StopProgressIndicator stops the progress indicator if it is running.
+// Note that a textual progess indicator does not create a progress indicator,
+// so this method is a no-op in that case.
 func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicatorMu.Lock()
 	defer s.progressIndicatorMu.Unlock()
