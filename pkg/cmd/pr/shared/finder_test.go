@@ -84,19 +84,6 @@ func TestFind(t *testing.T) {
 			wantRepo: "https://github.com/ORIGINOWNER/REPO",
 		},
 		{
-			name: "PR number 0 is invalid",
-			args: args{
-				selector:   "0",
-				fields:     []string{"id", "number"},
-				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
-				branchFn: func() (string, error) {
-					return "blueberries", nil
-				},
-				branchConfig: stubBranchConfig(git.BranchConfig{}, nil),
-			},
-			wantErr: true,
-		},
-		{
 			name: "number argument with base branch",
 			args: args{
 				selector:   "13",
@@ -176,6 +163,25 @@ func TestFind(t *testing.T) {
 			},
 			httpStub: nil,
 			wantPR:   13,
+			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+		},
+		{
+			name: "pr number zero",
+			args: args{
+				selector:   "0",
+				fields:     []string{"number"},
+				baseRepoFn: stubBaseRepoFn(ghrepo.New("ORIGINOWNER", "REPO"), nil),
+				branchFn: func() (string, error) {
+					return "blueberries", nil
+				},
+				gitConfigClient: stubGitConfigClient{
+					readBranchConfigFn:  stubBranchConfig(git.BranchConfig{}, nil),
+					pushDefaultFn:       stubPushDefault(git.PushDefaultSimple, nil),
+					remotePushDefaultFn: stubRemotePushDefault("", nil),
+				},
+			},
+			httpStub: nil,
+			wantPR:   0,
 			wantRepo: "https://github.com/ORIGINOWNER/REPO",
 		},
 		{
