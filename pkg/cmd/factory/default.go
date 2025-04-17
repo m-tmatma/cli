@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -283,6 +284,12 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		io.SetNeverPrompt(true)
 	}
 
+	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
+	falseyValues := []string{"false", "0", "no", ""}
+	if ghSpinnerDisabledIsSet && !slices.Contains(falseyValues, ghSpinnerDisabledValue) {
+		io.SetSpinnerDisabled(true)
+	}
+
 	// Pager precedence
 	// 1. GH_PAGER
 	// 2. pager from config
@@ -291,6 +298,17 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		io.SetPager(ghPager)
 	} else if pager := cfg.Pager(""); pager.Value != "" {
 		io.SetPager(pager.Value)
+	}
+
+	if ghColorLabels, ghColorLabelsExists := os.LookupEnv("GH_COLOR_LABELS"); ghColorLabelsExists {
+		switch ghColorLabels {
+		case "", "0", "false", "no":
+			io.SetColorLabels(false)
+		default:
+			io.SetColorLabels(true)
+		}
+	} else if prompt := cfg.ColorLabels(""); prompt.Value == "enabled" {
+		io.SetColorLabels(true)
 	}
 
 	io.SetAccessibleColorsEnabled(xcolor.IsAccessibleColorsEnabled())
