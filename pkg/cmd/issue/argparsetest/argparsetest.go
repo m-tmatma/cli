@@ -18,6 +18,14 @@ import (
 // It is generic over `T` as each command construction has their own Options type e.g. `ViewOptions`
 type newCmdFunc[T any] func(f *cmdutil.Factory, runF func(*T) error) *cobra.Command
 
+// TestArgParsing is a test helper that verifies that issue commands correctly parse the `{issue number | url}`
+// positional arg into an issue number and base repo.
+//
+// Looking through the existing tests, I noticed that the coverage was pretty smattered.
+// Since nearly all issue commands only accept a single positional argument, we are able to reuse this test helper.
+// Commands with no further flags or args can use this solely.
+// Commands with extra flags use this and further table tests.
+// Commands with extra required positional arguments (like `transfer`) cannot use this. They duplicate these cases inline.
 func TestArgParsing[T any](t *testing.T, fn newCmdFunc[T]) {
 	tests := []struct {
 		name                string
