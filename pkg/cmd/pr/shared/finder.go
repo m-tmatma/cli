@@ -16,6 +16,7 @@ import (
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	o "github.com/cli/cli/v2/pkg/option"
@@ -79,6 +80,10 @@ func RunCommandFinder(selector string, pr *api.PullRequest, repo ghrepo.Interfac
 	return finder
 }
 
+func ResetRunCommandFinder() {
+	runCommandFinder = nil
+}
+
 type FindOptions struct {
 	// Selector can be a number with optional `#` prefix, a branch name with optional `<owner>:` prefix, or
 	// a PR URL.
@@ -89,6 +94,8 @@ type FindOptions struct {
 	BaseBranch string
 	// States lists the possible PR states to scope the PR-for-branch lookup to.
 	States []string
+
+	Detector fd.Detector
 }
 
 func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
@@ -193,9 +200,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.AddValues([]string{"id", "number"}) // for additional preload queries below
 
 	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
-		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		detector := fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
-		prFeatures, err := detector.PullRequestFeatures()
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
+		}
+		prFeatures, err := opts.Detector.PullRequestFeatures()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -209,6 +218,20 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	if fields.Contains("projectItems") {
 		getProjectItems = true
 		fields.Remove("projectItems")
+	}
+
+	// TODO projectsV1Deprecation
+	// Remove this block
+	// When removing this, remember to remove `projectCards` from the list of default fields in pr/view.go
+	if fields.Contains("projectCards") {
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
+		}
+
+		if opts.Detector.ProjectsV1() == gh.ProjectsV1Unsupported {
+			fields.Remove("projectCards")
+		}
 	}
 
 	var pr *api.PullRequest

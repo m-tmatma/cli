@@ -12,6 +12,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -175,6 +176,9 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	factory := &cmdutil.Factory{
 		IOStreams: ios,
 		Browser:   browser,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: rt}, nil
+		},
 	}
 
 	cmd := NewCmdView(factory, nil)
@@ -398,6 +402,8 @@ func TestPRView_Preview_nontty(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Cleanup(shared.ResetRunCommandFinder)
+
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
@@ -602,6 +608,8 @@ func TestPRView_Preview(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Cleanup(shared.ResetRunCommandFinder)
+
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
@@ -846,6 +854,8 @@ func TestPRView_nontty_Comments(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Cleanup(shared.ResetRunCommandFinder)
+
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
@@ -868,4 +878,75 @@ func TestPRView_nontty_Comments(t *testing.T) {
 			test.ExpectLines(t, output.String(), tt.expectedOutputs...)
 		})
 	}
+}
+
+// TODO projectsV1Deprecation
+// Remove this test.
+func TestProjectsV1Deprecation(t *testing.T) {
+	t.Run("when projects v1 is supported, is included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Register(
+			httpmock.GraphQL(`projectCards`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		f := &cmdutil.Factory{
+			IOStreams: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+		}
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = viewRun(&ViewOptions{
+			IO:       ios,
+			Finder:   shared.NewFinder(f),
+			Detector: &fd.EnabledDetectorMock{},
+
+			SelectorArg: "https://github.com/cli/cli/pull/123",
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
+
+	t.Run("when projects v1 is not supported, is not included in query", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Exclude(
+			t,
+			httpmock.GraphQL(`projectCards`),
+		)
+
+		f := &cmdutil.Factory{
+			IOStreams: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+		}
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we have no way to really stub it without
+		// fully stubbing a GQL error structure in the request body.
+		_ = viewRun(&ViewOptions{
+			IO:       ios,
+			Finder:   shared.NewFinder(f),
+			Detector: &fd.DisabledDetectorMock{},
+
+			SelectorArg: "https://github.com/cli/cli/pull/123",
+		})
+
+		// Verify that our request contained projectCards
+		reg.Verify(t)
+	})
 }
