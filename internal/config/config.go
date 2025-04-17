@@ -14,7 +14,12 @@ import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
+// It is important to note that some of these configuration setting keys are used outside of `cli/cli`
+// such as `accessible_colors`, `browser`, and `http_unix_socket` used in `cli/go-gh`.
+//
+// These configuration settings are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
+	accessibleColorsKey   = "accessible_colors"
 	aliasesKey            = "aliases"
 	browserKey            = "browser"
 	colorLabelsKey        = "color_labels"
@@ -107,6 +112,11 @@ func (c *cfg) Aliases() gh.AliasConfig {
 
 func (c *cfg) Authentication() gh.AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
+}
+
+func (c *cfg) AccessibleColors(hostname string) gh.ConfigEntry {
+	// Intentionally panic if there is no user provided value or default value (which would be a programmer error)
+	return c.GetOrDefault(hostname, accessibleColorsKey).Unwrap()
 }
 
 func (c *cfg) Browser(hostname string) gh.ConfigEntry {
@@ -540,6 +550,8 @@ http_unix_socket:
 browser:
 # Whether to display labels using their RGB hex color codes in terminals that support truecolor. Supported values: enabled, disabled
 color_labels: disabled
+# Whether customizable, 4-bit accessible colors should be used. Supported values: enabled, disabled
+accessible_colors: disabled
 `
 
 type ConfigOption struct {
@@ -617,6 +629,15 @@ var Options = []ConfigOption{
 		AllowedValues: []string{"enabled", "disabled"},
 		CurrentValue: func(c gh.Config, hostname string) string {
 			return c.ColorLabels(hostname).Value
+		},
+	},
+	{
+		Key:           accessibleColorsKey,
+		Description:   "whether customizable, 4-bit accessible colors should be used",
+		DefaultValue:  "disabled",
+		AllowedValues: []string{"enabled", "disabled"},
+		CurrentValue: func(c gh.Config, hostname string) string {
+			return c.AccessibleColors(hostname).Value
 		},
 	},
 }

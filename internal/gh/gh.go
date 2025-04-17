@@ -35,6 +35,8 @@ type Config interface {
 	// Set provides primitive access for setting configuration values, optionally scoped by host.
 	Set(hostname string, key string, value string)
 
+	// AccessibleColors returns the configured accessible_colors setting, optionally scoped by host.
+	AccessibleColors(hostname string) ConfigEntry
 	// Browser returns the configured browser, optionally scoped by host.
 	Browser(hostname string) ConfigEntry
 	// ColorLabels returns the configured color_label setting, optionally scoped by host.
