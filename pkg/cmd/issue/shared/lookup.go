@@ -18,6 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/(?:issues|pull)/(\d+)`)
+
 func ParseIssuesFromArgs(args []string) ([]int, o.Option[ghrepo.Interface], error) {
 	var repo o.Option[ghrepo.Interface]
 	issueNumbers := make([]int, len(args))
@@ -94,63 +96,6 @@ func tryParseIssueFromURL(maybeURL string) o.Option[issueLocator] {
 		issueNumber: issueNumber,
 		repo:        repo,
 	})
-}
-
-// IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
-// could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
-func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
-	issueNumber, baseRepo, err := IssueNumberAndRepoFromArg(arg)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if baseRepo == nil {
-		var err error
-		if baseRepo, err = baseRepoFn(); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	issue, err := FindIssueOrPR(httpClient, baseRepo, issueNumber, fields)
-	return issue, baseRepo, err
-}
-
-var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/(?:issues|pull)/(\d+)`)
-
-func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
-	u, err := url.Parse(s)
-	if err != nil {
-		return 0, nil
-	}
-
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return 0, nil
-	}
-
-	m := issueURLRE.FindStringSubmatch(u.Path)
-	if m == nil {
-		return 0, nil
-	}
-
-	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
-	issueNumber, _ := strconv.Atoi(m[3])
-	return issueNumber, repo
-}
-
-// Returns the issue number and repo if the issue URL is provided.
-// If only the issue number is provided, returns the number and nil repo.
-func IssueNumberAndRepoFromArg(arg string) (int, ghrepo.Interface, error) {
-	issueNumber, baseRepo := issueMetadataFromURL(arg)
-
-	if issueNumber == 0 {
-		var err error
-		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
-		if err != nil {
-			return 0, nil, fmt.Errorf("invalid issue format: %q", arg)
-		}
-	}
-
-	return issueNumber, baseRepo, nil
 }
 
 type PartialLoadError struct {
