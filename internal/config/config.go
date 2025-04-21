@@ -14,20 +14,18 @@ import (
 	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 )
 
-// It is important to note that some of these configuration setting keys are used outside of `cli/cli`
-// such as `accessible_colors`, `browser`, and `http_unix_socket` used in `cli/go-gh`.
-//
-// These configuration settings are defined here to avoid `cli/cli` being changed unexpectedly.
+// Important: some of the following configuration settings are used outside of `cli/cli`,
+// they are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
-	accessibleColorsKey   = "accessible_colors"
+	accessibleColorsKey   = "accessible_colors" // by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
 	aliasesKey            = "aliases"
-	browserKey            = "browser"
+	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
 	colorLabelsKey        = "color_labels"
-	editorKey             = "editor"
+	editorKey             = "editor" // used by cli/go-gh to open interactive text editor
 	gitProtocolKey        = "git_protocol"
-	hostsKey              = "hosts"
+	hostsKey              = "hosts" // used by cli/go-gh to locate authenticated host tokens
 	httpUnixSocketKey     = "http_unix_socket"
-	oauthTokenKey         = "oauth_token"
+	oauthTokenKey         = "oauth_token" // used by cli/go-gh to locate authenticated host tokens
 	pagerKey              = "pager"
 	promptKey             = "prompt"
 	preferEditorPromptKey = "prefer_editor_prompt"
