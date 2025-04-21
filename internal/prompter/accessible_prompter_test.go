@@ -11,6 +11,7 @@ import (
 
 	"github.com/Netflix/go-expect"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/creack/pty"
 	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
@@ -419,21 +420,40 @@ func newTestVirtualTerminal(t *testing.T) *expect.Console {
 	return console
 }
 
+func newTestVirtualTerminalIOStreams(t *testing.T, console *expect.Console) *iostreams.IOStreams {
+	t.Helper()
+	io := &iostreams.IOStreams{
+		In:     console.Tty(),
+		Out:    console.Tty(),
+		ErrOut: console.Tty(),
+	}
+	io.SetStdinTTY(false)
+	io.SetStdoutTTY(false)
+	io.SetStderrTTY(false)
+	return io
+}
+
+// `echo` is chosen as the editor command because it immediately returns
+// a success exit code, returns an empty string, doesn't require any user input,
+// and since this file is only built on Linux, it is near guaranteed to be available.
+var editorCmd = "echo"
+
 func newTestAcessiblePrompter(t *testing.T, console *expect.Console) prompter.Prompter {
 	t.Helper()
 
-	t.Setenv("GH_ACCESSIBLE_PROMPTER", "true")
-	// `echo`` is chose as the editor command because it immediately returns
-	// a success exit code, returns an empty string, doesn't require any user input,
-	// and since this file is only built on Linux, it is near guaranteed to be available.
-	return prompter.New("echo", console.Tty(), console.Tty(), console.Tty())
+	io := newTestVirtualTerminalIOStreams(t, console)
+	io.SetAccessiblePrompterEnabled(true)
+
+	return prompter.New(editorCmd, io)
 }
 
 func newTestSurveyPrompter(t *testing.T, console *expect.Console) prompter.Prompter {
 	t.Helper()
 
-	t.Setenv("GH_ACCESSIBLE_PROMPTER", "false")
-	return prompter.New("echo", console.Tty(), console.Tty(), console.Tty())
+	io := newTestVirtualTerminalIOStreams(t, console)
+	io.SetAccessiblePrompterEnabled(false)
+
+	return prompter.New(editorCmd, io)
 }
 
 // failOnExpectError adds an observer that will fail the test in a standardised way

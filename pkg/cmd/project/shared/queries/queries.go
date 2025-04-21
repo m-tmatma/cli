@@ -25,7 +25,7 @@ func NewClient(httpClient *http.Client, hostname string, ios *iostreams.IOStream
 	return &Client{
 		apiClient: apiClient,
 		spinner:   ios.IsStdoutTTY() && ios.IsStderrTTY(),
-		prompter:  prompter.New("", ios.In, ios.Out, ios.ErrOut),
+		prompter:  prompter.New("", ios),
 	}
 }
 
