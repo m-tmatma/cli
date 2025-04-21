@@ -52,6 +52,9 @@ func NewFromString(cfgStr string) *ghmock.ConfigMock {
 			},
 		}
 	}
+	mock.AccessibleColorsFunc = func(hostname string) gh.ConfigEntry {
+		return cfg.AccessibleColors(hostname)
+	}
 	mock.BrowserFunc = func(hostname string) gh.ConfigEntry {
 		return cfg.Browser(hostname)
 	}
