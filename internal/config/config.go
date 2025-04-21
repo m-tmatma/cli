@@ -17,7 +17,7 @@ import (
 // Important: some of the following configuration settings are used outside of `cli/cli`,
 // they are defined here to avoid `cli/cli` being changed unexpectedly.
 const (
-	accessibleColorsKey   = "accessible_colors" // by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
+	accessibleColorsKey   = "accessible_colors" // used by cli/go-gh to enable the use of customizable, accessible 4-bit colors.
 	aliasesKey            = "aliases"
 	browserKey            = "browser" // used by cli/go-gh to open URLs in web browsers
 	colorLabelsKey        = "color_labels"
