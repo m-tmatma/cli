@@ -19,6 +19,9 @@ var _ gh.Config = &ConfigMock{}
 //
 //		// make and configure a mocked gh.Config
 //		mockedConfig := &ConfigMock{
+//			AccessibleColorsFunc: func(hostname string) gh.ConfigEntry {
+//				panic("mock out the AccessibleColors method")
+//			},
 //			AliasesFunc: func() gh.AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
@@ -74,6 +77,9 @@ var _ gh.Config = &ConfigMock{}
 //
 //	}
 type ConfigMock struct {
+	// AccessibleColorsFunc mocks the AccessibleColors method.
+	AccessibleColorsFunc func(hostname string) gh.ConfigEntry
+
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() gh.AliasConfig
 
@@ -124,6 +130,11 @@ type ConfigMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// AccessibleColors holds details about calls to the AccessibleColors method.
+		AccessibleColors []struct {
+			// Hostname is the hostname argument value.
+			Hostname string
+		}
 		// Aliases holds details about calls to the Aliases method.
 		Aliases []struct {
 		}
@@ -201,6 +212,7 @@ type ConfigMock struct {
 		Write []struct {
 		}
 	}
+	lockAccessibleColors   sync.RWMutex
 	lockAliases            sync.RWMutex
 	lockAuthentication     sync.RWMutex
 	lockBrowser            sync.RWMutex
@@ -217,6 +229,38 @@ type ConfigMock struct {
 	lockSet                sync.RWMutex
 	lockVersion            sync.RWMutex
 	lockWrite              sync.RWMutex
+}
+
+// AccessibleColors calls AccessibleColorsFunc.
+func (mock *ConfigMock) AccessibleColors(hostname string) gh.ConfigEntry {
+	if mock.AccessibleColorsFunc == nil {
+		panic("ConfigMock.AccessibleColorsFunc: method is nil but Config.AccessibleColors was just called")
+	}
+	callInfo := struct {
+		Hostname string
+	}{
+		Hostname: hostname,
+	}
+	mock.lockAccessibleColors.Lock()
+	mock.calls.AccessibleColors = append(mock.calls.AccessibleColors, callInfo)
+	mock.lockAccessibleColors.Unlock()
+	return mock.AccessibleColorsFunc(hostname)
+}
+
+// AccessibleColorsCalls gets all the calls that were made to AccessibleColors.
+// Check the length with:
+//
+//	len(mockedConfig.AccessibleColorsCalls())
+func (mock *ConfigMock) AccessibleColorsCalls() []struct {
+	Hostname string
+} {
+	var calls []struct {
+		Hostname string
+	}
+	mock.lockAccessibleColors.RLock()
+	calls = mock.calls.AccessibleColors
+	mock.lockAccessibleColors.RUnlock()
+	return calls
 }
 
 // Aliases calls AliasesFunc.
