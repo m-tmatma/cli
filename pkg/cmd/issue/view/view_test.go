@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/issue/argparsetest"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -45,6 +46,11 @@ func TestJSONFields(t *testing.T) {
 		"isPinned",
 		"stateReason",
 	})
+}
+
+func TestNewCmdView(t *testing.T) {
+	// Test shared parsing of issue number / URL.
+	argparsetest.TestArgParsing(t, NewCmdView)
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
@@ -116,7 +122,7 @@ func TestIssueView_web(t *testing.T) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
 		WebMode:     true,
-		SelectorArg: "123",
+		IssueNumber: 123,
 	})
 	if err != nil {
 		t.Errorf("error running command `issue view`: %v", err)
@@ -273,7 +279,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
-				SelectorArg: "123",
+				IssueNumber: 123,
 			}
 
 			err := viewRun(&opts)
