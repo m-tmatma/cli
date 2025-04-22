@@ -34,7 +34,7 @@ import (
 func TestAccessiblePrompter(t *testing.T) {
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
@@ -53,7 +53,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("MultiSelect", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
@@ -78,7 +78,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("Input", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		dummyText := "12345abcdefg"
 
 		go func() {
@@ -98,7 +98,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("Input - blank input returns default value", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		dummyDefaultValue := "12345abcdefg"
 
 		go func() {
@@ -118,7 +118,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("Password", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		dummyPassword := "12345abcdefg"
 
 		go func() {
@@ -138,7 +138,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("Confirm", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
@@ -157,7 +157,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("Confirm - blank input returns default", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
@@ -176,7 +176,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("AuthToken", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		dummyAuthToken := "12345abcdefg"
 
 		go func() {
@@ -196,7 +196,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("AuthToken - blank input returns error", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		dummyAuthTokenForAfterFailure := "12345abcdefg"
 
 		go func() {
@@ -224,7 +224,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("ConfirmDeletion", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		requiredValue := "test"
 		go func() {
@@ -244,7 +244,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("ConfirmDeletion - bad input", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		requiredValue := "test"
 		badInputValue := "garbage"
 
@@ -273,7 +273,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("InputHostname", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		hostname := "example.com"
 
 		go func() {
@@ -293,7 +293,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("MarkdownEditor - blank allowed with blank input returns blank", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
@@ -312,7 +312,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("MarkdownEditor - blank disallowed with default value returns default value", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 		defaultValue := "12345abcdefg"
 
 		go func() {
@@ -340,7 +340,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 	t.Run("MarkdownEditor - blank disallowed no default value returns error", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
-		p := newTestAcessiblePrompter(t, console)
+		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
@@ -438,7 +438,7 @@ func newTestVirtualTerminalIOStreams(t *testing.T, console *expect.Console) *ios
 // and since this file is only built on Linux, it is near guaranteed to be available.
 var editorCmd = "echo"
 
-func newTestAcessiblePrompter(t *testing.T, console *expect.Console) prompter.Prompter {
+func newTestAccessiblePrompter(t *testing.T, console *expect.Console) prompter.Prompter {
 	t.Helper()
 
 	io := newTestVirtualTerminalIOStreams(t, console)
