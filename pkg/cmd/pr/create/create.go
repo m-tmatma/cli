@@ -440,7 +440,8 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		return submitPR(*opts, *ctx, *state)
+		// TODO wm: revisit project support
+		return submitPR(*opts, *ctx, *state, gh.ProjectsV1Supported)
 	}
 
 	if opts.RecoverFile != "" {
@@ -536,7 +537,8 @@ func createRun(opts *CreateOptions) error {
 				Repo:      ctx.PRRefs.BaseRepo(),
 				State:     state,
 			}
-			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state)
+			// TODO wm: revisit project support
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state, gh.ProjectsV1Supported)
 			if err != nil {
 				return err
 			}
@@ -565,11 +567,13 @@ func createRun(opts *CreateOptions) error {
 
 	if action == shared.SubmitDraftAction {
 		state.Draft = true
-		return submitPR(*opts, *ctx, *state)
+		// TODO wm: revisit project support
+		return submitPR(*opts, *ctx, *state, gh.ProjectsV1Supported)
 	}
 
 	if action == shared.SubmitAction {
-		return submitPR(*opts, *ctx, *state)
+		// TODO wm: revisit project support
+		return submitPR(*opts, *ctx, *state, gh.ProjectsV1Supported)
 	}
 
 	err = errors.New("expected to cancel, preview, or submit")
@@ -966,7 +970,7 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 	return remotes, nil
 }
 
-func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
+func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState, projectV1Support gh.ProjectsV1Support) error {
 	client := ctx.Client
 
 	params := map[string]interface{}{
@@ -982,7 +986,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		return errors.New("pull request title must not be blank")
 	}
 
-	err := shared.AddMetadataToIssueParams(client, ctx.PRRefs.BaseRepo(), params, &state)
+	err := shared.AddMetadataToIssueParams(client, ctx.PRRefs.BaseRepo(), params, &state, projectV1Support)
 	if err != nil {
 		return err
 	}

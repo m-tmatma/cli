@@ -44,7 +44,8 @@ func Test_RepoMetadata(t *testing.T) {
 		Assignees:  true,
 		Reviewers:  true,
 		Labels:     true,
-		Projects:   true,
+		ProjectsV1: true,
+		ProjectsV2: true,
 		Milestones: true,
 	}
 

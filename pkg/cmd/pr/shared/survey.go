@@ -151,7 +151,7 @@ type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
 }
 
-func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
+func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState, projectsV1Support gh.ProjectsV1Support) error {
 	isChosen := func(m string) bool {
 		for _, c := range state.Metadata {
 			if m == c {
@@ -181,7 +181,8 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		Reviewers:  isChosen("Reviewers"),
 		Assignees:  isChosen("Assignees"),
 		Labels:     isChosen("Labels"),
-		Projects:   isChosen("Projects"),
+		ProjectsV1: isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
+		ProjectsV2: isChosen("Projects"),
 		Milestones: isChosen("Milestone"),
 	}
 	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
