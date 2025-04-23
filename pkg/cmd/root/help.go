@@ -109,8 +109,6 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 		return
 	}
 
-	namePadding := 12
-
 	type helpEntry struct {
 		Title string
 		Body  string
@@ -135,6 +133,12 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 		helpEntries = append(helpEntries, helpEntry{"ALIASES", strings.Join(BuildAliasList(command, command.Aliases), ", ") + "\n"})
 	}
 
+	// Statically calculated padding for non-extension commands,
+	// longest is `gh accessibility` with 13 characters + 1 space.
+	//
+	// Should consider novel way to calculate this in the future [AF]
+	namePadding := 14
+
 	for _, g := range GroupedCommands(command) {
 		var names []string
 		for _, c := range g.Commands {
@@ -148,6 +152,9 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 
 	if isRootCmd(command) {
 		var helpTopics []string
+		if c := findCommand(command, "accessibility"); c != nil {
+			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
+		}
 		if c := findCommand(command, "actions"); c != nil {
 			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
 		}
