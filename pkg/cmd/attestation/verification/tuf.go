@@ -8,6 +8,7 @@ import (
 	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/go-gh/v2/pkg/config"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
+	"github.com/theupdateframework/go-tuf/v2/metadata/fetcher"
 )
 
 //go:embed embed/tuf-repo.github.com/root.json
@@ -15,7 +16,7 @@ var githubRoot []byte
 
 const GitHubTUFMirror = "https://tuf-repo.github.com"
 
-func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string]) *tuf.Options {
+func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string], hc *http.Client) *tuf.Options {
 	opts := tuf.DefaultOptions()
 
 	// The CODESPACES environment variable will be set to true in a Codespaces workspace
@@ -32,10 +33,16 @@ func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string]) *tuf.Option
 	// Allow TUF cache for 1 day
 	opts.CacheValidity = 1
 
+	// configure fetcher timeout and retry
+	f := fetcher.DefaultFetcher{}
+	f.SetHTTPClient(hc)
+	retryOptions := []backoff.RetryOption{backoff.WithMaxTries(3)}
+	f.SetRetryOptions(retryOptions...)
+
 	return opts
 }
 
-func GitHubTUFOptions(tufMetadataDir o.Option[string]) *tuf.Options {
+func GitHubTUFOptions(tufMetadataDir o.Option[string], hc *http.Client) *tuf.Options {
 	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
 
 	opts.Root = githubRoot

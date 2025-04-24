@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
@@ -33,6 +34,7 @@ type SigstoreConfig struct {
 	TrustedRoot  string
 	Logger       *io.Handler
 	NoPublicGood bool
+	HttpClient   *http.Client
 	// If tenancy mode is not used, trust domain is empty
 	TrustDomain string
 	// TUFMetadataDir
@@ -77,7 +79,7 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, erro
 		}
 		liveVerifier.PublicGood = publicGoodVerifier
 	}
-	github, err := newGitHubVerifier(config.TrustDomain, config.TUFMetadataDir)
+	github, err := newGitHubVerifier(config.TrustDomain, config.TUFMetadataDir, config.HttpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -314,10 +316,10 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.SignedEntityVerif
 	return gv, nil
 }
 
-func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
+func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string], hc *http.Client) (*verify.SignedEntityVerifier, error) {
 	var tr string
 
-	opts := GitHubTUFOptions(tufMetadataDir)
+	opts := GitHubTUFOptions(tufMetadataDir, hc)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
