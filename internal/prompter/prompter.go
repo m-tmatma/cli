@@ -137,10 +137,12 @@ func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) 
 
 func (p *accessiblePrompter) Password(prompt string) (string, error) {
 	var result string
-	// EchoMode(huh.EchoModePassword) doesn't have any effect in accessible mode.
+	// EchoModeNone and EchoModePassword both result in disabling echo mode
+	// as password masking is outside of VT100 spec.
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
+				EchoMode(huh.EchoModeNone).
 				Title(prompt).
 				Value(&result),
 		),
@@ -171,9 +173,12 @@ func (p *accessiblePrompter) Confirm(prompt string, defaultValue bool) (bool, er
 
 func (p *accessiblePrompter) AuthToken() (string, error) {
 	var result string
+	// EchoModeNone and EchoModePassword both result in disabling echo mode
+	// as password masking is outside of VT100 spec.
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
+				EchoMode(huh.EchoModeNone).
 				Title("Paste your authentication token:").
 				// Note: if this validation fails, the prompt loops.
 				Validate(func(input string) error {
@@ -183,8 +188,6 @@ func (p *accessiblePrompter) AuthToken() (string, error) {
 					return nil
 				}).
 				Value(&result),
-			// This doesn't have any effect in accessible mode.
-			// EchoMode(huh.EchoModePassword),
 		),
 	)
 
