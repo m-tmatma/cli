@@ -38,7 +38,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Choose:")
+			_, err := console.ExpectString("Input a number between 1 and 3:")
 			require.NoError(t, err)
 
 			// Select option 1
@@ -57,7 +57,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Select a number")
+			_, err := console.ExpectString("Input a number between 0 and 3:")
 			require.NoError(t, err)
 
 			// Select options 1 and 2
@@ -340,7 +340,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Expect a notice to enter something valid since blank is disallowed.
-			_, err = console.ExpectString("invalid input. please try again")
+			_, err = console.ExpectString("Invalid: must be between 1 and 1")
 			require.NoError(t, err)
 
 			// Send a 1 to select to open the editor. This will immediately exit
@@ -367,7 +367,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Expect a notice to enter something valid since blank is disallowed.
-			_, err = console.ExpectString("invalid input. please try again")
+			_, err = console.ExpectString("Invalid: must be between 1 and 1")
 			require.NoError(t, err)
 
 			// Send a 1 to select to open the editor since skip is invalid and
