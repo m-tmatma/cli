@@ -199,7 +199,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		require.Equal(t, dummyAuthToken, authValue)
 
 		// Ensure the dummy password is not printed to the screen,
-		// asserting that echo mode is disabled without OS-level tests.
+		// asserting that echo mode is disabled.
 		_, err = console.ExpectString(" \r\n\r\n")
 		require.NoError(t, err)
 	})
@@ -232,7 +232,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		require.Equal(t, dummyAuthTokenForAfterFailure, authValue)
 
 		// Ensure the dummy password is not printed to the screen,
-		// asserting that echo mode is disabled without OS-level tests.
+		// asserting that echo mode is disabled.
 		_, err = console.ExpectString(" \r\n\r\n")
 		require.NoError(t, err)
 	})
