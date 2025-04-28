@@ -137,8 +137,8 @@ func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) 
 
 func (p *accessiblePrompter) Password(prompt string) (string, error) {
 	var result string
-	// EchoModeNone and EchoModePassword both result in disabling echo mode
-	// as password masking is outside of VT100 spec.
+	// EchoModePassword is not used as password masking is unsupported in huh.
+	// EchoModeNone and EchoModePassword have the same effect of hiding user input.
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
