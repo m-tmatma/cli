@@ -134,6 +134,11 @@ func TestAccessiblePrompter(t *testing.T) {
 		passwordValue, err := p.Password("Enter password")
 		require.NoError(t, err)
 		require.Equal(t, dummyPassword, passwordValue)
+
+		// Ensure the dummy password is not printed to the screen,
+		// asserting that echo mode is disabled without OS-level tests.
+		_, err = console.ExpectString(" \r\n\r\n")
+		require.NoError(t, err)
 	})
 
 	t.Run("Confirm", func(t *testing.T) {
@@ -192,6 +197,11 @@ func TestAccessiblePrompter(t *testing.T) {
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
 		require.Equal(t, dummyAuthToken, authValue)
+
+		// Ensure the dummy password is not printed to the screen,
+		// asserting that echo mode is disabled without OS-level tests.
+		_, err = console.ExpectString(" \r\n\r\n")
+		require.NoError(t, err)
 	})
 
 	t.Run("AuthToken - blank input returns error", func(t *testing.T) {
@@ -220,6 +230,11 @@ func TestAccessiblePrompter(t *testing.T) {
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
 		require.Equal(t, dummyAuthTokenForAfterFailure, authValue)
+
+		// Ensure the dummy password is not printed to the screen,
+		// asserting that echo mode is disabled without OS-level tests.
+		_, err = console.ExpectString(" \r\n\r\n")
+		require.NoError(t, err)
 	})
 
 	t.Run("ConfirmDeletion", func(t *testing.T) {
