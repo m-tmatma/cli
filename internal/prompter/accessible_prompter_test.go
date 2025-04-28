@@ -136,7 +136,7 @@ func TestAccessiblePrompter(t *testing.T) {
 		require.Equal(t, dummyPassword, passwordValue)
 
 		// Ensure the dummy password is not printed to the screen,
-		// asserting that echo mode is disabled without OS-level tests.
+		// asserting that echo mode is disabled.
 		_, err = console.ExpectString(" \r\n\r\n")
 		require.NoError(t, err)
 	})
