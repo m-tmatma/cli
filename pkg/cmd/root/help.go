@@ -190,6 +190,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, _ []string) {
 		Use %[1]sgh <command> <subcommand> --help%[1]s for more information about a command.
 		Read the manual at https://cli.github.com/manual
 		Learn about exit codes using %[1]sgh help exit-codes%[1]s
+		Learn about accessibility experiences using %[1]sgh help accessibility%[1]s
 	`, "`")})
 
 	out := f.IOStreams.Out
