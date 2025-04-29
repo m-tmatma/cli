@@ -76,6 +76,27 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, []int{0, 1}, multiSelectValue)
 	})
 
+	t.Run("MultiSelect - default values are respected by being pre-selected", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number")
+			require.NoError(t, err)
+
+			// Don't select anything because the default should be selected.
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValue, err := p.MultiSelect("Select a number", []string{"2"}, []string{"1", "2", "3"})
+		require.NoError(t, err)
+		assert.Equal(t, []int{1}, multiSelectValue)
+	})
+
 	t.Run("Input", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
