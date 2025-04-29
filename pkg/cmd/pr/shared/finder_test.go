@@ -180,9 +180,7 @@ func TestFind(t *testing.T) {
 					remotePushDefaultFn: stubRemotePushDefault("", nil),
 				},
 			},
-			httpStub: nil,
-			wantPR:   0,
-			wantRepo: "https://github.com/ORIGINOWNER/REPO",
+			wantErr: true,
 		},
 		{
 			name: "number with hash argument",
