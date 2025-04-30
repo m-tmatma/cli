@@ -102,7 +102,7 @@ func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, optio
 	formOptions := make([]huh.Option[int], len(options))
 	for i, o := range options {
 		// If this option is in the defaults slice,
-		// let's add it's index to the result slice and huh
+		// let's add its index to the result slice and huh
 		// will treat it as a default selection.
 		// TODO: does an invalid default value constitute a panic?
 		if slices.Contains(defaults, o) {
