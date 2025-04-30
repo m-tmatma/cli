@@ -30,7 +30,7 @@ func NewCmdAccessibility(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "accessibility",
 		Aliases: []string{"a11y"},
-		Short:   "Learn about GitHub CLI accessibility experiences",
+		Short:   "Learn about GitHub CLI's accessibility experiences",
 		Long:    longDescription(opts.IO),
 		Hidden:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -87,7 +87,7 @@ func longDescription(io *iostreams.IOStreams) string {
 		Text interfaces often use color for various purposes, but insufficient contrast
 		or customizability can leave some users unable to benefit.
 
-		To create a more accessible experience, the GitHub CLI will use color palettes
+		For a more accessible experience, the GitHub CLI can use color palettes
 		based on terminal background appearance and limit colors to 4-bit ANSI color
 		palettes, which users can customize within terminal preferences.
 
@@ -115,8 +115,7 @@ func longDescription(io *iostreams.IOStreams) string {
 		of the screen, which can be difficult for speech synthesizers or braille displays
 		to accurately detect and read.
 
-		To create a more accessible experience, the GitHub CLI gives users the ability to
-		disable this interactivity while providing a similar experience using
+		For a more accessible experience, the GitHub CLI can provide a similar experience using
 		non-interactive prompts for user input.
 
 		To enable this experience, use one of the following methods:
@@ -126,12 +125,11 @@ func longDescription(io *iostreams.IOStreams) string {
 		%[5]s
 
 		Motion-based spinners communicate in-progress activity by manipulating the
-		terminal cursor to create a spinning effect, which can be difficult for users
+		terminal cursor to create a spinning effect, which may cause discomfort to users
 		with motion sensitivity or miscommunicate information to speech synthesizers.
 
-		To create a more accessible experience, the GitHub CLI gives users the ability to
-		disable this interactivity while providing a similar experience using text-based
-		progress indicators.
+		For a more accessible experience, this interactivity can be disabled in favor 
+		of text-based progress indicators.
 
 		To enable this experience, use one of the following methods:
 		- Run %[1]sgh config set spinner disabled%[1]s
