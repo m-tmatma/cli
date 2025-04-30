@@ -69,7 +69,7 @@ func NewCmdAccessibility(f *cmdutil.Factory) *cobra.Command {
 
 func longDescription(io *iostreams.IOStreams) string {
 	cs := io.ColorScheme()
-	title := cs.Bold("Learn about GitHub CLI accessibility experiences")
+	title := cs.Bold("Learn about GitHub CLI's accessibility experiences")
 	color := cs.Bold("Customizable and contrasting colors")
 	prompter := cs.Bold("Non-interactive user input prompting")
 	spinner := cs.Bold("Text-based spinners")
