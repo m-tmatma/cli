@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	feedbackURL = "https://accessibility.github.com/feedback"
+	webURL = "https://accessibility.github.com/conformance/cli/"
 )
 
 type AccessibilityOptions struct {
@@ -36,9 +36,9 @@ func NewCmdAccessibility(f *cmdutil.Factory) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Web {
 				if opts.IO.IsStdoutTTY() {
-					fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(feedbackURL))
+					fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(webURL))
 				}
-				return opts.Browser.Browse(feedbackURL)
+				return opts.Browser.Browse(webURL)
 			}
 
 			return cmd.Help()
@@ -125,7 +125,7 @@ func longDescription(io *iostreams.IOStreams) string {
 		terminal cursor to create a spinning effect, which may cause discomfort to users
 		with motion sensitivity or miscommunicate information to speech synthesizers.
 
-		For a more accessible experience, this interactivity can be disabled in favor 
+		For a more accessible experience, this interactivity can be disabled in favor
 		of text-based progress indicators.
 
 		To enable this experience, use one of the following methods:
@@ -138,5 +138,5 @@ func longDescription(io *iostreams.IOStreams) string {
 		feedback and ideas through GitHub Accessibility feedback channels:
 
 		%[7]s
-	`, "`", title, color, prompter, spinner, feedback, feedbackURL)
+	`, "`", title, color, prompter, spinner, feedback, webURL)
 }
