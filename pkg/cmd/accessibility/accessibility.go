@@ -50,9 +50,6 @@ func NewCmdAccessibility(f *cmdutil.Factory) *cobra.Command {
 			# Display color using customizable, 4-bit accessible colors
 			$ gh config set accessible_colors enabled
 
-			# Display issue and pull request labels using RGB hex color codes in terminals that support 24-bit true color
-			$ gh config set color_labels enabled
-
 			# Use input prompts without redrawing the screen
 			$ gh config set accessible_prompter enabled
 
