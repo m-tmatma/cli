@@ -2,6 +2,7 @@ package prompter
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -100,6 +101,14 @@ func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, optio
 	var result []int
 	formOptions := make([]huh.Option[int], len(options))
 	for i, o := range options {
+		// If this option is in the defaults slice,
+		// let's add its index to the result slice and huh
+		// will treat it as a default selection.
+		// TODO: does an invalid default value constitute a panic?
+		if slices.Contains(defaults, o) {
+			result = append(result, i)
+		}
+
 		formOptions[i] = huh.NewOption(o, i)
 	}
 
