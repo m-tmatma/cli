@@ -1943,7 +1943,6 @@ func Test_generateCompareURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO wm: projects v1 support?
 			got, err := generateCompareURL(tt.ctx, tt.state, gh.ProjectsV1Supported)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("generateCompareURL() error = %v, wantErr %v", err, tt.wantErr)
@@ -2010,8 +2009,6 @@ func mockRetrieveProjects(_ *testing.T, reg *httpmock.Registry) {
 				} } } }
 				`))
 }
-
-// TODO interactive metadata tests once: 1) we have test utils for Prompter and 2) metadata questions use Prompter
 
 // TODO projectsV1Deprecation
 // Remove this test.
@@ -2128,6 +2125,211 @@ func TestProjectsV1Deprecation(t *testing.T) {
 		})
 	})
 
+	t.Run("interactive submission", func(t *testing.T) {
+		t.Run("when projects v1 is supported, queries for it", func(t *testing.T) {
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			cs.Register(`git config --get-regexp \^branch\\\..+\\\.\(remote\|merge\|pushremote\|gh-merge-base\)\$`, 0, "")
+			cs.Register("git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature", 0, "")
+			cs.Register(`git rev-parse --show-toplevel`, 0, "")
+
+			// When the command is run
+			reg := &httpmock.Registry{}
+			reg.StubRepoResponse("OWNER", "REPO")
+
+			reg.Register(
+				httpmock.GraphQL(`query PullRequestTemplates\b`),
+				httpmock.StringResponse(`{ "data": { "repository": { "pullRequestTemplates": [] } } }`),
+			)
+
+			reg.Register(
+				// ( is required to avoid matching projectsV2
+				httpmock.GraphQL(`projects\(`),
+				// Simulate a GraphQL error to early exit the test.
+				httpmock.StatusStringResponse(500, ""),
+			)
+
+			// Register a handler to check for projects V2 just to avoid the registry panicking, even
+			// though we return a 500 error. This is because the project lookup is done in parallel
+			// so the previous error doesn't early exit.
+			reg.Register(
+				httpmock.GraphQL(`projectsV2`),
+				// Simulate a GraphQL error to early exit the test.
+				httpmock.StatusStringResponse(500, ""),
+			)
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			ios.SetStderrTTY(true)
+
+			pm := &prompter.PrompterMock{}
+			pm.InputFunc = func(p, _ string) (string, error) {
+				if p == "Title (required)" {
+					return "Test Title", nil
+				} else {
+					return "", prompter.NoSuchPromptErr(p)
+				}
+			}
+			pm.MarkdownEditorFunc = func(p, _ string, ba bool) (string, error) {
+				if p == "Body" {
+					return "Test Body", nil
+				} else {
+					return "", prompter.NoSuchPromptErr(p)
+				}
+			}
+			pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+				switch p {
+				case "Choose a template":
+					return 0, nil
+				case "What's next?":
+					return prompter.IndexFor(opts, "Add metadata")
+				default:
+					return -1, prompter.NoSuchPromptErr(p)
+				}
+			}
+			pm.MultiSelectFunc = func(p string, _ []string, opts []string) ([]int, error) {
+				return prompter.IndexesFor(opts, "Projects")
+			}
+
+			opts := CreateOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Browser:  &browser.Stub{},
+				IO:       ios,
+				Prompter: pm,
+				GitClient: &git.Client{
+					GhPath:  "some/path/gh",
+					GitPath: "some/path/git",
+				},
+				Finder:   shared.NewMockFinder("feature", nil, nil),
+				Detector: &fd.EnabledDetectorMock{},
+				Remotes: func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{
+								Name: "origin",
+							},
+							Repo: ghrepo.New("OWNER", "REPO"),
+						},
+					}, nil
+				},
+				Branch: func() (string, error) {
+					return "feature", nil
+				},
+
+				HeadBranch: "feature",
+			}
+
+			// Ignore the error because we have no way to really stub it without
+			// fully stubbing a GQL error structure in the request body.
+			_ = createRun(&opts)
+
+			// Verify that our request contained projects
+			reg.Verify(t)
+		})
+
+		t.Run("when projects v1 is not supported, does not query for it", func(t *testing.T) {
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			cs.Register(`git config --get-regexp \^branch\\\..+\\\.\(remote\|merge\|pushremote\|gh-merge-base\)\$`, 0, "")
+			cs.Register("git -c log.ShowSignature=false log --pretty=format:%H%x00%s%x00%b%x00 --cherry origin/master...feature", 0, "")
+			cs.Register(`git rev-parse --show-toplevel`, 0, "")
+
+			// When the command is run
+			reg := &httpmock.Registry{}
+			reg.StubRepoResponse("OWNER", "REPO")
+
+			reg.Register(
+				httpmock.GraphQL(`query PullRequestTemplates\b`),
+				httpmock.StringResponse(`{ "data": { "repository": { "pullRequestTemplates": [] } } }`),
+			)
+
+			// ( is required to avoid matching projectsV2
+			reg.Exclude(t, httpmock.GraphQL(`projects\(`))
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			ios.SetStderrTTY(true)
+
+			pm := &prompter.PrompterMock{}
+			pm.InputFunc = func(p, _ string) (string, error) {
+				if p == "Title (required)" {
+					return "Test Title", nil
+				} else {
+					return "", prompter.NoSuchPromptErr(p)
+				}
+			}
+			pm.MarkdownEditorFunc = func(p, _ string, ba bool) (string, error) {
+				if p == "Body" {
+					return "Test Body", nil
+				} else {
+					return "", prompter.NoSuchPromptErr(p)
+				}
+			}
+			pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+				switch p {
+				case "Choose a template":
+					return 0, nil
+				case "What's next?":
+					return prompter.IndexFor(opts, "Add metadata")
+				default:
+					return -1, prompter.NoSuchPromptErr(p)
+				}
+			}
+			pm.MultiSelectFunc = func(p string, _ []string, opts []string) ([]int, error) {
+				return prompter.IndexesFor(opts, "Projects")
+			}
+
+			opts := CreateOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (gh.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				Browser:  &browser.Stub{},
+				IO:       ios,
+				Prompter: pm,
+				GitClient: &git.Client{
+					GhPath:  "some/path/gh",
+					GitPath: "some/path/git",
+				},
+				Finder:   shared.NewMockFinder("feature", nil, nil),
+				Detector: &fd.DisabledDetectorMock{},
+				Remotes: func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{
+								Name: "origin",
+							},
+							Repo: ghrepo.New("OWNER", "REPO"),
+						},
+					}, nil
+				},
+				Branch: func() (string, error) {
+					return "feature", nil
+				},
+
+				HeadBranch: "feature",
+			}
+
+			// Ignore the error because we have no way to really stub it without
+			// fully stubbing a GQL error structure in the request body.
+			_ = createRun(&opts)
+
+			// Verify that our request did not contain projectCards
+			reg.Verify(t)
+		})
+	})
+
 	t.Run("web mode", func(t *testing.T) {
 		t.Run("when projects v1 is supported, queries for it", func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
@@ -2238,7 +2440,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 				Projects: []string{"Project"},
 			})
 
-			// Verify that our request contained projectCards
+			// Verify that our request did not contain projectCards
 			reg.Verify(t)
 		})
 	})
