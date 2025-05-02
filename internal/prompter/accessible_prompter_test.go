@@ -32,6 +32,9 @@ import (
 // are sufficient to ensure that the accessible prompter behaves roughly as expected
 // but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
+
+	beforePasswordSendTimeout := 20 * time.Microsecond
+
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -147,6 +150,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Enter password")
 			require.NoError(t, err)
 
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
+
 			// Enter a number
 			_, err = console.SendLine(dummyPassword)
 			require.NoError(t, err)
@@ -210,6 +216,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
+
 			// Enter some dummy auth token
 			_, err = console.SendLine(dummyAuthToken)
 			require.NoError(t, err)
@@ -242,6 +251,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			// Expect an error message
 			_, err = console.ExpectString("token is required")
 			require.NoError(t, err)
+
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
 
 			// Now enter some dummy auth token to return control back to the test
 			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
