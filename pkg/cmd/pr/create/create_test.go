@@ -1852,11 +1852,13 @@ func mustParseQualifiedHeadRef(ref string) shared.QualifiedHeadRef {
 
 func Test_generateCompareURL(t *testing.T) {
 	tests := []struct {
-		name    string
-		ctx     CreateContext
-		state   shared.IssueMetadataState
-		want    string
-		wantErr bool
+		name              string
+		ctx               CreateContext
+		state             shared.IssueMetadataState
+		httpStubs         func(*testing.T, *httpmock.Registry)
+		projectsV1Support gh.ProjectsV1Support
+		want              string
+		wantErr           bool
 	}{
 		{
 			name: "basic",
@@ -1940,10 +1942,135 @@ func Test_generateCompareURL(t *testing.T) {
 			want:    "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1&template=story.md",
 			wantErr: false,
 		},
+		// TODO projectsV1Deprecation
+		// Clean up these tests, but probably keep one for general project ID resolution.
+		{
+			name: "with projects, no v1 support",
+			ctx: CreateContext{
+				PRRefs: &skipPushRefs{
+					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
+					baseRefs: baseRefs{
+						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+						baseBranchName: "main",
+					},
+				},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				// Ensure no v1 projects are requestd
+				// ( is required to avoid matching projectsV2
+				reg.Exclude(t, httpmock.GraphQL(`projects\(`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+							{ "data": { "repository": { "projectsV2": {
+								"nodes": [
+									{ "title": "ProjectTitle", "id": "PROJECTV2ID", "resourcePath": "/OWNER/REPO/projects/3" }
+								],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+							{ "data": { "organization": { "projectsV2": {
+								"nodes": [],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+				reg.Register(
+					httpmock.GraphQL(`query UserProjectV2List\b`),
+					httpmock.StringResponse(`
+							{ "data": { "viewer": { "projectsV2": {
+								"nodes": [],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+			},
+			state: shared.IssueMetadataState{
+				ProjectTitles: []string{"ProjectTitle"},
+			},
+			projectsV1Support: gh.ProjectsV1Unsupported,
+			want:              "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1&projects=OWNER%2FREPO%2F3",
+			wantErr:           false,
+		},
+		{
+			name: "with projects, v1 support",
+			ctx: CreateContext{
+				PRRefs: &skipPushRefs{
+					qualifiedHeadRef: shared.NewQualifiedHeadRefWithoutOwner("feature"),
+					baseRefs: baseRefs{
+						baseRepo:       api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+						baseBranchName: "main",
+					},
+				},
+			},
+			state: shared.IssueMetadataState{
+				ProjectTitles: []string{"ProjectV1Title"},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				// v1 project query responses
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`
+							{ "data": { "repository": { "projects": {
+								"nodes": [
+									{ "name": "ProjectV1Title", "id": "PROJECTV1ID", "resourcePath": "/OWNER/REPO/projects/1" }
+								],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectList\b`),
+					httpmock.StringResponse(`
+										{ "data": { "organization": { "projects": {
+											"nodes": [],
+											"pageInfo": { "hasNextPage": false }
+										} } } }
+										`))
+				// v2 project query responses
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+							{ "data": { "repository": { "projectsV2": {
+								"nodes": [],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+							{ "data": { "organization": { "projectsV2": {
+								"nodes": [],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+				reg.Register(
+					httpmock.GraphQL(`query UserProjectV2List\b`),
+					httpmock.StringResponse(`
+							{ "data": { "viewer": { "projectsV2": {
+								"nodes": [],
+								"pageInfo": { "hasNextPage": false }
+							} } } }
+							`))
+			},
+			projectsV1Support: gh.ProjectsV1Supported,
+			want:              "https://github.com/OWNER/REPO/compare/main...feature?body=&expand=1&projects=OWNER%2FREPO%2F1",
+			wantErr:           false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := generateCompareURL(tt.ctx, tt.state, gh.ProjectsV1Supported)
+			// If http stubs are provided, register them and inject the registry into a client
+			// that is provided to generateCompareURL in the ctx.
+			if tt.httpStubs != nil {
+				reg := &httpmock.Registry{}
+				defer reg.Verify(t)
+
+				tt.httpStubs(t, reg)
+				tt.ctx.Client = api.NewClientFromHTTP(&http.Client{Transport: reg})
+			}
+
+			got, err := generateCompareURL(tt.ctx, tt.state, tt.projectsV1Support)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("generateCompareURL() error = %v, wantErr %v", err, tt.wantErr)
 				return

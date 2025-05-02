@@ -533,7 +533,7 @@ func createRun(opts *CreateOptions) error {
 			}
 		}
 
-		openURL, err = generateCompareURL(*ctx, *state, gh.ProjectsV1Supported)
+		openURL, err = generateCompareURL(*ctx, *state, projectsV1Support)
 		if err != nil {
 			return err
 		}
