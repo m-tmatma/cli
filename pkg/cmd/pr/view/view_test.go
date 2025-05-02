@@ -402,14 +402,12 @@ func TestPRView_Preview_nontty(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Cleanup(shared.ResetRunCommandFinder)
-
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
 			pr, err := prFromFixtures(tc.fixtures)
 			require.NoError(t, err)
-			shared.RunCommandFinder("12", pr, ghrepo.New("OWNER", "REPO"))
+			shared.StubFinderForRunCommandStyleTests(t, "12", pr, ghrepo.New("OWNER", "REPO"))
 
 			output, err := runCommand(http, tc.branch, false, tc.args)
 			if err != nil {
@@ -608,14 +606,12 @@ func TestPRView_Preview(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Cleanup(shared.ResetRunCommandFinder)
-
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
 			pr, err := prFromFixtures(tc.fixtures)
 			require.NoError(t, err)
-			shared.RunCommandFinder("12", pr, ghrepo.New("OWNER", "REPO"))
+			shared.StubFinderForRunCommandStyleTests(t, "12", pr, ghrepo.New("OWNER", "REPO"))
 
 			output, err := runCommand(http, tc.branch, true, tc.args)
 			if err != nil {
@@ -638,7 +634,7 @@ func TestPRView_web_currentBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/10"}, ghrepo.New("OWNER", "REPO"))
+	shared.StubFinderForRunCommandStyleTests(t, "", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/10"}, ghrepo.New("OWNER", "REPO"))
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -657,7 +653,7 @@ func TestPRView_web_noResultsForBranch(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	shared.RunCommandFinder("", nil, nil)
+	shared.StubFinderForRunCommandStyleTests(t, "", nil, nil)
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -749,9 +745,9 @@ func TestPRView_tty_Comments(t *testing.T) {
 			if len(tt.fixtures) > 0 {
 				pr, err := prFromFixtures(tt.fixtures)
 				require.NoError(t, err)
-				shared.RunCommandFinder("123", pr, ghrepo.New("OWNER", "REPO"))
+				shared.StubFinderForRunCommandStyleTests(t, "123", pr, ghrepo.New("OWNER", "REPO"))
 			} else {
-				shared.RunCommandFinder("123", nil, nil)
+				shared.StubFinderForRunCommandStyleTests(t, "123", nil, nil)
 			}
 
 			output, err := runCommand(http, tt.branch, true, tt.cli)
@@ -854,17 +850,15 @@ func TestPRView_nontty_Comments(t *testing.T) {
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Cleanup(shared.ResetRunCommandFinder)
-
 			http := &httpmock.Registry{}
 			defer http.Verify(t)
 
 			if len(tt.fixtures) > 0 {
 				pr, err := prFromFixtures(tt.fixtures)
 				require.NoError(t, err)
-				shared.RunCommandFinder("123", pr, ghrepo.New("OWNER", "REPO"))
+				shared.StubFinderForRunCommandStyleTests(t, "123", pr, ghrepo.New("OWNER", "REPO"))
 			} else {
-				shared.RunCommandFinder("123", nil, nil)
+				shared.StubFinderForRunCommandStyleTests(t, "123", nil, nil)
 			}
 
 			output, err := runCommand(http, tt.branch, false, tt.cli)

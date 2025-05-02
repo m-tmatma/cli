@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -55,9 +56,9 @@ type finder struct {
 }
 
 func NewFinder(factory *cmdutil.Factory) PRFinder {
-	if runCommandFinder != nil {
-		f := runCommandFinder
-		runCommandFinder = &mockFinder{err: errors.New("you must use a RunCommandFinder to stub PR lookups")}
+	if finderForRunCommandStyleTests != nil {
+		f := finderForRunCommandStyleTests
+		finderForRunCommandStyleTests = &mockFinder{err: errors.New("you must use StubFinderForRunCommandStyleTests to stub PR lookups")}
 		return f
 	}
 
@@ -71,17 +72,24 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 	}
 }
 
-var runCommandFinder PRFinder
+var finderForRunCommandStyleTests PRFinder
 
-// RunCommandFinder is the NewMockFinder substitute to be used ONLY in runCommand-style tests.
-func RunCommandFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
+// StubFinderForRunCommandStyleTests is the NewMockFinder substitute to be used ONLY in runCommand-style tests.
+func StubFinderForRunCommandStyleTests(t *testing.T, selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
+	// Create a new mock finder and override the "runCommandFinder" variable so that calls to
+	// NewFinder() will return this mock. This is a bad pattern, and a result of old style runCommand
+	// tests that would ideally be replaced. The reason we need to do this is that the runCommand style tests
+	// construct the cobra command via NewCmd* functions, and then Execute them directly, providing no opportunity
+	// to inject a test double unless it's on the factory, which finder never is, because only PR commands need it.
 	finder := NewMockFinder(selector, pr, repo)
-	runCommandFinder = finder
-	return finder
-}
+	finderForRunCommandStyleTests = finder
 
-func ResetRunCommandFinder() {
-	runCommandFinder = nil
+	// Ensure that at the end of the test, we reset the "runCommandFinder" variable so that tests are isolated,
+	// at least if they are run sequentially.
+	t.Cleanup(func() {
+		finderForRunCommandStyleTests = nil
+	})
+	return finder
 }
 
 type FindOptions struct {
