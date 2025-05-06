@@ -304,6 +304,26 @@ func TestAccessiblePrompter(t *testing.T) {
 		require.Equal(t, false, confirmValue)
 	})
 
+	t.Run("Confirm - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		defaultValue := true
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Are you sure (default: yes)")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		confirmValue, err := p.Confirm("Are you sure", defaultValue)
+		require.NoError(t, err)
+		require.Equal(t, defaultValue, confirmValue)
+	})
+
 	t.Run("AuthToken", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)

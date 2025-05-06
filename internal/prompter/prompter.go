@@ -189,6 +189,11 @@ func (p *accessiblePrompter) Password(prompt string) (string, error) {
 
 func (p *accessiblePrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
 	result := defaultValue
+	if defaultValue {
+		prompt = p.addDefaultsToPrompt(prompt, []string{"yes"})
+	} else {
+		prompt = p.addDefaultsToPrompt(prompt, []string{"no"})
+	}
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewConfirm().
