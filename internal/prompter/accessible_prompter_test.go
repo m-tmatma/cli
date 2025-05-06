@@ -140,6 +140,26 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, dummyDefaultValue, inputValue)
 	})
 
+	t.Run("Input - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "12345abcdefg"
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Enter some characters (default: 12345abcdefg)")
+			require.NoError(t, err)
+
+			// Enter nothing
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		inputValue, err := p.Input("Enter some characters", dummyDefaultValue)
+		require.NoError(t, err)
+		assert.Equal(t, dummyDefaultValue, inputValue)
+	})
+
 	t.Run("Password", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)

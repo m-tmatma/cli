@@ -131,7 +131,11 @@ func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, optio
 
 func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) {
 	result := defaultValue
-	prompt = fmt.Sprintf("%s (%s)", prompt, defaultValue)
+	if defaultValue != "" {
+		prompt = fmt.Sprintf("%s (default: %s)", prompt, defaultValue)
+	} else {
+		prompt = fmt.Sprintf("%s:", prompt)
+	}
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
