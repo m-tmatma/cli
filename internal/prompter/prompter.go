@@ -79,12 +79,15 @@ func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 
 // addDefaultsToPrompt adds default values to the prompt string.
 func (p *accessiblePrompter) addDefaultsToPrompt(prompt string, defaultValues []string) string {
+	// We don't show empty default values in the prompt.
+	defaultValues = slices.DeleteFunc(defaultValues, func(s string) bool {
+		return s == ""
+	})
+
 	if len(defaultValues) == 1 {
-		prompt = fmt.Sprintf("%s (default: %s):", prompt, defaultValues[0])
+		prompt = fmt.Sprintf("%s (default: %s)", prompt, defaultValues[0])
 	} else if len(defaultValues) > 1 {
-		prompt = fmt.Sprintf("%s (defaults: %s):", prompt, strings.Join(defaultValues, ", "))
-	} else {
-		prompt = fmt.Sprintf("%s:", prompt)
+		prompt = fmt.Sprintf("%s (defaults: %s)", prompt, strings.Join(defaultValues, ", "))
 	}
 
 	return prompt
@@ -93,6 +96,7 @@ func (p *accessiblePrompter) addDefaultsToPrompt(prompt string, defaultValues []
 func (p *accessiblePrompter) Select(prompt, defaultValue string, options []string) (int, error) {
 	var result int
 	formOptions := []huh.Option[int]{}
+	prompt = p.addDefaultsToPrompt(prompt, []string{defaultValue})
 	for i, o := range options {
 		// If this option is the default value, assign its index
 		// to the result variable. huh will treat it as a default selection.

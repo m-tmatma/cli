@@ -78,6 +78,29 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, expectedIndex, selectValue)
 	})
 
+	t.Run("Select - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "12345abcdefg"
+		options := []string{"1", "2", dummyDefaultValue}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number (default: 12345abcdefg)")
+			require.NoError(t, err)
+
+			// Just press enter to accept the default
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", dummyDefaultValue, options)
+		require.NoError(t, err)
+
+		expectedIndex := slices.Index(options, dummyDefaultValue)
+		assert.Equal(t, expectedIndex, selectValue)
+	})
+
 	t.Run("MultiSelect", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -171,7 +194,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Enter some characters (default: 12345abcdefg):")
+			_, err := console.ExpectString("Enter some characters (default: 12345abcdefg)")
 			require.NoError(t, err)
 
 			// Enter nothing
