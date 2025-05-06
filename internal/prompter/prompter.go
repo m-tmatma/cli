@@ -77,6 +77,19 @@ func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 		WithOutput(p.stdout)
 }
 
+// addDefaultsToPrompt adds default values to the prompt string.
+func (p *accessiblePrompter) addDefaultsToPrompt(prompt string, defaultValues []string) string {
+	if len(defaultValues) == 1 {
+		prompt = fmt.Sprintf("%s (default: %s):", prompt, defaultValues[0])
+	} else if len(defaultValues) > 1 {
+		prompt = fmt.Sprintf("%s (defaults: %s):", prompt, strings.Join(defaultValues, ", "))
+	} else {
+		prompt = fmt.Sprintf("%s:", prompt)
+	}
+
+	return prompt
+}
+
 func (p *accessiblePrompter) Select(prompt, defaultValue string, options []string) (int, error) {
 	var result int
 	formOptions := []huh.Option[int]{}
@@ -136,11 +149,7 @@ func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, optio
 
 func (p *accessiblePrompter) Input(prompt, defaultValue string) (string, error) {
 	result := defaultValue
-	if defaultValue != "" {
-		prompt = fmt.Sprintf("%s (default: %s)", prompt, defaultValue)
-	} else {
-		prompt = fmt.Sprintf("%s:", prompt)
-	}
+	prompt = p.addDefaultsToPrompt(prompt, []string{defaultValue})
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().

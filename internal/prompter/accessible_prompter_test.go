@@ -171,7 +171,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Enter some characters (default: 12345abcdefg)")
+			_, err := console.ExpectString("Enter some characters (default: 12345abcdefg):")
 			require.NoError(t, err)
 
 			// Enter nothing
