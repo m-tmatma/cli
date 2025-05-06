@@ -121,6 +121,7 @@ func (p *accessiblePrompter) Select(prompt, defaultValue string, options []strin
 
 func (p *accessiblePrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
 	var result []int
+	prompt = p.addDefaultsToPrompt(prompt, defaults)
 	formOptions := make([]huh.Option[int], len(options))
 	for i, o := range options {
 		// If this option is in the defaults slice,

@@ -147,6 +147,37 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, []int{1}, multiSelectValue)
 	})
 
+	t.Run("MultiSelect - default value is in prompt and in readable format", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValues := []string{"foo", "bar"}
+		options := []string{"1", "2"}
+		options = append(options, dummyDefaultValues...)
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number (defaults: foo, bar)")
+			require.NoError(t, err)
+
+			// Don't select anything because the defaults should be selected.
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValues, err := p.MultiSelect("Select a number", dummyDefaultValues, options)
+		require.NoError(t, err)
+		var expectedIndices []int
+
+		// Get the indices of the default values within the options slice
+		// as that's what we expect the prompter to return when no selections are made.
+		for _, defaultValue := range dummyDefaultValues {
+			expectedIndices = append(expectedIndices, slices.Index(options, defaultValue))
+		}
+		assert.Equal(t, expectedIndices, multiSelectValues)
+	})
+
 	t.Run("Input", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
