@@ -77,10 +77,15 @@ func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 		WithOutput(p.stdout)
 }
 
-func (p *accessiblePrompter) Select(prompt, _ string, options []string) (int, error) {
+func (p *accessiblePrompter) Select(prompt, defaultValue string, options []string) (int, error) {
 	var result int
 	formOptions := []huh.Option[int]{}
 	for i, o := range options {
+		// If this option is the default value, assign its index
+		// to the result variable. huh will treat it as a default selection.
+		if defaultValue == o {
+			result = i
+		}
 		formOptions = append(formOptions, huh.NewOption(o, i))
 	}
 

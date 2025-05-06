@@ -5,6 +5,7 @@ package prompter_test
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -52,6 +53,29 @@ func TestAccessiblePrompter(t *testing.T) {
 		selectValue, err := p.Select("Select a number", "", []string{"1", "2", "3"})
 		require.NoError(t, err)
 		assert.Equal(t, 0, selectValue)
+	})
+
+	t.Run("Select - blank input returns default value", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "12345abcdefg"
+		options := []string{"1", "2", dummyDefaultValue}
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Input a number between 1 and 3:")
+			require.NoError(t, err)
+
+			// Just press enter to accept the default
+			_, err = console.SendLine("")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", dummyDefaultValue, options)
+		require.NoError(t, err)
+
+		expectedIndex := slices.Index(options, dummyDefaultValue)
+		assert.Equal(t, expectedIndex, selectValue)
 	})
 
 	t.Run("MultiSelect", func(t *testing.T) {
