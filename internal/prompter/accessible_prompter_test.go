@@ -32,13 +32,16 @@ import (
 // are sufficient to ensure that the accessible prompter behaves roughly as expected
 // but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
+
+	beforePasswordSendTimeout := 20 * time.Microsecond
+
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Choose:")
+			_, err := console.ExpectString("Input a number between 1 and 3:")
 			require.NoError(t, err)
 
 			// Select option 1
@@ -57,7 +60,7 @@ func TestAccessiblePrompter(t *testing.T) {
 
 		go func() {
 			// Wait for prompt to appear
-			_, err := console.ExpectString("Select a number")
+			_, err := console.ExpectString("Input a number between 0 and 3:")
 			require.NoError(t, err)
 
 			// Select options 1 and 2
@@ -74,6 +77,27 @@ func TestAccessiblePrompter(t *testing.T) {
 		multiSelectValue, err := p.MultiSelect("Select a number", []string{}, []string{"1", "2", "3"})
 		require.NoError(t, err)
 		assert.Equal(t, []int{0, 1}, multiSelectValue)
+	})
+
+	t.Run("MultiSelect - default values are respected by being pre-selected", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+
+		go func() {
+			// Wait for prompt to appear
+			_, err := console.ExpectString("Select a number")
+			require.NoError(t, err)
+
+			// Don't select anything because the default should be selected.
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValue, err := p.MultiSelect("Select a number", []string{"2"}, []string{"1", "2", "3"})
+		require.NoError(t, err)
+		assert.Equal(t, []int{1}, multiSelectValue)
 	})
 
 	t.Run("Input", func(t *testing.T) {
@@ -126,6 +150,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Enter password")
 			require.NoError(t, err)
 
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
+
 			// Enter a number
 			_, err = console.SendLine(dummyPassword)
 			require.NoError(t, err)
@@ -134,6 +161,11 @@ func TestAccessiblePrompter(t *testing.T) {
 		passwordValue, err := p.Password("Enter password")
 		require.NoError(t, err)
 		require.Equal(t, dummyPassword, passwordValue)
+
+		// Ensure the dummy password is not printed to the screen,
+		// asserting that echo mode is disabled.
+		_, err = console.ExpectString(" \r\n\r\n")
+		require.NoError(t, err)
 	})
 
 	t.Run("Confirm", func(t *testing.T) {
@@ -184,6 +216,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
+
 			// Enter some dummy auth token
 			_, err = console.SendLine(dummyAuthToken)
 			require.NoError(t, err)
@@ -192,6 +227,11 @@ func TestAccessiblePrompter(t *testing.T) {
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
 		require.Equal(t, dummyAuthToken, authValue)
+
+		// Ensure the dummy password is not printed to the screen,
+		// asserting that echo mode is disabled.
+		_, err = console.ExpectString(" \r\n\r\n")
+		require.NoError(t, err)
 	})
 
 	t.Run("AuthToken - blank input returns error", func(t *testing.T) {
@@ -212,6 +252,9 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err = console.ExpectString("token is required")
 			require.NoError(t, err)
 
+			// Wait to ensure huh has time to set the echo mode
+			time.Sleep(beforePasswordSendTimeout)
+
 			// Now enter some dummy auth token to return control back to the test
 			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
 			require.NoError(t, err)
@@ -220,6 +263,11 @@ func TestAccessiblePrompter(t *testing.T) {
 		authValue, err := p.AuthToken()
 		require.NoError(t, err)
 		require.Equal(t, dummyAuthTokenForAfterFailure, authValue)
+
+		// Ensure the dummy password is not printed to the screen,
+		// asserting that echo mode is disabled.
+		_, err = console.ExpectString(" \r\n\r\n")
+		require.NoError(t, err)
 	})
 
 	t.Run("ConfirmDeletion", func(t *testing.T) {
@@ -325,7 +373,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Expect a notice to enter something valid since blank is disallowed.
-			_, err = console.ExpectString("invalid input. please try again")
+			_, err = console.ExpectString("Invalid: must be between 1 and 1")
 			require.NoError(t, err)
 
 			// Send a 1 to select to open the editor. This will immediately exit
@@ -352,7 +400,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Expect a notice to enter something valid since blank is disallowed.
-			_, err = console.ExpectString("invalid input. please try again")
+			_, err = console.ExpectString("Invalid: must be between 1 and 1")
 			require.NoError(t, err)
 
 			// Send a 1 to select to open the editor since skip is invalid and

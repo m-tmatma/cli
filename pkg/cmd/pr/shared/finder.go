@@ -10,12 +10,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	o "github.com/cli/cli/v2/pkg/option"
@@ -54,9 +56,9 @@ type finder struct {
 }
 
 func NewFinder(factory *cmdutil.Factory) PRFinder {
-	if runCommandFinder != nil {
-		f := runCommandFinder
-		runCommandFinder = &mockFinder{err: errors.New("you must use a RunCommandFinder to stub PR lookups")}
+	if finderForRunCommandStyleTests != nil {
+		f := finderForRunCommandStyleTests
+		finderForRunCommandStyleTests = &mockFinder{err: errors.New("you must use StubFinderForRunCommandStyleTests to stub PR lookups")}
 		return f
 	}
 
@@ -70,12 +72,23 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 	}
 }
 
-var runCommandFinder PRFinder
+var finderForRunCommandStyleTests PRFinder
 
-// RunCommandFinder is the NewMockFinder substitute to be used ONLY in runCommand-style tests.
-func RunCommandFinder(selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
+// StubFinderForRunCommandStyleTests is the NewMockFinder substitute to be used ONLY in runCommand-style tests.
+func StubFinderForRunCommandStyleTests(t *testing.T, selector string, pr *api.PullRequest, repo ghrepo.Interface) *mockFinder {
+	// Create a new mock finder and override the "runCommandFinder" variable so that calls to
+	// NewFinder() will return this mock. This is a bad pattern, and a result of old style runCommand
+	// tests that would ideally be replaced. The reason we need to do this is that the runCommand style tests
+	// construct the cobra command via NewCmd* functions, and then Execute them directly, providing no opportunity
+	// to inject a test double unless it's on the factory, which finder never is, because only PR commands need it.
 	finder := NewMockFinder(selector, pr, repo)
-	runCommandFinder = finder
+	finderForRunCommandStyleTests = finder
+
+	// Ensure that at the end of the test, we reset the "runCommandFinder" variable so that tests are isolated,
+	// at least if they are run sequentially.
+	t.Cleanup(func() {
+		finderForRunCommandStyleTests = nil
+	})
 	return finder
 }
 
@@ -89,6 +102,8 @@ type FindOptions struct {
 	BaseBranch string
 	// States lists the possible PR states to scope the PR-for-branch lookup to.
 	States []string
+
+	Detector fd.Detector
 }
 
 func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, error) {
@@ -193,9 +208,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.AddValues([]string{"id", "number"}) // for additional preload queries below
 
 	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
-		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-		detector := fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
-		prFeatures, err := detector.PullRequestFeatures()
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
+		}
+		prFeatures, err := opts.Detector.PullRequestFeatures()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -211,8 +228,23 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		fields.Remove("projectItems")
 	}
 
+	// TODO projectsV1Deprecation
+	// Remove this block
+	// When removing this, remember to remove `projectCards` from the list of default fields in pr/view.go
+	if fields.Contains("projectCards") {
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, f.baseRefRepo.RepoHost())
+		}
+
+		if opts.Detector.ProjectsV1() == gh.ProjectsV1Unsupported {
+			fields.Remove("projectCards")
+		}
+	}
+
 	var pr *api.PullRequest
 	if f.prNumber > 0 {
+		// If we have a PR number, let's look it up
 		if numberFieldOnly {
 			// avoid hitting the API if we already have all the information
 			return &api.PullRequest{Number: f.prNumber}, f.baseRefRepo, nil
@@ -221,11 +253,16 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		if err != nil {
 			return pr, f.baseRefRepo, err
 		}
-	} else {
+	} else if prRefs.BaseRepo() != nil && f.branchName != "" {
+		// No PR number, but we have a base repo and branch name.
 		pr, err = findForRefs(httpClient, prRefs, opts.States, fields.ToSlice())
 		if err != nil {
 			return pr, f.baseRefRepo, err
 		}
+	} else {
+		// If we don't have a PR number or a base repo and branch name,
+		// we can't do anything
+		return nil, f.baseRefRepo, &NotFoundError{fmt.Errorf("no pull requests found")}
 	}
 
 	g, _ := errgroup.WithContext(context.Background())
@@ -237,6 +274,11 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	if fields.Contains("comments") {
 		g.Go(func() error {
 			return preloadPrComments(httpClient, f.baseRefRepo, pr)
+		})
+	}
+	if fields.Contains("closingIssuesReferences") {
+		g.Go(func() error {
+			return preloadPrClosingIssuesReferences(httpClient, f.baseRefRepo, pr)
 		})
 	}
 	if fields.Contains("statusCheckRollup") {
@@ -449,6 +491,45 @@ func preloadPrComments(client *http.Client, repo ghrepo.Interface, pr *api.PullR
 	}
 
 	pr.Comments.PageInfo.HasNextPage = false
+	return nil
+}
+
+func preloadPrClosingIssuesReferences(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	if !pr.ClosingIssuesReferences.PageInfo.HasNextPage {
+		return nil
+	}
+
+	type response struct {
+		Node struct {
+			PullRequest struct {
+				ClosingIssuesReferences api.ClosingIssuesReferences `graphql:"closingIssuesReferences(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":        githubv4.ID(pr.ID),
+		"endCursor": githubv4.String(pr.ClosingIssuesReferences.PageInfo.EndCursor),
+	}
+
+	gql := api.NewClientFromHTTP(client)
+
+	for {
+		var query response
+		err := gql.Query(repo.RepoHost(), "closingIssuesReferences", &query, variables)
+		if err != nil {
+			return err
+		}
+
+		pr.ClosingIssuesReferences.Nodes = append(pr.ClosingIssuesReferences.Nodes, query.Node.PullRequest.ClosingIssuesReferences.Nodes...)
+
+		if !query.Node.PullRequest.ClosingIssuesReferences.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Node.PullRequest.ClosingIssuesReferences.PageInfo.EndCursor)
+	}
+
+	pr.ClosingIssuesReferences.PageInfo.HasNextPage = false
 	return nil
 }
 
