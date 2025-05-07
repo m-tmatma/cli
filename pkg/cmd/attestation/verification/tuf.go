@@ -2,9 +2,11 @@ package verification
 
 import (
 	_ "embed"
+	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/cenkalti/backoff/v5"
 	o "github.com/cli/cli/v2/pkg/option"
 	"github.com/cli/go-gh/v2/pkg/config"
 	"github.com/sigstore/sigstore-go/pkg/tuf"
@@ -43,7 +45,7 @@ func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string], hc *http.Cl
 }
 
 func GitHubTUFOptions(tufMetadataDir o.Option[string], hc *http.Client) *tuf.Options {
-	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
+	opts := DefaultOptionsWithCacheSetting(tufMetadataDir, hc)
 
 	opts.Root = githubRoot
 	opts.RepositoryBaseURL = GitHubTUFMirror

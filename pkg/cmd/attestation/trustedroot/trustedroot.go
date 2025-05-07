@@ -122,7 +122,7 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 	var tufOptions []tufConfig
 	var defaultTR = "trusted_root.json"
 
-	tufOpt := verification.DefaultOptionsWithCacheSetting(o.None[string]())
+	tufOpt := verification.DefaultOptionsWithCacheSetting(o.None[string](), nil)
 	// Disable local caching, so we get up-to-date response from TUF repository
 	tufOpt.CacheValidity = 0
 
@@ -151,7 +151,7 @@ func getTrustedRoot(makeTUF tufClientInstantiator, opts *Options) error {
 			targets:    []string{defaultTR},
 		})
 
-		tufOpt = verification.GitHubTUFOptions(o.None[string]())
+		tufOpt = verification.GitHubTUFOptions(o.None[string](), nil)
 		tufOpt.CacheValidity = 0
 		tufOptions = append(tufOptions, tufConfig{
 			tufOptions: tufOpt,

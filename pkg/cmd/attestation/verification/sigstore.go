@@ -73,7 +73,7 @@ func NewLiveSigstoreVerifier(config SigstoreConfig) (*LiveSigstoreVerifier, erro
 		return liveVerifier, nil
 	}
 	if !config.NoPublicGood {
-		publicGoodVerifier, err := newPublicGoodVerifier(config.TUFMetadataDir)
+		publicGoodVerifier, err := newPublicGoodVerifier(config.TUFMetadataDir, config.HttpClient)
 		if err != nil {
 			return nil, err
 		}
@@ -350,8 +350,8 @@ func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Si
 	return gv, nil
 }
 
-func newPublicGoodVerifier(tufMetadataDir o.Option[string]) (*verify.SignedEntityVerifier, error) {
-	opts := DefaultOptionsWithCacheSetting(tufMetadataDir)
+func newPublicGoodVerifier(tufMetadataDir o.Option[string], hc *http.Client) (*verify.SignedEntityVerifier, error) {
+	opts := DefaultOptionsWithCacheSetting(tufMetadataDir, hc)
 	client, err := tuf.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TUF client: %v", err)
