@@ -21,9 +21,7 @@ const (
 	SigstoreSanRegex = "^https://github.com/sigstore/sigstore-js/"
 )
 
-var (
-	bundlePath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
-)
+var bundlePath = test.NormalizeRelativePath("../test/data/sigstore-js-2.1.0-bundle.json")
 
 func TestRunInspect(t *testing.T) {
 	opts := Options{
