@@ -40,6 +40,7 @@ func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string], hc *http.Cl
 	f.SetHTTPClient(hc)
 	retryOptions := []backoff.RetryOption{backoff.WithMaxTries(3)}
 	f.SetRetryOptions(retryOptions...)
+	opts.WithFetcher(&f)
 
 	return opts
 }
