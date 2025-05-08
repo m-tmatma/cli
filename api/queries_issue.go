@@ -38,6 +38,7 @@ type Issue struct {
 	Comments         Comments
 	Author           Author
 	Assignees        Assignees
+	AssignedActors   ActorAssignees
 	Labels           Labels
 	ProjectCards     ProjectCards
 	ProjectItems     ProjectItems
@@ -87,6 +88,21 @@ func (a Assignees) Logins() []string {
 	logins := make([]string, len(a.Nodes))
 	for i, a := range a.Nodes {
 		logins[i] = a.Login
+	}
+	return logins
+}
+
+type ActorAssignees struct {
+	Edges []struct {
+		Node Actor
+	}
+	TotalCount int
+}
+
+func (a ActorAssignees) Logins() []string {
+	logins := make([]string, len(a.Edges))
+	for i, a := range a.Edges {
+		logins[i] = a.Node.Login
 	}
 	return logins
 }

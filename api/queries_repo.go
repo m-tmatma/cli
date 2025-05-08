@@ -146,6 +146,13 @@ type GitHubUser struct {
 	Name  string `json:"name"`
 }
 
+// Actor is a superset of User and Bot
+// At the time of writing, it does not support Name.
+type Actor struct {
+	ID    string `json:"id"`
+	Login string `json:"login"`
+}
+
 // BranchRef is the branch name in a GitHub repository
 type BranchRef struct {
 	Name string `json:"name"`
