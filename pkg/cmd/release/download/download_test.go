@@ -462,6 +462,66 @@ func Test_downloadRun(t *testing.T) {
 			wantStdout: `1234`,
 			wantStderr: ``,
 		},
+		{
+			name:  "draft release with null tarball_url and zipball_url",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				ArchiveType: "tar.gz",
+				Destination: "tmp/packages",
+				Concurrency: 2,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"tag_name": "v1.2.3",
+					"name": "patch-36",
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						  "url": "https://api.github.com/assets/1234" },
+						{ "name": "windows-64bit.zip", "size": 34,
+						  "url": "https://api.github.com/assets/3456" },
+						{ "name": "linux.tgz", "size": 56,
+						  "url": "https://api.github.com/assets/5678" }
+					],
+					"tarball_url": null,
+					"zipball_url": null,
+					"draft": true
+				}`)
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    "release \"patch-36\" with tag \"v1.2.3\", does not have a \"tar.gz\" archive asset. Most likely, this is because it is a draft.",
+		},
+		{
+			name:  "non-draft release with null tarball_url and zipball_url",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				ArchiveType: "tar.gz",
+				Destination: "tmp/packages",
+				Concurrency: 2,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				shared.StubFetchRelease(t, reg, "OWNER", "REPO", "v1.2.3", `{
+					"tag_name": "v1.2.3",
+					"name": "patch-36",
+					"assets": [
+						{ "name": "windows-32bit.zip", "size": 12,
+						  "url": "https://api.github.com/assets/1234" },
+						{ "name": "windows-64bit.zip", "size": 34,
+						  "url": "https://api.github.com/assets/3456" },
+						{ "name": "linux.tgz", "size": 56,
+						  "url": "https://api.github.com/assets/5678" }
+					],
+					"tarball_url": null,
+					"zipball_url": null,
+					"draft": false
+				}`)
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    "release \"patch-36\" with tag \"v1.2.3\", does not have a \"tar.gz\" archive asset.",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
