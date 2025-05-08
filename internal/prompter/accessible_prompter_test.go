@@ -101,6 +101,27 @@ func TestAccessiblePrompter(t *testing.T) {
 		assert.Equal(t, expectedIndex, selectValue)
 	})
 
+	t.Run("Select - invalid defaults are excluded from prompt", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValue := "foo"
+		options := []string{"1", "2"}
+
+		go func() {
+			// Wait for prompt to appear without the invalid default value
+			_, err := console.ExpectString("Select a number \r\n")
+			require.NoError(t, err)
+
+			// Select option 2
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+		}()
+
+		selectValue, err := p.Select("Select a number", dummyDefaultValue, options)
+		require.NoError(t, err)
+		assert.Equal(t, 1, selectValue)
+	})
+
 	t.Run("MultiSelect", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
 		p := newTestAccessiblePrompter(t, console)
@@ -176,6 +197,31 @@ func TestAccessiblePrompter(t *testing.T) {
 			expectedIndices = append(expectedIndices, slices.Index(options, defaultValue))
 		}
 		assert.Equal(t, expectedIndices, multiSelectValues)
+	})
+
+	t.Run("MultiSelect - invalid defaults are excluded from prompt", func(t *testing.T) {
+		console := newTestVirtualTerminal(t)
+		p := newTestAccessiblePrompter(t, console)
+		dummyDefaultValues := []string{"foo", "bar"}
+		options := []string{"1", "2"}
+
+		go func() {
+			// Wait for prompt to appear without the invalid default values
+			_, err := console.ExpectString("Select a number \r\n")
+			require.NoError(t, err)
+
+			// Not selecting anything will fail because there are no defaults.
+			_, err = console.SendLine("2")
+			require.NoError(t, err)
+
+			// This confirms selections
+			_, err = console.SendLine("0")
+			require.NoError(t, err)
+		}()
+
+		multiSelectValues, err := p.MultiSelect("Select a number", dummyDefaultValues, options)
+		require.NoError(t, err)
+		assert.Equal(t, []int{1}, multiSelectValues)
 	})
 
 	t.Run("Input", func(t *testing.T) {
