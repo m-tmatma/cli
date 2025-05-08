@@ -36,11 +36,11 @@ func DefaultOptionsWithCacheSetting(tufMetadataDir o.Option[string], hc *http.Cl
 	opts.CacheValidity = 1
 
 	// configure fetcher timeout and retry
-	f := fetcher.DefaultFetcher{}
+	f := fetcher.NewDefaultFetcher()
 	f.SetHTTPClient(hc)
 	retryOptions := []backoff.RetryOption{backoff.WithMaxTries(3)}
 	f.SetRetryOptions(retryOptions...)
-	opts.WithFetcher(&f)
+	opts.WithFetcher(f)
 
 	return opts
 }
