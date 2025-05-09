@@ -118,9 +118,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
-					Assignees: prShared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Edited: true,
+					Assignees: prShared.EditableAssignees{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -132,9 +134,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				IssueNumbers: []int{23},
 				Editable: prShared.Editable{
-					Assignees: prShared.EditableSlice{
-						Remove: []string{"monalisa", "hubot"},
-						Edited: true,
+					Assignees: prShared.EditableAssignees{
+						EditableSlice: prShared.EditableSlice{
+							Remove: []string{"monalisa", "hubot"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -354,10 +358,12 @@ func Test_editRun(t *testing.T) {
 						Value:  "new body",
 						Edited: true,
 					},
-					Assignees: prShared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: prShared.EditableAssignees{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: prShared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -399,10 +405,12 @@ func Test_editRun(t *testing.T) {
 				IssueNumbers: []int{456, 123},
 				Interactive:  false,
 				Editable: prShared.Editable{
-					Assignees: prShared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: prShared.EditableAssignees{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: prShared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -449,10 +457,12 @@ func Test_editRun(t *testing.T) {
 				IssueNumbers: []int{123, 9999},
 				Interactive:  false,
 				Editable: prShared.Editable{
-					Assignees: prShared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: prShared.EditableAssignees{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: prShared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -494,10 +504,12 @@ func Test_editRun(t *testing.T) {
 				IssueNumbers: []int{123, 456},
 				Interactive:  false,
 				Editable: prShared.Editable{
-					Assignees: prShared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: prShared.EditableAssignees{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Milestone: prShared.EditableString{
 						Value:  "GA",
@@ -509,14 +521,14 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
 					httpmock.StringResponse(`
-					{ "data": { "repository": { "assignableUsers": {
+					{ "data": { "repository": { "suggestedActors": {
 						"nodes": [
 							{ "login": "hubot", "id": "HUBOTID" },
 							{ "login": "MonaLisa", "id": "MONAID" }
 						],
-						"pageInfo": { "hasNextPage": false }
+						"pageInfo": { "hasNextPage": false, "endCursor": "Mg" }
 					} } } }
 					`))
 				reg.Register(
@@ -669,17 +681,30 @@ func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
+	// reg.Register(
+	// 	httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+	// 	httpmock.StringResponse(`
+	// 	{ "data": { "repository": { "assignableUsers": {
+	// 		"nodes": [
+	// 			{ "login": "hubot", "id": "HUBOTID" },
+	// 			{ "login": "MonaLisa", "id": "MONAID" }
+	// 		],
+	// 		"pageInfo": { "hasNextPage": false }
+	// 	} } } }
+	// 	`))
+
 	reg.Register(
-		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
 		httpmock.StringResponse(`
-		{ "data": { "repository": { "assignableUsers": {
+		{ "data": { "repository": { "suggestedActors": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
-			"pageInfo": { "hasNextPage": false }
+			"pageInfo": { "hasNextPage": false, "endCursor": "Mg" }
 		} } } }
 		`))
+
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryLabelList\b`),
 		httpmock.StringResponse(`
@@ -902,9 +927,11 @@ func TestActorIsAssignable(t *testing.T) {
 			Detector:     &fd.EnabledDetectorMock{},
 			IssueNumbers: []int{123},
 			Editable: prShared.Editable{
-				Assignees: prShared.EditableSlice{
-					Add:    []string{"monalisa", "octocat"},
-					Edited: true,
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "octocat"},
+						Edited: true,
+					},
 				},
 			},
 		})
@@ -940,9 +967,11 @@ func TestActorIsAssignable(t *testing.T) {
 			Detector:     &fd.DisabledDetectorMock{},
 			IssueNumbers: []int{123},
 			Editable: prShared.Editable{
-				Assignees: prShared.EditableSlice{
-					Add:    []string{"monalisa", "octocat"},
-					Edited: true,
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "octocat"},
+						Edited: true,
+					},
 				},
 			},
 		})

@@ -210,6 +210,8 @@ func editRun(opts *EditOptions) error {
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
 		if issueFeatures.ActorIsAssignable {
+			editable.Assignees.ActorAssignees = true
+
 			// At the time of writing, only 10 Actors can be assigned to an issue.
 			assignedActors := heredoc.Doc(`
 				assignedActors(first: 10) {
@@ -277,7 +279,7 @@ func editRun(opts *EditOptions) error {
 		editable.Body.Default = issue.Body
 		// We use Actors as the default assignees if Actors are assignable
 		// on this GitHub host.
-		if issueFeatures.ActorIsAssignable {
+		if editable.Assignees.ActorAssignees {
 			editable.Assignees.Default = issue.AssignedActors.Logins()
 		} else {
 			editable.Assignees.Default = issue.Assignees.Logins()

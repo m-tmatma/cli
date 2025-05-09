@@ -14,7 +14,7 @@ type Editable struct {
 	Body      EditableString
 	Base      EditableString
 	Reviewers EditableSlice
-	Assignees EditableSlice
+	Assignees EditableAssignees
 	Labels    EditableSlice
 	Projects  EditableProjects
 	Milestone EditableString
@@ -36,6 +36,13 @@ type EditableSlice struct {
 	Options []string
 	Edited  bool
 	Allowed bool
+}
+
+// EditableAssignees is a special case of EditableSlice.
+// It contains a flag to indicate whether the assignees are actors or not.
+type EditableAssignees struct {
+	EditableSlice
+	ActorAssignees bool
 }
 
 // ProjectsV2 mutations require a mapping of an item ID to a project ID.
@@ -245,6 +252,13 @@ func (es *EditableSlice) clone() EditableSlice {
 	return cpy
 }
 
+func (ea *EditableAssignees) clone() EditableAssignees {
+	return EditableAssignees{
+		EditableSlice:  ea.EditableSlice.clone(),
+		ActorAssignees: ea.ActorAssignees,
+	}
+}
+
 func (ep *EditableProjects) clone() EditableProjects {
 	return EditableProjects{
 		EditableSlice: ep.EditableSlice.clone(),
@@ -378,12 +392,13 @@ func FieldsToEditSurvey(p EditPrompter, editable *Editable) error {
 
 func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable) error {
 	input := api.RepoMetadataInput{
-		Reviewers:  editable.Reviewers.Edited,
-		Assignees:  editable.Assignees.Edited,
-		Labels:     editable.Labels.Edited,
-		ProjectsV1: editable.Projects.Edited,
-		ProjectsV2: editable.Projects.Edited,
-		Milestones: editable.Milestone.Edited,
+		Reviewers:      editable.Reviewers.Edited,
+		Assignees:      editable.Assignees.Edited,
+		ActorAssignees: editable.Assignees.ActorAssignees,
+		Labels:         editable.Labels.Edited,
+		ProjectsV1:     editable.Projects.Edited,
+		ProjectsV2:     editable.Projects.Edited,
+		Milestones:     editable.Milestone.Edited,
 	}
 	metadata, err := api.RepoMetadata(client, repo, input)
 	if err != nil {
@@ -393,6 +408,10 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 	var users []string
 	for _, u := range metadata.AssignableUsers {
 		users = append(users, u.Login)
+	}
+	var actors []string
+	for _, a := range metadata.AssignableActors {
+		actors = append(actors, a.Login)
 	}
 	var teams []string
 	for _, t := range metadata.Teams {
@@ -416,7 +435,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 
 	editable.Metadata = *metadata
 	editable.Reviewers.Options = append(users, teams...)
-	editable.Assignees.Options = users
+	if editable.Assignees.ActorAssignees {
+		editable.Assignees.Options = actors
+	} else {
+		editable.Assignees.Options = users
+	}
 	editable.Labels.Options = labels
 	editable.Projects.Options = projects
 	editable.Milestone.Options = milestones

@@ -681,13 +681,14 @@ func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Reposit
 }
 
 type RepoMetadataResult struct {
-	CurrentLogin    string
-	AssignableUsers []RepoAssignee
-	Labels          []RepoLabel
-	Projects        []RepoProject
-	ProjectsV2      []ProjectV2
-	Milestones      []RepoMilestone
-	Teams           []OrgTeam
+	CurrentLogin     string
+	AssignableUsers  []RepoAssignee
+	AssignableActors []RepoAssignee
+	Labels           []RepoLabel
+	Projects         []RepoProject
+	ProjectsV2       []ProjectV2
+	Milestones       []RepoMilestone
+	Teams            []OrgTeam
 }
 
 func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
@@ -701,6 +702,16 @@ func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
 				break
 			}
 		}
+
+		// Look for ID in assignable actors if not found in assignable users
+		for _, u := range m.AssignableActors {
+			if strings.EqualFold(assigneeLogin, u.Login) {
+				ids = append(ids, u.ID)
+				found = true
+				break
+			}
+		}
+
 		if !found {
 			return nil, fmt.Errorf("'%s' not found", assigneeLogin)
 		}
@@ -892,12 +903,13 @@ func (m *RepoMetadataResult) Merge(m2 *RepoMetadataResult) {
 }
 
 type RepoMetadataInput struct {
-	Assignees  bool
-	Reviewers  bool
-	Labels     bool
-	ProjectsV1 bool
-	ProjectsV2 bool
-	Milestones bool
+	Assignees      bool
+	ActorAssignees bool
+	Reviewers      bool
+	Labels         bool
+	ProjectsV1     bool
+	ProjectsV2     bool
+	Milestones     bool
 }
 
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
@@ -906,14 +918,48 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	var g errgroup.Group
 
 	if input.Assignees || input.Reviewers {
-		g.Go(func() error {
-			users, err := RepoAssignableUsers(client, repo)
-			if err != nil {
-				err = fmt.Errorf("error fetching assignees: %w", err)
+
+		if input.ActorAssignees {
+			g.Go(func() error {
+				actors, err := RepoAssignableActors(client, repo)
+				if err != nil {
+					err = fmt.Errorf("error fetching assignees: %w", err)
+				}
+				result.AssignableActors = actors
+				return err
+			})
+
+			// If reviewers are requested, we still need to fetch the assignable users
+			// since commands use assignable users for reviewers too,
+			// but Actors are not supported for requesting review (need to confirm this).
+			// TODO KW: find out how to do this in the above query so we don't need to
+			// run two potentially expensive queries. When we fetch Actors, this
+			// should still return Users - Users are distinguishable from other Actors
+			// by having a name property. Maybe we can use the Name to filter out
+			// non-user Actors and populate the users list for reviewers based on
+			// that.
+			if input.Reviewers {
+				g.Go(func() error {
+					users, err := RepoAssignableUsers(client, repo)
+					if err != nil {
+						err = fmt.Errorf("error fetching assignees: %w", err)
+					}
+					result.AssignableUsers = users
+					return err
+				})
 			}
-			result.AssignableUsers = users
-			return err
-		})
+		} else {
+			// Not using Actors, fetch legacy assignable users.
+			g.Go(func() error {
+				users, err := RepoAssignableUsers(client, repo)
+				if err != nil {
+					err = fmt.Errorf("error fetching assignees: %w", err)
+				}
+				result.AssignableUsers = users
+				return err
+			})
+		}
+
 	}
 
 	if input.Reviewers {
@@ -1184,6 +1230,61 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 	}
 
 	return users, nil
+}
+
+// RepoAssignableActors fetches all the assignable actors for a repository on
+// GitHub hosts that support Actor assignees.
+func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]RepoAssignee, error) {
+	type repoActorAssignee struct {
+		ID    string
+		Login string
+	}
+
+	type responseData struct {
+		Repository struct {
+			SuggestedActors struct {
+				Nodes []struct {
+					User RepoAssignee      `graphql:"... on User"`
+					Bot  repoActorAssignee `graphql:"... on Bot"`
+				}
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"suggestedActors(first: 100, after: $endCursor, capabilities: CAN_BE_ASSIGNED)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	var actors []RepoAssignee
+	for {
+		var query responseData
+		err := client.Query(repo.RepoHost(), "RepositoryAssignableActors", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, node := range query.Repository.SuggestedActors.Nodes {
+			// Edge case if the Actor is not a Bot or a User,
+			// it won't be unmarshalled properly, and we'll have an
+			// zero value node.
+			if node.User.ID == "" || node.User.Login == "" {
+				continue
+			}
+			actors = append(actors, node.User)
+		}
+
+		if !query.Repository.SuggestedActors.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.SuggestedActors.PageInfo.EndCursor)
+	}
+	return actors, nil
 }
 
 type RepoLabel struct {
