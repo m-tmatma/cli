@@ -394,6 +394,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateActorAssignees(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
 			},
@@ -441,6 +442,8 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateActorAssignees(t, reg)
+				mockIssueUpdateActorAssignees(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
@@ -547,6 +550,14 @@ func Test_editRun(t *testing.T) {
 				mockIssueNumberGet(t, reg, 456)
 				// Updating 123 should succeed.
 				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation ReplaceActorsForAssignable\b`, func(m map[string]interface{}) bool {
+						return m["assignableId"] == "123"
+					}),
+					httpmock.GraphQLMutation(`
+					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {}),
+				)
+				reg.Register(
 					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
 						return m["id"] == "123"
 					}),
@@ -555,6 +566,14 @@ func Test_editRun(t *testing.T) {
 						func(inputs map[string]interface{}) {}),
 				)
 				// Updating 456 should fail.
+				reg.Register(
+					httpmock.GraphQLMutationMatcher(`mutation ReplaceActorsForAssignable\b`, func(m map[string]interface{}) bool {
+						return m["assignableId"] == "456"
+					}),
+					httpmock.GraphQLMutation(`
+							{ "errors": [ { "message": "test error" } ] }`,
+						func(inputs map[string]interface{}) {}),
+				)
 				reg.Register(
 					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
 						return m["id"] == "456"
@@ -603,6 +622,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateActorAssignees(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
 			},
@@ -792,6 +812,15 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
+func mockIssueUpdateActorAssignees(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
 func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation LabelAdd\b`),
@@ -814,6 +843,85 @@ func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
+}
+
+func TestActorIsAssignable(t *testing.T) {
+	t.Run("when actors are assignable, query includes assignedActors", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		reg.Register(
+			httpmock.GraphQL(`assignedActors`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we don't care.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Detector:     &fd.EnabledDetectorMock{},
+			IssueNumbers: []int{123},
+			Editable: prShared.Editable{
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "octocat"},
+						Edited: true,
+					},
+				},
+			},
+		})
+
+		reg.Verify(t)
+	})
+
+	t.Run("when actors are not assignable, query includes assignees instead", func(t *testing.T) {
+		ios, _, _, _ := iostreams.Test()
+
+		reg := &httpmock.Registry{}
+		// This test should NOT include assignedActors in the query
+		reg.Exclude(t, httpmock.GraphQL(`assignedActors`))
+		// It should include the regular assignees field
+		reg.Register(
+			httpmock.GraphQL(`assignees`),
+			// Simulate a GraphQL error to early exit the test.
+			httpmock.StatusStringResponse(500, ""),
+		)
+
+		_, cmdTeardown := run.Stub()
+		defer cmdTeardown(t)
+
+		// Ignore the error because we're not really interested in it.
+		_ = editRun(&EditOptions{
+			IO: ios,
+			HttpClient: func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			},
+			BaseRepo: func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			},
+			Detector:     &fd.DisabledDetectorMock{},
+			IssueNumbers: []int{123},
+			Editable: prShared.Editable{
+				Assignees: prShared.EditableAssignees{
+					EditableSlice: prShared.EditableSlice{
+						Add:    []string{"monalisa", "octocat"},
+						Edited: true,
+					},
+				},
+			},
+		})
+
+		reg.Verify(t)
+	})
 }
 
 // TODO projectsV1Deprecation
@@ -897,85 +1005,6 @@ func TestProjectsV1Deprecation(t *testing.T) {
 		})
 
 		// Verify that our request contained projectCards
-		reg.Verify(t)
-	})
-}
-
-func TestActorIsAssignable(t *testing.T) {
-	t.Run("when actors are assignable, query includes assignedActors", func(t *testing.T) {
-		ios, _, _, _ := iostreams.Test()
-
-		reg := &httpmock.Registry{}
-		reg.Register(
-			httpmock.GraphQL(`assignedActors`),
-			// Simulate a GraphQL error to early exit the test.
-			httpmock.StatusStringResponse(500, ""),
-		)
-
-		_, cmdTeardown := run.Stub()
-		defer cmdTeardown(t)
-
-		// Ignore the error because we don't care.
-		_ = editRun(&EditOptions{
-			IO: ios,
-			HttpClient: func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			},
-			BaseRepo: func() (ghrepo.Interface, error) {
-				return ghrepo.New("OWNER", "REPO"), nil
-			},
-			Detector:     &fd.EnabledDetectorMock{},
-			IssueNumbers: []int{123},
-			Editable: prShared.Editable{
-				Assignees: prShared.EditableAssignees{
-					EditableSlice: prShared.EditableSlice{
-						Add:    []string{"monalisa", "octocat"},
-						Edited: true,
-					},
-				},
-			},
-		})
-
-		reg.Verify(t)
-	})
-
-	t.Run("when actors are not assignable, query includes assignees instead", func(t *testing.T) {
-		ios, _, _, _ := iostreams.Test()
-
-		reg := &httpmock.Registry{}
-		// This test should NOT include assignedActors in the query
-		reg.Exclude(t, httpmock.GraphQL(`assignedActors`))
-		// It should include the regular assignees field
-		reg.Register(
-			httpmock.GraphQL(`assignees`),
-			// Simulate a GraphQL error to early exit the test.
-			httpmock.StatusStringResponse(500, ""),
-		)
-
-		_, cmdTeardown := run.Stub()
-		defer cmdTeardown(t)
-
-		// Ignore the error because we're not really interested in it.
-		_ = editRun(&EditOptions{
-			IO: ios,
-			HttpClient: func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			},
-			BaseRepo: func() (ghrepo.Interface, error) {
-				return ghrepo.New("OWNER", "REPO"), nil
-			},
-			Detector:     &fd.DisabledDetectorMock{},
-			IssueNumbers: []int{123},
-			Editable: prShared.Editable{
-				Assignees: prShared.EditableAssignees{
-					EditableSlice: prShared.EditableSlice{
-						Add:    []string{"monalisa", "octocat"},
-						Edited: true,
-					},
-				},
-			},
-		})
-
 		reg.Verify(t)
 	})
 }

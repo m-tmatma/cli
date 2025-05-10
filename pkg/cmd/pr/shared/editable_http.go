@@ -58,6 +58,26 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 		})
 	}
 
+	// updateIssue mutation does not support Actors so assignment needs to
+	// be in a separate request when our assignees are Actors.
+	if options.Assignees.Edited && options.Assignees.ActorAssignees {
+		apiClient := api.NewClientFromHTTP(httpClient)
+		assigneeIds, err := options.AssigneeIds(apiClient, repo)
+		if err != nil {
+			return err
+		}
+
+		// Disable the edited flag for assignees so that it doesn't
+		// trigger a second update in the replaceIssueFields function.
+		// It's important that this is done AFTER the call to
+		// options.AssigneeIds() above because otherwise that just exits.
+		options.Assignees.Edited = false
+
+		wg.Go(func() error {
+			return replaceActorAssigneesForEditable(apiClient, repo, id, assigneeIds)
+		})
+	}
+
 	if dirtyExcludingLabels(options) {
 		wg.Go(func() error {
 			return replaceIssueFields(httpClient, repo, id, isPR, options)
@@ -65,6 +85,32 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 	}
 
 	return wg.Wait()
+}
+
+func replaceActorAssigneesForEditable(apiClient *api.Client, repo ghrepo.Interface, id string, assigneeIds *[]string) error {
+	type ReplaceActorsForAssignableInput struct {
+		AssignableID githubv4.ID   `json:"assignableId"`
+		ActorIDs     []githubv4.ID `json:"actorIds"`
+	}
+
+	params := ReplaceActorsForAssignableInput{
+		AssignableID: githubv4.ID(id),
+		ActorIDs:     *ghIds(assigneeIds),
+	}
+
+	var mutation struct {
+		ReplaceActorsForAssignable struct {
+			Typename string `graphql:"__typename"`
+		} `graphql:"replaceActorsForAssignable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{"input": params}
+	err := apiClient.Mutate(repo.RepoHost(), "ReplaceActorsForAssignable", &mutation, variables)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func replaceIssueFields(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
