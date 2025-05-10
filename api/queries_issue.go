@@ -99,6 +99,7 @@ type ActorAssignees struct {
 	TotalCount int
 }
 
+// TODO kw: Display names for actors with special display names.
 func (a ActorAssignees) Logins() []string {
 	logins := make([]string, len(a.Edges))
 	for i, a := range a.Edges {

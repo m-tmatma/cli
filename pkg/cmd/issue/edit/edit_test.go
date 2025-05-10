@@ -701,18 +701,6 @@ func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
-	// reg.Register(
-	// 	httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
-	// 	httpmock.StringResponse(`
-	// 	{ "data": { "repository": { "assignableUsers": {
-	// 		"nodes": [
-	// 			{ "login": "hubot", "id": "HUBOTID" },
-	// 			{ "login": "MonaLisa", "id": "MONAID" }
-	// 		],
-	// 		"pageInfo": { "hasNextPage": false }
-	// 	} } } }
-	// 	`))
-
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
 		httpmock.StringResponse(`
@@ -721,7 +709,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 				{ "login": "hubot", "id": "HUBOTID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
-			"pageInfo": { "hasNextPage": false, "endCursor": "Mg" }
+			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
 
