@@ -120,8 +120,6 @@ func prompterRun(opts *prompterOptions) error {
 		if err := f(p); err != nil {
 			return err
 		}
-		// Newline for readability
-		fmt.Println()
 	}
 
 	return nil
