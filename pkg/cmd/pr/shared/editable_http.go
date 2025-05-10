@@ -61,19 +61,13 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 	// updateIssue mutation does not support Actors so assignment needs to
 	// be in a separate request when our assignees are Actors.
 	if options.Assignees.Edited && options.Assignees.ActorAssignees {
-		apiClient := api.NewClientFromHTTP(httpClient)
-		assigneeIds, err := options.AssigneeIds(apiClient, repo)
-		if err != nil {
-			return err
-		}
-
-		// Disable the edited flag for assignees so that it doesn't
-		// trigger a second update in the replaceIssueFields function.
-		// It's important that this is done AFTER the call to
-		// options.AssigneeIds() above because otherwise that just exits.
-		options.Assignees.Edited = false
-
 		wg.Go(func() error {
+			apiClient := api.NewClientFromHTTP(httpClient)
+			assigneeIds, err := options.AssigneeIds(apiClient, repo)
+			if err != nil {
+				return err
+			}
+
 			return replaceActorAssigneesForEditable(apiClient, repo, id, assigneeIds)
 		})
 	}
@@ -115,14 +109,18 @@ func replaceActorAssigneesForEditable(apiClient *api.Client, repo ghrepo.Interfa
 
 func replaceIssueFields(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
-	assigneeIds, err := options.AssigneeIds(apiClient, repo)
-	if err != nil {
-		return err
-	}
 
 	projectIds, err := options.ProjectIds()
 	if err != nil {
 		return err
+	}
+
+	var assigneeIds *[]string
+	if !options.Assignees.ActorAssignees {
+		assigneeIds, err = options.AssigneeIds(apiClient, repo)
+		if err != nil {
+			return err
+		}
 	}
 
 	milestoneId, err := options.MilestoneId()
