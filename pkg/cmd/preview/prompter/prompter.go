@@ -15,7 +15,7 @@ type prompterOptions struct {
 	IO     *iostreams.IOStreams
 	Config func() (gh.Config, error)
 
-	PromptsToRun []func(prompter.Prompter) error
+	PromptsToRun []func(prompter.Prompter, *iostreams.IOStreams) error
 }
 
 func NewCmdPrompter(f *cmdutil.Factory, runF func(*prompterOptions) error) *cobra.Command {
@@ -36,7 +36,7 @@ func NewCmdPrompter(f *cmdutil.Factory, runF func(*prompterOptions) error) *cobr
 		markdownEditorPrompt  = "markdown-editor"
 	)
 
-	prompterTypeFuncMap := map[string]func(prompter.Prompter) error{
+	prompterTypeFuncMap := map[string]func(prompter.Prompter, *iostreams.IOStreams) error{
 		selectPrompt:          runSelect,
 		multiSelectPrompt:     runMultiSelect,
 		inputPrompt:           runInput,
@@ -117,7 +117,7 @@ func prompterRun(opts *prompterOptions) error {
 	p := prompter.New(editor, opts.IO)
 
 	for _, f := range opts.PromptsToRun {
-		if err := f(p); err != nil {
+		if err := f(p, opts.IO); err != nil {
 			return err
 		}
 	}
@@ -125,112 +125,112 @@ func prompterRun(opts *prompterOptions) error {
 	return nil
 }
 
-func runSelect(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Single Select")
+func runSelect(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Single Select")
 	cuisines := []string{"Italian", "Greek", "Indian", "Japanese", "American"}
 	favorite, err := p.Select("Favorite cuisine?", "Italian", cuisines)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Favorite cuisine: %s\n", cuisines[favorite])
+	fmt.Fprintf(io.Out, "Favorite cuisine: %s\n", cuisines[favorite])
 	return nil
 }
 
-func runMultiSelect(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Multi Select")
+func runMultiSelect(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Multi Select")
 	cuisines := []string{"Italian", "Greek", "Indian", "Japanese", "American"}
 	favorites, err := p.MultiSelect("Favorite cuisines?", []string{}, cuisines)
 	if err != nil {
 		return err
 	}
 	for _, f := range favorites {
-		fmt.Printf("Favorite cuisine: %s\n", cuisines[f])
+		fmt.Fprintf(io.Out, "Favorite cuisine: %s\n", cuisines[f])
 	}
 	return nil
 }
 
-func runInput(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Text Input")
+func runInput(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Text Input")
 	text, err := p.Input("Favorite meal?", "Breakfast")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("You typed: %s\n", text)
+	fmt.Fprintf(io.Out, "You typed: %s\n", text)
 	return nil
 }
 
-func runPassword(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Password Input")
+func runPassword(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Password Input")
 	safeword, err := p.Password("Safe word?")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Safe word: %s\n", safeword)
+	fmt.Fprintf(io.Out, "Safe word: %s\n", safeword)
 	return nil
 }
 
-func runConfirm(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Confirmation")
+func runConfirm(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Confirmation")
 	confirmation, err := p.Confirm("Are you sure?", true)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Confirmation: %t\n", confirmation)
+	fmt.Fprintf(io.Out, "Confirmation: %t\n", confirmation)
 	return nil
 }
 
-func runAuthToken(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Auth Token (can't be blank)")
+func runAuthToken(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Auth Token (can't be blank)")
 	token, err := p.AuthToken()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Auth token: %s\n", token)
+	fmt.Fprintf(io.Out, "Auth token: %s\n", token)
 	return nil
 }
 
-func runConfirmDeletion(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Deletion Confirmation")
+func runConfirmDeletion(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Deletion Confirmation")
 	err := p.ConfirmDeletion("delete-me")
 	if err != nil {
 		return err
 	}
-	fmt.Println("Item deleted")
+	fmt.Fprintln(io.Out, "Item deleted")
 	return nil
 }
 
-func runInputHostname(p prompter.Prompter) error {
-	fmt.Println("Demonstrating Hostname")
+func runInputHostname(p prompter.Prompter, io *iostreams.IOStreams) error {
+	fmt.Fprintln(io.Out, "Demonstrating Hostname")
 	hostname, err := p.InputHostname()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Hostname: %s\n", hostname)
+	fmt.Fprintf(io.Out, "Hostname: %s\n", hostname)
 	return nil
 }
 
-func runMarkdownEditor(p prompter.Prompter) error {
+func runMarkdownEditor(p prompter.Prompter, io *iostreams.IOStreams) error {
 	defaultText := "default text value"
 
-	fmt.Println("Demonstrating Markdown Editor with blanks allowed and default text")
+	fmt.Fprintln(io.Out, "Demonstrating Markdown Editor with blanks allowed and default text")
 	editorText, err := p.MarkdownEditor("Edit your text:", defaultText, true)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Returned text: %s\n\n", editorText)
+	fmt.Fprintf(io.Out, "Returned text: %s\n\n", editorText)
 
-	fmt.Println("Demonstrating Markdown Editor with blanks disallowed and default text")
+	fmt.Fprintln(io.Out, "Demonstrating Markdown Editor with blanks disallowed and default text")
 	editorText2, err := p.MarkdownEditor("Edit your text:", defaultText, false)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Returned text: %s\n\n", editorText2)
+	fmt.Fprintf(io.Out, "Returned text: %s\n\n", editorText2)
 
-	fmt.Println("Demonstrating Markdown Editor with blanks disallowed and no default text")
+	fmt.Fprintln(io.Out, "Demonstrating Markdown Editor with blanks disallowed and no default text")
 	editorText3, err := p.MarkdownEditor("Edit your text:", "", false)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Returned text: %s\n", editorText3)
+	fmt.Fprintf(io.Out, "Returned text: %s\n", editorText3)
 	return nil
 }
