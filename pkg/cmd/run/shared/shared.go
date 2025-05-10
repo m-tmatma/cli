@@ -230,6 +230,8 @@ type Job struct {
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
 	RunID       int64     `json:"run_id"`
+
+	Log *zip.File
 }
 
 type Step struct {
@@ -239,7 +241,8 @@ type Step struct {
 	Number      int
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
-	Log         *zip.File
+
+	Log *zip.File
 }
 
 type Steps []Step
@@ -575,7 +578,7 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
 		case Skipped, Neutral:
-			return "-", cs.Gray
+			return "-", cs.Muted
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}
