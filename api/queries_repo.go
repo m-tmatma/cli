@@ -1235,17 +1235,25 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 // RepoAssignableActors fetches all the assignable actors for a repository on
 // GitHub hosts that support Actor assignees.
 func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]RepoAssignee, error) {
-	type repoActorAssignee struct {
-		ID    string
-		Login string
+	type repoBotAssignee struct {
+		ID       string
+		Login    string
+		TypeName string `graphql:"__typename"`
+	}
+
+	type repoUserAssignee struct {
+		ID       string
+		Login    string
+		Name     string
+		TypeName string `graphql:"__typename"`
 	}
 
 	type responseData struct {
 		Repository struct {
 			SuggestedActors struct {
 				Nodes []struct {
-					User RepoAssignee      `graphql:"... on User"`
-					Bot  repoActorAssignee `graphql:"... on Bot"`
+					User repoUserAssignee `graphql:"... on User"`
+					Bot  repoBotAssignee  `graphql:"... on Bot"`
 				}
 				PageInfo struct {
 					HasNextPage bool
@@ -1270,13 +1278,20 @@ func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]RepoAssignee
 		}
 
 		for _, node := range query.Repository.SuggestedActors.Nodes {
-			// Edge case if the Actor is not a Bot or a User,
-			// it won't be unmarshalled properly, and we'll have an
-			// zero value node.
-			if node.User.ID == "" || node.User.Login == "" {
-				continue
+			if node.User.TypeName == "User" {
+				actor := RepoAssignee{
+					ID:    node.User.ID,
+					Login: node.User.Login,
+					Name:  node.User.Name,
+				}
+				actors = append(actors, actor)
+			} else if node.Bot.TypeName == "Bot" {
+				actor := RepoAssignee{
+					ID:    node.Bot.ID,
+					Login: node.Bot.Login,
+				}
+				actors = append(actors, actor)
 			}
-			actors = append(actors, node.User)
 		}
 
 		if !query.Repository.SuggestedActors.PageInfo.HasNextPage {

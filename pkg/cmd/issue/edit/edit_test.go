@@ -528,8 +528,8 @@ func Test_editRun(t *testing.T) {
 					httpmock.StringResponse(`
 					{ "data": { "repository": { "suggestedActors": {
 						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID" },
-							{ "login": "MonaLisa", "id": "MONAID" }
+							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+							{ "login": "MonaLisa", "id": "MONAID", "__typename": "User" }
 						],
 						"pageInfo": { "hasNextPage": false, "endCursor": "Mg" }
 					} } } }
@@ -706,8 +706,8 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		httpmock.StringResponse(`
 		{ "data": { "repository": { "suggestedActors": {
 			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID" },
-				{ "login": "MonaLisa", "id": "MONAID" }
+				{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+				{ "login": "MonaLisa", "id": "MONAID", "__typename": "User" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
