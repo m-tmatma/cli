@@ -929,7 +929,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 				return err
 			})
 
-			// If reviewers are requested, we still need to fetch the assignable users
+			// If reviewers are also requested, we still need to fetch the assignable users
 			// since commands use assignable users for reviewers too,
 			// but Actors are not supported for requesting review (need to confirm this).
 			// TODO KW: find out how to do this in the above query so we don't need to
@@ -938,6 +938,9 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			// by having a name property. Maybe we can use the Name to filter out
 			// non-user Actors and populate the users list for reviewers based on
 			// that.
+			// Note: this only matters for `gh pr` flows, which currently does not
+			// request actor assignees, so we probably won't hit this until
+			// `gh pr` reqeuests actor assignees.
 			if input.Reviewers {
 				g.Go(func() error {
 					users, err := RepoAssignableUsers(client, repo)
