@@ -73,7 +73,7 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 
 	features := IssueFeatures{
 		StateReason:       false,
-		ActorIsAssignable: false,
+		ActorIsAssignable: false, // replaceActorsForAssignable GraphQL mutation unavailable on GHES
 	}
 
 	var featureDetection struct {
