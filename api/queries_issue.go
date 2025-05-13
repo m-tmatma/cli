@@ -38,7 +38,7 @@ type Issue struct {
 	Comments         Comments
 	Author           Author
 	Assignees        Assignees
-	ActorAssignees   ActorAssignees
+	AssignedActors   AssignedActors
 	Labels           Labels
 	ProjectCards     ProjectCards
 	ProjectItems     ProjectItems
@@ -92,7 +92,7 @@ func (a Assignees) Logins() []string {
 	return logins
 }
 
-type ActorAssignees struct {
+type AssignedActors struct {
 	Edges []struct {
 		Node Actor
 	}
@@ -100,7 +100,7 @@ type ActorAssignees struct {
 }
 
 // TODO kw: Display names for actors with special display names.
-func (a ActorAssignees) Logins() []string {
+func (a AssignedActors) Logins() []string {
 	logins := make([]string, len(a.Edges))
 	for i, a := range a.Edges {
 		logins[i] = a.Node.Login
