@@ -38,7 +38,7 @@ type Issue struct {
 	Comments         Comments
 	Author           Author
 	Assignees        Assignees
-	AssignedActors   ActorAssignees
+	ActorAssignees   ActorAssignees
 	Labels           Labels
 	ProjectCards     ProjectCards
 	ProjectItems     ProjectItems
