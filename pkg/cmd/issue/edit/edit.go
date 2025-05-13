@@ -211,7 +211,7 @@ func editRun(opts *EditOptions) error {
 	if editable.Assignees.Edited {
 		if issueFeatures.ActorIsAssignable {
 			editable.Assignees.ActorAssignees = true
-			lookupFields = append(lookupFields, `assignedActors`)
+			lookupFields = append(lookupFields, "assignedActors")
 		} else {
 			lookupFields = append(lookupFields, "assignees")
 		}
