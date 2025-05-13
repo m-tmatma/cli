@@ -211,20 +211,7 @@ func editRun(opts *EditOptions) error {
 	if editable.Assignees.Edited {
 		if issueFeatures.ActorIsAssignable {
 			editable.Assignees.ActorAssignees = true
-
-			// At the time of writing, only 10 Actors can be assigned to an issue.
-			assignedActors := heredoc.Doc(`
-				assignedActors(first: 10) {
-					edges {
-						node {
-							... on Actor {
-								login
-							}
-						}
-					}
-				}
-			`)
-			lookupFields = append(lookupFields, assignedActors)
+			lookupFields = append(lookupFields, `assignedActors`)
 		} else {
 			lookupFields = append(lookupFields, "assignees")
 		}
