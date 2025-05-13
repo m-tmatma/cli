@@ -64,6 +64,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			# List PRs authored by you
 			$ gh pr list --author "@me"
 
+			# List PRs with a specific head branch name
+			$ gh pr list --head "typo"
+
 			# List only PRs with all of the given labels
 			$ gh pr list --label bug --label "priority 1"
 
