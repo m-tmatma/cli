@@ -704,9 +704,9 @@ func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
 		}
 
 		// Look for ID in assignable actors if not found in assignable users
-		for _, u := range m.AssignableActors {
-			if strings.EqualFold(assigneeLogin, u.Login) {
-				ids = append(ids, u.ID)
+		for _, a := range m.AssignableActors {
+			if strings.EqualFold(assigneeLogin, a.Login) {
+				ids = append(ids, a.ID)
 				found = true
 				break
 			}
