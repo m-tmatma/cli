@@ -764,7 +764,7 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 	e.Body.Value = "new body"
 	if !s.skipReviewers {
 		if s.removeAllReviewers {
-			e.Reviewers.Remove = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+			e.Reviewers.Remove = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external", "dependabot"}
 		} else {
 			e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
 		}
