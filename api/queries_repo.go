@@ -1202,8 +1202,6 @@ type AssignableUser struct {
 	name  string
 }
 
-// NewAssignableUser is a test helper to create a new AssignableUser
-// since the ID and Login are private fields
 func NewAssignableUser(id, login, name string) AssignableUser {
 	return AssignableUser{
 		id:    id,
