@@ -62,6 +62,10 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 		wg.Go(func() error {
 			// updateIssue mutation does not support Actors so assignment needs to
 			// be in a separate request when our assignees are Actors.
+			// Note: this is intentionally done synchronously with updating
+			// other issue fields to ensure consistency with how legacy
+			// user assignees are handled.
+			// https://github.com/cli/cli/pull/10960#discussion_r2086725348
 			if options.Assignees.Edited && options.Assignees.ActorAssignees {
 				apiClient := api.NewClientFromHTTP(httpClient)
 				assigneeIds, err := options.AssigneeIds(apiClient, repo)
