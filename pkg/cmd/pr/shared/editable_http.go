@@ -58,23 +58,28 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 		})
 	}
 
-	// updateIssue mutation does not support Actors so assignment needs to
-	// be in a separate request when our assignees are Actors.
-	if options.Assignees.Edited && options.Assignees.ActorAssignees {
+	if dirtyExcludingLabels(options) {
 		wg.Go(func() error {
-			apiClient := api.NewClientFromHTTP(httpClient)
-			assigneeIds, err := options.AssigneeIds(apiClient, repo)
+			// updateIssue mutation does not support Actors so assignment needs to
+			// be in a separate request when our assignees are Actors.
+			if options.Assignees.Edited && options.Assignees.ActorAssignees {
+				apiClient := api.NewClientFromHTTP(httpClient)
+				assigneeIds, err := options.AssigneeIds(apiClient, repo)
+				if err != nil {
+					return err
+				}
+
+				err = replaceActorAssigneesForEditable(apiClient, repo, id, assigneeIds)
+				if err != nil {
+					return err
+				}
+			}
+			err := replaceIssueFields(httpClient, repo, id, isPR, options)
 			if err != nil {
 				return err
 			}
 
-			return replaceActorAssigneesForEditable(apiClient, repo, id, assigneeIds)
-		})
-	}
-
-	if dirtyExcludingLabels(options) {
-		wg.Go(func() error {
-			return replaceIssueFields(httpClient, repo, id, isPR, options)
+			return nil
 		})
 	}
 

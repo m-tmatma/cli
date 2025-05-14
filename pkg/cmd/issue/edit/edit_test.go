@@ -574,14 +574,6 @@ func Test_editRun(t *testing.T) {
 							{ "errors": [ { "message": "test error" } ] }`,
 						func(inputs map[string]interface{}) {}),
 				)
-				reg.Register(
-					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
-						return m["id"] == "456"
-					}),
-					httpmock.GraphQLMutation(`
-							{ "errors": [ { "message": "test error" } ] }`,
-						func(inputs map[string]interface{}) {}),
-				)
 			},
 			stdout: heredoc.Doc(`
 				https://github.com/OWNER/REPO/issue/123
