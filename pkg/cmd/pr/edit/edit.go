@@ -238,7 +238,7 @@ func editRun(opts *EditOptions) error {
 	editable.Base.Default = pr.BaseRefName
 	editable.Reviewers.Default = pr.ReviewRequests.Logins()
 	if issueFeatures.ActorIsAssignable {
-		// editable.Assignees.ActorAssignees = true
+		editable.Assignees.ActorAssignees = true
 		editable.Assignees.Default = pr.AssignedActors.Logins()
 	} else {
 		editable.Assignees.Default = pr.Assignees.Logins()

@@ -918,39 +918,30 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	var g errgroup.Group
 
 	if input.Assignees || input.Reviewers {
-
 		if input.ActorAssignees {
 			g.Go(func() error {
 				actors, err := RepoAssignableActors(client, repo)
 				if err != nil {
-					err = fmt.Errorf("error fetching assignees: %w", err)
+					return fmt.Errorf("error fetching assignees: %w", err)
 				}
 				result.AssignableActors = actors
-				return err
-			})
 
-			// If reviewers are also requested, we still need to fetch the assignable users
-			// since commands use assignable users for reviewers too,
-			// but Actors are not supported for requesting review (need to confirm this).
-			// TODO KW: find out how to do this in the above query so we don't need to
-			// run two potentially expensive queries. When we fetch Actors, this
-			// should still return Users - Users are distinguishable from other Actors
-			// by having a name property. Maybe we can use the Name to filter out
-			// non-user Actors and populate the users list for reviewers based on
-			// that.
-			// Note: this only matters for `gh pr` flows, which currently does not
-			// request actor assignees, so we probably won't hit this until
-			// `gh pr` reqeuests actor assignees.
-			if input.Reviewers {
-				g.Go(func() error {
-					users, err := RepoAssignableUsers(client, repo)
-					if err != nil {
-						err = fmt.Errorf("error fetching assignees: %w", err)
+				// Processing the bots out from the actors
+				// because requesting a reviewer leverages
+				// result.AssignableUsers.
+				// Note: this prevents us from needing to make another
+				// request to fetch assignable users when the user has
+				// selected to modify both reviewers and assignees.
+				var users []AssignableUser
+				for _, a := range actors {
+					if _, ok := a.(AssignableUser); !ok {
+						continue
 					}
-					result.AssignableUsers = users
-					return err
-				})
-			}
+					users = append(users, a.(AssignableUser))
+				}
+				result.AssignableUsers = users
+				return nil
+			})
 		} else {
 			// Not using Actors, fetch legacy assignable users.
 			g.Go(func() error {
@@ -962,7 +953,6 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 				return err
 			})
 		}
-
 	}
 
 	if input.Reviewers {
