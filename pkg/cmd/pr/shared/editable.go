@@ -407,11 +407,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 
 	var users []string
 	for _, u := range metadata.AssignableUsers {
-		users = append(users, u.Login)
+		users = append(users, u.Login())
 	}
 	var actors []string
 	for _, a := range metadata.AssignableActors {
-		actors = append(actors, a.Login)
+		actors = append(actors, a.Login())
 	}
 	var teams []string
 	for _, t := range metadata.Teams {
