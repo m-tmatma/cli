@@ -500,7 +500,7 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
-			name: "Legacy assignee user are fetched and updated on unsupported GitHub Hosts",
+			name: "Legacy assignee users are fetched and updated on unsupported GitHub Hosts",
 			input: &EditOptions{
 				Detector:    &fd.DisabledDetectorMock{},
 				SelectorArg: "123",
