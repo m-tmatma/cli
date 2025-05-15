@@ -197,9 +197,24 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
-		lookupFields = append(lookupFields, "assignees")
+		if issueFeatures.ActorIsAssignable {
+			editable.Assignees.ActorAssignees = true
+			lookupFields = append(lookupFields, "assignedActors")
+		} else {
+			lookupFields = append(lookupFields, "assignees")
+		}
 	}
 	if editable.Labels.Edited {
 		lookupFields = append(lookupFields, "labels")
@@ -207,11 +222,6 @@ func editRun(opts *EditOptions) error {
 	if editable.Projects.Edited {
 		// TODO projectsV1Deprecation
 		// Remove this section as we should no longer add projectCards
-		if opts.Detector == nil {
-			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
-		}
-
 		projectsV1Support := opts.Detector.ProjectsV1()
 		if projectsV1Support == gh.ProjectsV1Supported {
 			lookupFields = append(lookupFields, "projectCards")
@@ -254,7 +264,13 @@ func editRun(opts *EditOptions) error {
 
 		editable.Title.Default = issue.Title
 		editable.Body.Default = issue.Body
-		editable.Assignees.Default = issue.Assignees.Logins()
+		// We use Actors as the default assignees if Actors are assignable
+		// on this GitHub host.
+		if editable.Assignees.ActorAssignees {
+			editable.Assignees.Default = issue.AssignedActors.Logins()
+		} else {
+			editable.Assignees.Default = issue.Assignees.Logins()
+		}
 		editable.Labels.Default = issue.Labels.Names()
 		editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
 		projectItems := map[string]string{}

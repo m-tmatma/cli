@@ -166,9 +166,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Assignees: shared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -180,9 +182,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Assignees: shared.EditableSlice{
-						Remove: []string{"monalisa", "hubot"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Remove: []string{"monalisa", "hubot"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -360,10 +364,12 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"dependabot"},
 						Edited: true,
 					},
-					Assignees: shared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: shared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
@@ -414,10 +420,12 @@ func Test_editRun(t *testing.T) {
 						Value:  "base-branch-name",
 						Edited: true,
 					},
-					Assignees: shared.EditableSlice{
-						Add:    []string{"monalisa", "hubot"},
-						Remove: []string{"octocat"},
-						Edited: true,
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
 					},
 					Labels: shared.EditableSlice{
 						Add:    []string{"feature", "TODO", "bug"},
