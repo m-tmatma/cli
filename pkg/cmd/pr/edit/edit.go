@@ -21,6 +21,9 @@ import (
 type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	// TODO projectsV1Deprecation
+	// Remove this detector since it is only used for test validation.
+	Detector fd.Detector
 
 	Finder          shared.PRFinder
 	Surveyor        Surveyor
@@ -198,6 +201,7 @@ func editRun(opts *EditOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
+		Detector: opts.Detector,
 	}
 
 	if opts.Detector == nil {
