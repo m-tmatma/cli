@@ -926,12 +926,8 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 				}
 				result.AssignableActors = actors
 
-				// Processing the bots out from the actors
-				// because requesting a reviewer leverages
-				// result.AssignableUsers.
-				// Note: this prevents us from needing to make another
-				// request to fetch assignable users when the user has
-				// selected to modify both reviewers and assignees.
+				// Filter actors for users to use for pull request reviewers,
+				// skip retrieving the same info through RepoAssignableUsers().
 				var users []AssignableUser
 				for _, a := range actors {
 					if _, ok := a.(AssignableUser); !ok {
