@@ -922,7 +922,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			g.Go(func() error {
 				actors, err := RepoAssignableActors(client, repo)
 				if err != nil {
-					return fmt.Errorf("error fetching assignees: %w", err)
+					return fmt.Errorf("error fetching assignable actors: %w", err)
 				}
 				result.AssignableActors = actors
 
@@ -943,7 +943,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			g.Go(func() error {
 				users, err := RepoAssignableUsers(client, repo)
 				if err != nil {
-					err = fmt.Errorf("error fetching assignees: %w", err)
+					err = fmt.Errorf("error fetching assignable users: %w", err)
 				}
 				result.AssignableUsers = users
 				return err
