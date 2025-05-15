@@ -696,7 +696,7 @@ func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
 	for _, assigneeLogin := range names {
 		found := false
 		for _, u := range m.AssignableUsers {
-			if strings.EqualFold(assigneeLogin, (u.Login())) {
+			if strings.EqualFold(assigneeLogin, u.Login()) {
 				ids = append(ids, u.ID())
 				found = true
 				break
