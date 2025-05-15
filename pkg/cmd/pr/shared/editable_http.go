@@ -103,7 +103,7 @@ func replaceActorAssigneesForEditable(apiClient *api.Client, repo ghrepo.Interfa
 
 	var mutation struct {
 		ReplaceActorsForAssignable struct {
-			Typename string `graphql:"__typename"`
+			TypeName string `graphql:"__typename"`
 		} `graphql:"replaceActorsForAssignable(input: $input)"`
 	}
 

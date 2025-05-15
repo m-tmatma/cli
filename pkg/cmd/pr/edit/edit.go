@@ -198,6 +198,7 @@ func editRun(opts *EditOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
+		Detector: opts.Detector,
 	}
 
 	if opts.Detector == nil {
