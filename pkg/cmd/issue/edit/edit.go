@@ -268,6 +268,7 @@ func editRun(opts *EditOptions) error {
 		// on this GitHub host.
 		if editable.Assignees.ActorAssignees {
 			editable.Assignees.Default = issue.AssignedActors.DisplayNames()
+			editable.Assignees.DefaultLogins = issue.AssignedActors.Logins()
 		} else {
 			editable.Assignees.Default = issue.Assignees.Logins()
 		}

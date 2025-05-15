@@ -43,6 +43,7 @@ type EditableSlice struct {
 type EditableAssignees struct {
 	EditableSlice
 	ActorAssignees bool
+	DefaultLogins  []string
 }
 
 // ProjectsV2 mutations require a mapping of an item ID to a project ID.
@@ -115,7 +116,11 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
 		meReplacer := NewMeReplacer(client, repo.RepoHost())
 		s := set.NewStringSet()
-		s.AddValues(e.Assignees.Default)
+		if e.Assignees.ActorAssignees {
+			s.AddValues(e.Assignees.DefaultLogins)
+		} else {
+			s.AddValues(e.Assignees.Default)
+		}
 		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
 		if err != nil {
 			return nil, err

@@ -97,6 +97,14 @@ type AssignedActors struct {
 	TotalCount int
 }
 
+func (a AssignedActors) Logins() []string {
+	logins := make([]string, len(a.Nodes))
+	for i, a := range a.Nodes {
+		logins[i] = a.Login
+	}
+	return logins
+}
+
 // DisplayNames returns a list of display names for the assigned actors.
 func (a AssignedActors) DisplayNames() []string {
 	// These display names are used for populating the "default" assigned actors
@@ -119,7 +127,7 @@ func (a AssignedActors) DisplayNames() []string {
 	// repository's assignableActors, treating the assignableActors DisplayName
 	// methods as the sources of truth.
 	// TODO KW: make this comment less of a wall of text if needed.
-	displayNames := make([]string, len(a.Nodes))
+	var displayNames []string
 	for _, a := range a.Nodes {
 		if a.TypeName == "User" {
 			u := NewAssignableUser(
