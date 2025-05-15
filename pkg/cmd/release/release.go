@@ -8,6 +8,7 @@ import (
 	cmdUpdate "github.com/cli/cli/v2/pkg/cmd/release/edit"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/release/list"
 	cmdUpload "github.com/cli/cli/v2/pkg/cmd/release/upload"
+	cmdVerify "github.com/cli/cli/v2/pkg/cmd/release/verify"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/release/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -34,6 +35,7 @@ func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 		cmdDownload.NewCmdDownload(f, nil),
 		cmdDelete.NewCmdDelete(f, nil),
 		cmdDeleteAsset.NewCmdDeleteAsset(f, nil),
+		cmdVerify.NewCmdVerify(f, nil),
 	)
 
 	return cmd

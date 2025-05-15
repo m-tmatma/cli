@@ -131,6 +131,41 @@ type fetchResult struct {
 	error   error
 }
 
+func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (string, error) {
+	path := fmt.Sprintf("repos/%s/%s/git/refs/tags/%s", repo.RepoOwner(), repo.RepoName(), tagName)
+	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+path, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		// ErrRefNotFound
+		return "", ErrReleaseNotFound
+	}
+
+	if resp.StatusCode > 299 {
+		return "", api.HandleHTTPError(resp)
+	}
+
+	var ref struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ref); err != nil {
+		return "", err
+	}
+
+	return ref.Object.SHA, nil
+}
+
 // FetchRelease finds a published repository release by its tagName, or a draft release by its pending tag name.
 func FetchRelease(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (*Release, error) {
 	cc, cancel := context.WithCancel(ctx)
