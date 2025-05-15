@@ -3,6 +3,7 @@ package edit
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -20,15 +21,14 @@ import (
 type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	// TODO projectsV1Deprecation
-	// Remove this detector since it is only used for test validation.
-	Detector fd.Detector
 
 	Finder          shared.PRFinder
 	Surveyor        Surveyor
 	Fetcher         EditableOptionsFetcher
 	EditorRetriever EditorRetriever
 	Prompter        shared.EditPrompter
+	Detector        fd.Detector
+	BaseRepo        func() (ghrepo.Interface, error)
 
 	SelectorArg string
 	Interactive bool
@@ -73,6 +73,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
+			opts.BaseRepo = f.BaseRepo
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
@@ -196,9 +197,36 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 func editRun(opts *EditOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "assignees", "labels", "projectCards", "projectItems", "milestone"},
+		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "labels", "projectCards", "projectItems", "milestone"},
 		Detector: opts.Detector,
 	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	if opts.Detector == nil {
+		baseRepo, err := opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+
+	if issueFeatures.ActorIsAssignable {
+		findOptions.Fields = append(findOptions.Fields, "assignedActors")
+	} else {
+		findOptions.Fields = append(findOptions.Fields, "assignees")
+	}
+
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
@@ -210,7 +238,12 @@ func editRun(opts *EditOptions) error {
 	editable.Body.Default = pr.Body
 	editable.Base.Default = pr.BaseRefName
 	editable.Reviewers.Default = pr.ReviewRequests.Logins()
-	editable.Assignees.Default = pr.Assignees.Logins()
+	if issueFeatures.ActorIsAssignable {
+		editable.Assignees.ActorAssignees = true
+		editable.Assignees.Default = pr.AssignedActors.Logins()
+	} else {
+		editable.Assignees.Default = pr.Assignees.Logins()
+	}
 	editable.Labels.Default = pr.Labels.Names()
 	editable.Projects.Default = append(pr.ProjectCards.ProjectNames(), pr.ProjectItems.ProjectTitles()...)
 	projectItems := map[string]string{}
@@ -229,10 +262,6 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
