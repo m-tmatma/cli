@@ -118,7 +118,28 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	// curate the final list of assignees from the default list.
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
 		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		s := set.NewStringSet()
+		copilotReplacer := NewCopilotReplacer()
+
+		// A closure to replace special assignee names with the actual logins.
+		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
+			replaced, err := meReplacer.ReplaceSlice(value)
+			if err != nil {
+				return nil, err
+			}
+
+			// Only suppported for actor assignees.
+			if e.Assignees.ActorAssignees {
+				replaced, err = copilotReplacer.ReplaceSlice(replaced)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			return replaced, nil
+		}
+
+		assigneeSet := set.NewStringSet()
+
 		// This check below is required because in a non-interactive flow,
 		// the user gives us a login and not the DisplayName, and when
 		// we have actor assignees e.Assignees.Default will contain
@@ -128,21 +149,24 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 		// Otherwise, the value the user provided won't be found in the
 		// set to be added or removed, causing unexpected behavior.
 		if e.Assignees.ActorAssignees {
-			s.AddValues(e.Assignees.DefaultLogins)
+			assigneeSet.AddValues(e.Assignees.DefaultLogins)
 		} else {
-			s.AddValues(e.Assignees.Default)
+			assigneeSet.AddValues(e.Assignees.Default)
 		}
-		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
+
+		add, err := replaceSpecialAssigneeNames(e.Assignees.Add)
 		if err != nil {
 			return nil, err
 		}
-		s.AddValues(add)
-		remove, err := meReplacer.ReplaceSlice(e.Assignees.Remove)
+		assigneeSet.AddValues(add)
+
+		remove, err := replaceSpecialAssigneeNames(e.Assignees.Remove)
 		if err != nil {
 			return nil, err
 		}
-		s.RemoveValues(remove)
-		e.Assignees.Value = s.ToSlice()
+		assigneeSet.RemoveValues(remove)
+
+		e.Assignees.Value = assigneeSet.ToSlice()
 	}
 	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
 	return &a, err

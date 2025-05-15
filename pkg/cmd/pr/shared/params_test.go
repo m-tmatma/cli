@@ -187,6 +187,59 @@ func TestMeReplacer_Replace(t *testing.T) {
 	}
 }
 
+func TestCopilotReplacer_ReplaceSlice(t *testing.T) {
+	type args struct {
+		handles []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{
+			name: "replaces @copilot with copilot-swe-agent",
+			args: args{
+				handles: []string{"monalisa", "@copilot", "hubot"},
+			},
+			want:    []string{"monalisa", "copilot-swe-agent", "hubot"},
+			wantErr: false,
+		},
+		{
+			name: "handles no @copilot mentions",
+			args: args{
+				handles: []string{"monalisa", "user", "hubot"},
+			},
+			want:    []string{"monalisa", "user", "hubot"},
+			wantErr: false,
+		},
+		{
+			name: "replaces multiple @copilot mentions",
+			args: args{
+				handles: []string{"@copilot", "user", "@copilot"},
+			},
+			want:    []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
+			wantErr: false,
+		},
+		{
+			name: "handles @copilot case-insensitively",
+			args: args{
+				handles: []string{"@Copilot", "user", "@CoPiLoT"},
+			},
+			want:    []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewCopilotReplacer()
+			got, err := r.ReplaceSlice(tt.args.handles)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func Test_QueryHasStateClause(t *testing.T) {
 	tests := []struct {
 		searchQuery string
