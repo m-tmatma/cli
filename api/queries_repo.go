@@ -940,7 +940,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			// that.
 			// Note: this only matters for `gh pr` flows, which currently does not
 			// request actor assignees, so we probably won't hit this until
-			// `gh pr` reqeuests actor assignees.
+			// `gh pr` requests actor assignees.
 			if input.Reviewers {
 				g.Go(func() error {
 					users, err := RepoAssignableUsers(client, repo)
