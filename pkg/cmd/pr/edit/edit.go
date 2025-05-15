@@ -201,12 +201,12 @@ func editRun(opts *EditOptions) error {
 		Detector: opts.Detector,
 	}
 
-	if opts.Detector == nil {
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return err
-		}
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
 
+	if opts.Detector == nil {
 		baseRepo, err := opts.BaseRepo()
 		if err != nil {
 			return err
@@ -262,10 +262,6 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
