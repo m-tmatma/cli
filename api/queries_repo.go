@@ -1319,25 +1319,21 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]AssignableUse
 // RepoAssignableActors fetches all the assignable actors for a repository on
 // GitHub hosts that support Actor assignees.
 func RepoAssignableActors(client *Client, repo ghrepo.Interface) ([]AssignableActor, error) {
-	type assignableUser struct {
-		ID       string
-		Login    string
-		Name     string
-		TypeName string `graphql:"__typename"`
-	}
-
-	type assignableBot struct {
-		ID       string
-		Login    string
-		TypeName string `graphql:"__typename"`
-	}
-
 	type responseData struct {
 		Repository struct {
 			SuggestedActors struct {
 				Nodes []struct {
-					User assignableUser `graphql:"... on User"`
-					Bot  assignableBot  `graphql:"... on Bot"`
+					User struct {
+						ID       string
+						Login    string
+						Name     string
+						TypeName string `graphql:"__typename"`
+					} `graphql:"... on User"`
+					Bot struct {
+						ID       string
+						Login    string
+						TypeName string `graphql:"__typename"`
+					} `graphql:"... on Bot"`
 				}
 				PageInfo struct {
 					HasNextPage bool
