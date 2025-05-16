@@ -120,7 +120,6 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 		meReplacer := NewMeReplacer(client, repo.RepoHost())
 		copilotReplacer := NewCopilotReplacer()
 
-		// A closure to replace special assignee names with the actual logins.
 		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
 			replaced, err := meReplacer.ReplaceSlice(value)
 			if err != nil {
