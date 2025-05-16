@@ -9,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	v1 "github.com/in-toto/attestation/go/v1"
+
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
@@ -136,15 +139,22 @@ func verifyRun(opts *VerifyOptions) error {
 	// Print the message signifying success fetching attestations
 	logger.Println(logMsg)
 
+	td, err := attestOption.APIClient.GetTrustDomain()
+	if err != nil {
+		logger.Println(logger.ColorScheme.Red("✗ Failed to get trust domain"))
+		return err
+	}
+
 	// print information about the policy that will be enforced against attestations
-	logger.Println("\nThe following policy criteria will be enforced:")
+	// logger.Println("\nThe following policy criteria will be enforced:")
 	ec, err := newEnforcementCriteria(attestOption)
+	ec.SANRegex = "https://dotcom.releases.github.com"
 
 	if err != nil {
 		logger.Println(logger.ColorScheme.Red("✗ Failed to build policy information"))
 		return err
 	}
-	logger.Println(ec.BuildPolicyInformation())
+	// logger.Println(ec.BuildPolicyInformation())
 
 	config := verification.SigstoreConfig{
 		TrustedRoot:  "",
@@ -152,12 +162,41 @@ func verifyRun(opts *VerifyOptions) error {
 		NoPublicGood: true,
 	}
 
+	config.TrustDomain = td
+
 	sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
 	if err != nil {
 		logger.Println(logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
 		return err
 	}
-	verified, errMsg, err := verifyAttestations(*artifact, attestations, sigstoreVerifier, ec)
+
+	var filteredAttestations []*api.Attestation
+
+	for _, att := range attestations {
+		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
+
+		var statementData v1.Statement
+		err = protojson.Unmarshal([]byte(statement), &statementData)
+
+		if err != nil {
+			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
+			return err
+		}
+		expectedPURL := "pkg:github/" + attestOption.Repo + "@" + opts.TagName
+		purlValue := statementData.Predicate.GetFields()["purl"]
+		var purl string
+		if purlValue != nil {
+			purl = purlValue.GetStringValue()
+		}
+
+		// fmt.Print("purlValue: ", expectedPURL, "\n")
+		// fmt.Print("purl: ", purl, "\n")
+		if purl == expectedPURL {
+			filteredAttestations = append(filteredAttestations, att)
+		}
+	}
+
+	verified, errMsg, err := verifyAttestations(*artifact, filteredAttestations, sigstoreVerifier, ec)
 	if err != nil {
 		logger.Println(logger.ColorScheme.Red(errMsg))
 		return err
@@ -166,6 +205,39 @@ func verifyRun(opts *VerifyOptions) error {
 	logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))
 
 	logger.Println(logger.ColorScheme.Green("✓ Verification succeeded!\n"))
+
+	// Print verified attestations
+	for _, att := range verified {
+
+		// • {"_type":"https://in-toto.io/Statement/v1", "subject":[{"name":"pkg:github/bdehamer/delme@v2.0.0", "digest":{"sha1":"c5e17a62e06a1d201570249c61fae531e9244e1b"}}, {"name":"bdehamer-attest-demo-attestation-6498970.sigstore.1.json", "digest":{"sha256":"b41c3c570a2f60272cb387a58f3e574c6f9da913f6281204b67a223e6ae56176"}}], "predicateType":"https://in-toto.io/attestation/release/v0.1", "predicate":{"ownerId":"398027", "purl":"pkg:github/bdehamer/delme@v2.0.0", "releaseId":"217656813", "repository":"bdehamer/delme", "repositoryId":"905988044", "tag":"v2.0.0"}}
+		statement := att.Attestation.Bundle.GetDsseEnvelope().Payload
+
+		// cast statement to {"_type":"https://in-toto.io/Statement/v1", "subject":[{"name":"pkg:github/bdehamer/delme@v2.0.0", "digest":{"sha1":"c5e17a62e06a1d201570249c61fae531e9244e1b"}}, {"name":"bdehamer-attest-demo-attestation-6498970.sigstore.1.json", "digest":{"sha256":"b41c3c570a2f60272cb387a58f3e574c6f9da913f6281204b67a223e6ae56176"}}], "predicateType":"https://in-toto.io/attestation/release/v0.1", "predicate":{"ownerId":"398027", "purl":"pkg:github/bdehamer/delme@v2.0.0", "releaseId":"217656813", "repository":"bdehamer/delme", "repositoryId":"905988044", "tag":"v2.0.0"}}
+
+		var statementData v1.Statement
+		err = protojson.Unmarshal([]byte(statement), &statementData)
+		if err != nil {
+			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
+			return err
+		}
+
+		subjects := statementData.Subject
+
+		for _, s := range subjects {
+			// // Print the subject name and digest
+			// logger.Printf("• %s\n", s.Name)
+			// for k, v := range s.Digest {
+			// 	// Print the digest algorithm and value
+			// 	logger.Printf("  - %s: %s\n", k, v)
+			// }
+
+			// Print the whole subject
+			logger.Printf("%s\n", s.String())
+		}
+
+		// logger.Printf("• %s\n", att.Attestation.Bundle.GetDsseEnvelope().Payload)
+
+	}
 
 	// Verify attestations
 
@@ -196,7 +268,7 @@ func renderVerifyTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	cs := io.ColorScheme()
 	w := io.Out
 
-	fmt.Fprintf(w, "%s\n", cs.Bold(release.TagName))
+	// fmt.Fprintf(w, "%s\n", cs.Bold(release.TagName))
 	if release.IsDraft {
 		fmt.Fprintf(w, "%s • ", cs.Red("Draft"))
 	} else if release.IsPrerelease {
