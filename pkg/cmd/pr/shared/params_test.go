@@ -192,42 +192,51 @@ func TestCopilotReplacer_ReplaceSlice(t *testing.T) {
 		handles []string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []string
-		wantErr bool
+		name string
+		args args
+		want []string
 	}{
 		{
 			name: "replaces @copilot with copilot-swe-agent",
 			args: args{
 				handles: []string{"monalisa", "@copilot", "hubot"},
 			},
-			want:    []string{"monalisa", "copilot-swe-agent", "hubot"},
-			wantErr: false,
+			want: []string{"monalisa", "copilot-swe-agent", "hubot"},
 		},
 		{
 			name: "handles no @copilot mentions",
 			args: args{
 				handles: []string{"monalisa", "user", "hubot"},
 			},
-			want:    []string{"monalisa", "user", "hubot"},
-			wantErr: false,
+			want: []string{"monalisa", "user", "hubot"},
 		},
 		{
 			name: "replaces multiple @copilot mentions",
 			args: args{
 				handles: []string{"@copilot", "user", "@copilot"},
 			},
-			want:    []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
-			wantErr: false,
+			want: []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
 		},
 		{
 			name: "handles @copilot case-insensitively",
 			args: args{
 				handles: []string{"@Copilot", "user", "@CoPiLoT"},
 			},
-			want:    []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
-			wantErr: false,
+			want: []string{"copilot-swe-agent", "user", "copilot-swe-agent"},
+		},
+		{
+			name: "handles nil slice",
+			args: args{
+				handles: nil,
+			},
+			want: []string{},
+		},
+		{
+			name: "handles empty slice",
+			args: args{
+				handles: []string{},
+			},
+			want: []string{},
 		},
 	}
 	for _, tt := range tests {
