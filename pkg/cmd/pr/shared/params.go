@@ -320,22 +320,18 @@ func NewCopilotReplacer() *CopilotReplacer {
 	return &CopilotReplacer{}
 }
 
-func (r *CopilotReplacer) replace(handle string) (string, error) {
+func (r *CopilotReplacer) replace(handle string) string {
 	if strings.EqualFold(handle, "@copilot") {
-		return "copilot-swe-agent", nil
+		return "copilot-swe-agent"
 	}
-	return handle, nil
+	return handle
 }
 
 // Replace replaces usages of `@copilot` in a slice with Copilot's login.
-func (r *CopilotReplacer) ReplaceSlice(handles []string) ([]string, error) {
+func (r *CopilotReplacer) ReplaceSlice(handles []string) []string {
 	res := make([]string, len(handles))
 	for i, h := range handles {
-		var err error
-		res[i], err = r.replace(h)
-		if err != nil {
-			return nil, err
-		}
+		res[i] = r.replace(h)
 	}
-	return res, nil
+	return res
 }

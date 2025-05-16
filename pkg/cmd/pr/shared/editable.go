@@ -128,10 +128,7 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 
 			// Only suppported for actor assignees.
 			if e.Assignees.ActorAssignees {
-				replaced, err = copilotReplacer.ReplaceSlice(replaced)
-				if err != nil {
-					return nil, err
-				}
+				replaced = copilotReplacer.ReplaceSlice(replaced)
 			}
 
 			return replaced, nil
