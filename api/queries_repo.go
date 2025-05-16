@@ -146,11 +146,16 @@ type GitHubUser struct {
 	Name  string `json:"name"`
 }
 
-// Actor is a superset of User and Bot
-// At the time of writing, it does not support Name.
+// Actor is a superset of User and Bot, among others.
+// At the time of writing, some of these fields
+// are not directly supported by the Actor type and
+// instead are only available on the User or Bot types
+// directly.
 type Actor struct {
-	ID    string `json:"id"`
-	Login string `json:"login"`
+	ID       string `json:"id"`
+	Login    string `json:"login"`
+	Name     string `json:"name"`
+	TypeName string `json:"__typename"`
 }
 
 // BranchRef is the branch name in a GitHub repository
@@ -710,6 +715,11 @@ func (m *RepoMetadataResult) MembersToIDs(names []string) ([]string, error) {
 				found = true
 				break
 			}
+			if strings.EqualFold(assigneeLogin, a.DisplayName()) {
+				ids = append(ids, a.ID())
+				found = true
+				break
+			}
 		}
 
 		if !found {
@@ -1223,7 +1233,17 @@ type AssignableBot struct {
 	login string
 }
 
+func NewAssignableBot(id, login string) AssignableBot {
+	return AssignableBot{
+		id:    id,
+		login: login,
+	}
+}
+
 func (b AssignableBot) DisplayName() string {
+	if b.login == "copilot-swe-agent" {
+		return "Copilot (AI)"
+	}
 	return b.Login()
 }
 

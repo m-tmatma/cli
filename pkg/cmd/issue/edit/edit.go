@@ -267,7 +267,8 @@ func editRun(opts *EditOptions) error {
 		// We use Actors as the default assignees if Actors are assignable
 		// on this GitHub host.
 		if editable.Assignees.ActorAssignees {
-			editable.Assignees.Default = issue.AssignedActors.Logins()
+			editable.Assignees.Default = issue.AssignedActors.DisplayNames()
+			editable.Assignees.DefaultLogins = issue.AssignedActors.Logins()
 		} else {
 			editable.Assignees.Default = issue.Assignees.Logins()
 		}

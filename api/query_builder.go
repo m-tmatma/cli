@@ -20,6 +20,25 @@ func shortenQuery(q string) string {
 	return strings.Map(squeeze, q)
 }
 
+var assignedActors = shortenQuery(`
+	assignedActors(first: 10) {
+		nodes {
+			...on User {
+				id,
+				login,
+				name,
+				__typename
+			}
+			...on Bot {
+				id,
+				login,
+				__typename
+			}
+		},
+		totalCount
+	}
+`)
+
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
@@ -367,7 +386,7 @@ func IssueGraphQL(fields []string) string {
 		case "assignees":
 			q = append(q, `assignees(first:100){nodes{id,login,name},totalCount}`)
 		case "assignedActors":
-			q = append(q, `assignedActors(first: 10){edges{node{...on Actor{login}}},totalCount}`)
+			q = append(q, assignedActors)
 		case "labels":
 			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
 		case "projectCards":

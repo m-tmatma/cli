@@ -620,6 +620,123 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
+		{
+			name: "interactive prompts with actor assignee display names when actors available",
+			input: &EditOptions{
+				IssueNumbers: []int{123},
+				Interactive:  true,
+				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {
+					eo.Assignees.Edited = true
+					return nil
+				},
+				EditFieldsSurvey: func(p prShared.EditPrompter, eo *prShared.Editable, _ string) error {
+					// Checking that the display name is being used in the prompt.
+					require.Equal(t, eo.Assignees.Default, []string{"hubot", "MonaLisa (Mona Display Name)"})
+
+					// Mocking a selection of only MonaLisa in the prompt.
+					eo.Assignees.Value = []string{"MonaLisa (Mona Display Name)"}
+					return nil
+				},
+				FetchOptions:    prShared.FetchOptions,
+				DetermineEditor: func() (string, error) { return "vim", nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIsssueNumberGetWithAssignedActors(t, reg, 123)
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "suggestedActors": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockIssueUpdate(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {
+							// Checking that despite the display name being returned
+							// from the EditFieldsSurvey, the ID is still
+							// used in the mutation.
+							require.Contains(t, inputs["actorIds"], "MONAID")
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
+		{
+			name: "interactive prompts with user assignee logins when actors unavailable",
+			input: &EditOptions{
+				IssueNumbers: []int{123},
+				Interactive:  true,
+				FieldsToEditSurvey: func(p prShared.EditPrompter, eo *prShared.Editable) error {
+					eo.Assignees.Edited = true
+					return nil
+				},
+				EditFieldsSurvey: func(p prShared.EditPrompter, eo *prShared.Editable, _ string) error {
+					// Checking that only the login is used in the prompt (no display name)
+					require.Equal(t, eo.Assignees.Default, []string{"hubot", "MonaLisa"})
+
+					// Mocking a selection of only MonaLisa in the prompt.
+					eo.Assignees.Value = []string{"MonaLisa"}
+					return nil
+				},
+				FetchOptions:    prShared.FetchOptions,
+				DetermineEditor: func() (string, error) { return "vim", nil },
+				Detector:        &fd.DisabledDetectorMock{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(fmt.Sprintf(`
+                        { "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"id": "%[1]d",
+							"number": %[1]d,
+                            "url": "https://github.com/OWNER/REPO/issue/123",
+                            "assignees": {
+                                "nodes": [
+                                    {
+                                        "id": "HUBOTID",
+                                        "login": "hubot",
+										"name": ""
+                                    },
+                                    {
+                                        "id": "MONAID",
+                                        "login": "MonaLisa",
+										"name": "Mona Display Name"
+                                    }
+                                ],
+                                "totalCount": 2
+                            }
+                        } } } }`, 123)),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "assignableUsers": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID", "name": "" },
+							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`mutation IssueUpdate\b`),
+					httpmock.GraphQLMutation(`
+								{ "data": { "updateIssue": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {
+							// Checking that we still assigned the expected ID.
+							require.Contains(t, inputs["assigneeIds"], "MONAID")
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/issue/123\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -678,6 +795,34 @@ func mockIssueNumberGet(_ *testing.T, reg *httpmock.Registry, number int) {
 	)
 }
 
+func mockIsssueNumberGetWithAssignedActors(_ *testing.T, reg *httpmock.Registry, number int) {
+	reg.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(fmt.Sprintf(`
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"id": "%[1]d",
+				"number": %[1]d,
+				"url": "https://github.com/OWNER/REPO/issue/%[1]d",
+				"assignedActors": {
+					"nodes": [
+						{
+							"id": "HUBOTID",
+							"login": "hubot",
+							"__typename": "Bot"
+						},
+						{
+							"id": "MONAID",
+							"login": "MonaLisa",
+							"name": "Mona Display Name",
+							"__typename": "User"
+						}
+					],
+					"totalCount": 2
+				}
+			} } } }`, number)),
+	)
+}
+
 func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueProjectItems\b`),
@@ -699,7 +844,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		{ "data": { "repository": { "suggestedActors": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-				{ "login": "MonaLisa", "id": "MONAID", "__typename": "User" }
+				{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }

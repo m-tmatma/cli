@@ -43,6 +43,7 @@ type EditableSlice struct {
 type EditableAssignees struct {
 	EditableSlice
 	ActorAssignees bool
+	DefaultLogins  []string // For disambiguating actors from display names
 }
 
 // ProjectsV2 mutations require a mapping of an item ID to a project ID.
@@ -112,10 +113,25 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	if !e.Assignees.Edited {
 		return nil, nil
 	}
+
+	// If assignees came in from command line flags, we need to
+	// curate the final list of assignees from the default list.
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
 		meReplacer := NewMeReplacer(client, repo.RepoHost())
 		s := set.NewStringSet()
-		s.AddValues(e.Assignees.Default)
+		// This check below is required because in a non-interactive flow,
+		// the user gives us a login and not the DisplayName, and when
+		// we have actor assignees e.Assignees.Default will contain
+		// DisplayNames and not logins (this is to accommodate special actor
+		// display names in the interactive flow).
+		// So, we need to add the default logins here instead of the DisplayNames.
+		// Otherwise, the value the user provided won't be found in the
+		// set to be added or removed, causing unexpected behavior.
+		if e.Assignees.ActorAssignees {
+			s.AddValues(e.Assignees.DefaultLogins)
+		} else {
+			s.AddValues(e.Assignees.Default)
+		}
 		add, err := meReplacer.ReplaceSlice(e.Assignees.Add)
 		if err != nil {
 			return nil, err
@@ -411,7 +427,7 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 	}
 	var actors []string
 	for _, a := range metadata.AssignableActors {
-		actors = append(actors, a.Login())
+		actors = append(actors, a.DisplayName())
 	}
 	var teams []string
 	for _, t := range metadata.Teams {
