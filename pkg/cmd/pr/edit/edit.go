@@ -60,12 +60,21 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			Editing a pull request's projects requires authorization with the %[1]sproject%[1]s scope.
 			To authorize, run %[1]sgh auth refresh -s project%[1]s.
+
+			The %[1]s--add-assignee%[1]s and %[1]s--remove-assignee%[1]s flags both support
+			the following special values:
+			- %[1]s@me%[1]s: assign or unassign yourself
+			- %[1]s@copilot%[1]s: assign or unassign Copilot (not supported on GitHub Enterprise Server)
+
+			The %[1]s--add-reviewer%[1]s and %[1]s--remove-reviewer%[1]s flags do not support
+			these special values.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
 			$ gh pr edit 23 --add-reviewer monalisa,hubot  --remove-reviewer myorg/team-name
 			$ gh pr edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
+			$ gh pr edit 23 --add-assignee "@copilot"
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 			$ gh pr edit 23 --remove-milestone
