@@ -322,7 +322,7 @@ func NewCopilotReplacer() *CopilotReplacer {
 
 func (r *CopilotReplacer) replace(handle string) string {
 	if strings.EqualFold(handle, "@copilot") {
-		return "copilot-swe-agent"
+		return api.CopilotActorLogin
 	}
 	return handle
 }
