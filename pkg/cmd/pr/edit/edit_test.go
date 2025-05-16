@@ -457,6 +457,67 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
+			name: "non-interactive remove all reviewers",
+			input: &EditOptions{
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Editable: shared.Editable{
+					Title: shared.EditableString{
+						Value:  "new title",
+						Edited: true,
+					},
+					Body: shared.EditableString{
+						Value:  "new body",
+						Edited: true,
+					},
+					Base: shared.EditableString{
+						Value:  "base-branch-name",
+						Edited: true,
+					},
+					Reviewers: shared.EditableSlice{
+						Remove: []string{"OWNER/core", "OWNER/external", "monalisa", "hubot", "dependabot"},
+						Edited: true,
+					},
+					Assignees: shared.EditableAssignees{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"monalisa", "hubot"},
+							Remove: []string{"octocat"},
+							Edited: true,
+						},
+					},
+					Labels: shared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
+							Edited: true,
+						},
+					},
+					Milestone: shared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
+				mockPullRequestUpdate(reg)
+				mockPullRequestReviewersUpdate(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockPullRequestUpdateActorAssignees(reg)
+				mockProjectV2ItemUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
 			name: "interactive",
 			input: &EditOptions{
 				SelectorArg: "123",
@@ -493,6 +554,28 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				mockRepoMetadata(reg, true)
 				mockPullRequestUpdate(reg)
+				mockPullRequestUpdateActorAssignees(reg)
+				mockPullRequestUpdateLabels(reg)
+				mockProjectV2ItemUpdate(reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
+			name: "interactive remove all reviewers",
+			input: &EditOptions{
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive:     true,
+				Surveyor:        testSurveyor{removeAllReviewers: true},
+				Fetcher:         testFetcher{},
+				EditorRetriever: testEditorRetriever{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				mockRepoMetadata(reg, false)
+				mockPullRequestUpdate(reg)
+				mockPullRequestReviewersUpdate(reg)
 				mockPullRequestUpdateActorAssignees(reg)
 				mockPullRequestUpdateLabels(reg)
 				mockProjectV2ItemUpdate(reg)
@@ -719,7 +802,8 @@ func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 
 type testFetcher struct{}
 type testSurveyor struct {
-	skipReviewers bool
+	skipReviewers      bool
+	removeAllReviewers bool
 }
 type testEditorRetriever struct{}
 
@@ -744,7 +828,11 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 	e.Title.Value = "new title"
 	e.Body.Value = "new body"
 	if !s.skipReviewers {
-		e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+		if s.removeAllReviewers {
+			e.Reviewers.Remove = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external", "dependabot"}
+		} else {
+			e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+		}
 	}
 	e.Assignees.Value = []string{"monalisa", "hubot"}
 	e.Labels.Value = []string{"feature", "TODO", "bug"}
