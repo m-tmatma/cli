@@ -292,6 +292,7 @@ func (ea *EditableAssignees) clone() EditableAssignees {
 	return EditableAssignees{
 		EditableSlice:  ea.EditableSlice.clone(),
 		ActorAssignees: ea.ActorAssignees,
+		DefaultLogins:  ea.DefaultLogins,
 	}
 }
 
