@@ -154,7 +154,6 @@ func verifyRun(opts *VerifyOptions) error {
 		logger.Println(logger.ColorScheme.Red("✗ Failed to build policy information"))
 		return err
 	}
-	// logger.Println(ec.BuildPolicyInformation())
 
 	config := verification.SigstoreConfig{
 		TrustedRoot:  "",
@@ -170,6 +169,7 @@ func verifyRun(opts *VerifyOptions) error {
 		return err
 	}
 
+	// Filter attestations by predicate PURL
 	var filteredAttestations []*api.Attestation
 
 	for _, att := range attestations {
@@ -196,6 +196,7 @@ func verifyRun(opts *VerifyOptions) error {
 		}
 	}
 
+	// Verify attestations
 	verified, errMsg, err := verifyAttestations(*artifact, filteredAttestations, sigstoreVerifier, ec)
 	if err != nil {
 		logger.Println(logger.ColorScheme.Red(errMsg))
@@ -208,11 +209,7 @@ func verifyRun(opts *VerifyOptions) error {
 
 	// Print verified attestations
 	for _, att := range verified {
-
-		// • {"_type":"https://in-toto.io/Statement/v1", "subject":[{"name":"pkg:github/bdehamer/delme@v2.0.0", "digest":{"sha1":"c5e17a62e06a1d201570249c61fae531e9244e1b"}}, {"name":"bdehamer-attest-demo-attestation-6498970.sigstore.1.json", "digest":{"sha256":"b41c3c570a2f60272cb387a58f3e574c6f9da913f6281204b67a223e6ae56176"}}], "predicateType":"https://in-toto.io/attestation/release/v0.1", "predicate":{"ownerId":"398027", "purl":"pkg:github/bdehamer/delme@v2.0.0", "releaseId":"217656813", "repository":"bdehamer/delme", "repositoryId":"905988044", "tag":"v2.0.0"}}
 		statement := att.Attestation.Bundle.GetDsseEnvelope().Payload
-
-		// cast statement to {"_type":"https://in-toto.io/Statement/v1", "subject":[{"name":"pkg:github/bdehamer/delme@v2.0.0", "digest":{"sha1":"c5e17a62e06a1d201570249c61fae531e9244e1b"}}, {"name":"bdehamer-attest-demo-attestation-6498970.sigstore.1.json", "digest":{"sha256":"b41c3c570a2f60272cb387a58f3e574c6f9da913f6281204b67a223e6ae56176"}}], "predicateType":"https://in-toto.io/attestation/release/v0.1", "predicate":{"ownerId":"398027", "purl":"pkg:github/bdehamer/delme@v2.0.0", "releaseId":"217656813", "repository":"bdehamer/delme", "repositoryId":"905988044", "tag":"v2.0.0"}}
 
 		var statementData v1.Statement
 		err = protojson.Unmarshal([]byte(statement), &statementData)
@@ -224,22 +221,9 @@ func verifyRun(opts *VerifyOptions) error {
 		subjects := statementData.Subject
 
 		for _, s := range subjects {
-			// // Print the subject name and digest
-			// logger.Printf("• %s\n", s.Name)
-			// for k, v := range s.Digest {
-			// 	// Print the digest algorithm and value
-			// 	logger.Printf("  - %s: %s\n", k, v)
-			// }
-
-			// Print the whole subject
 			logger.Printf("%s\n", s.String())
 		}
-
-		// logger.Printf("• %s\n", att.Attestation.Bundle.GetDsseEnvelope().Payload)
-
 	}
-
-	// Verify attestations
 
 	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
