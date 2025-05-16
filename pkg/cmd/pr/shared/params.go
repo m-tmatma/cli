@@ -327,7 +327,7 @@ func (r *CopilotReplacer) replace(handle string) string {
 	return handle
 }
 
-// Replace replaces usages of `@copilot` in a slice with Copilot's login.
+// ReplaceSlice replaces usages of `@copilot` in a slice with Copilot's login.
 func (r *CopilotReplacer) ReplaceSlice(handles []string) []string {
 	res := make([]string, len(handles))
 	for i, h := range handles {
