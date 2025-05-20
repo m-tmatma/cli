@@ -1,4 +1,4 @@
-package verify
+package verify_asset
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.VerifyOptions) erro
 	}
 
 	cmd := &cobra.Command{
-		Use:   "verify [<tag>]",
+		Use:   "verify-asset [<tag>]",
 		Short: "Verify information about a release",
 		Long: heredoc.Doc(`
 			Verify information about a GitHub Release.
@@ -43,7 +43,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.VerifyOptions) erro
 			Without an explicit tag name argument, the latest release in the project
 			is shown.
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Create a logger for use throughout the verify command
 			// opts.Logger = io.NewHandler(f.IOStreams)

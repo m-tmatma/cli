@@ -1,4 +1,4 @@
-package verify
+package attestation
 
 import (
 	"errors"
@@ -8,9 +8,13 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+
+	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	v1 "github.com/in-toto/attestation/go/v1"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func getAttestations(o *Options, sha string) ([]*api.Attestation, string, error) {
+func GetAttestations(o *AttestOptions, sha string) ([]*api.Attestation, string, error) {
 	if o.APIClient == nil {
 		errMsg := "✗ No APIClient provided"
 		return nil, errMsg, errors.New(errMsg)
@@ -34,7 +38,7 @@ func getAttestations(o *Options, sha string) ([]*api.Attestation, string, error)
 	return attestations, msg, nil
 }
 
-func verifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, sgVerifier verification.SigstoreVerifier, ec verification.EnforcementCriteria) ([]*verification.AttestationProcessingResult, string, error) {
+func VerifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, sgVerifier verification.SigstoreVerifier, ec verification.EnforcementCriteria) ([]*verification.AttestationProcessingResult, string, error) {
 	sgPolicy, err := buildSigstoreVerifyPolicy(ec, art)
 	if err != nil {
 		logMsg := "✗ Failed to build Sigstore verification policy"
@@ -55,4 +59,27 @@ func verifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, s
 	// }
 
 	return sigstoreVerified, "", nil
+}
+
+func FilterAttestationsByPURL(attestations []*api.Attestation, repo, tagName string, logger *att_io.Handler) []*api.Attestation {
+	var filtered []*api.Attestation
+	expectedPURL := "pkg:github/" + repo + "@" + tagName
+	for _, att := range attestations {
+		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
+		var statementData v1.Statement
+		err := protojson.Unmarshal([]byte(statement), &statementData)
+		if err != nil {
+			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
+			continue
+		}
+		purlValue := statementData.Predicate.GetFields()["purl"]
+		var purl string
+		if purlValue != nil {
+			purl = purlValue.GetStringValue()
+		}
+		if purl == expectedPURL {
+			filtered = append(filtered, att)
+		}
+	}
+	return filtered
 }

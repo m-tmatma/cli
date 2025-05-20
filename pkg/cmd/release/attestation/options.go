@@ -1,0 +1,92 @@
+package attestation
+
+import (
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/cli/cli/v2/internal/gh"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+)
+
+type VerifyOptions struct {
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+	Exporter   cmdutil.Exporter
+	TagName    string
+}
+
+// AttestOptions captures the options for the verify command
+type AttestOptions struct {
+	Config           func() (gh.Config, error)
+	HttpClient       *http.Client
+	IO               *iostreams.IOStreams
+	BaseRepo         ghrepo.Interface
+	Exporter         cmdutil.Exporter
+	TagName          string
+	TrustedRoot      string
+	DigestAlgorithm  string
+	Limit            int
+	OIDCIssuer       string
+	Owner            string
+	PredicateType    string
+	Repo             string
+	SAN              string
+	SANRegex         string
+	SignerDigest     string
+	SignerRepo       string
+	SignerWorkflow   string
+	SourceDigest     string
+	SourceRef        string
+	APIClient        api.Client
+	Logger           *io.Handler
+	OCIClient        oci.Client
+	SigstoreVerifier verification.SigstoreVerifier
+	exporter         cmdutil.Exporter
+	Hostname         string
+	EC               verification.EnforcementCriteria
+	// Tenant is only set when tenancy is used
+	Tenant string
+}
+
+// AreFlagsValid checks that the provided flag combination is valid
+// and returns an error otherwise
+func (opts *AttestOptions) AreFlagsValid() error {
+	// If provided, check that the Repo option is in the expected format <OWNER>/<REPO>
+	if opts.Repo != "" && !isProvidedRepoValid(opts.Repo) {
+		return fmt.Errorf("invalid value provided for repo: %s", opts.Repo)
+	}
+
+	// If provided, check that the SignerRepo option is in the expected format <OWNER>/<REPO>
+	if opts.SignerRepo != "" && !isProvidedRepoValid(opts.SignerRepo) {
+		return fmt.Errorf("invalid value provided for signer-repo: %s", opts.SignerRepo)
+	}
+
+	// Check that limit is between 1 and 1000
+	if opts.Limit < 1 || opts.Limit > 1000 {
+		return fmt.Errorf("limit %d not allowed, must be between 1 and 1000", opts.Limit)
+	}
+
+	// Verify provided hostname
+	if opts.Hostname != "" {
+		if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
+			return fmt.Errorf("error parsing hostname: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func isProvidedRepoValid(repo string) bool {
+	// we expect a provided repository argument be in the format <OWNER>/<REPO>
+	splitRepo := strings.Split(repo, "/")
+	return len(splitRepo) == 2
+}
