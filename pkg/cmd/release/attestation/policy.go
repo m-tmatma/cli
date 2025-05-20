@@ -11,19 +11,11 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 )
 
-const hostRegex = `^[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+.*$`
-
 func expandToGitHubURL(tenant, ownerOrRepo string) string {
 	if tenant == "" {
 		return fmt.Sprintf("https://github.com/%s", ownerOrRepo)
 	}
 	return fmt.Sprintf("https://%s.ghe.com/%s", tenant, ownerOrRepo)
-}
-
-// TODO: revisit this policy
-func expandToGitHubURLRegex(tenant, ownerOrRepo string) string {
-	url := expandToGitHubURL(tenant, ownerOrRepo)
-	return fmt.Sprintf("(?i)^%s/", url)
 }
 
 // TODO: revist this policy

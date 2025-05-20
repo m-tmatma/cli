@@ -83,3 +83,29 @@ func FilterAttestationsByPURL(attestations []*api.Attestation, repo, tagName str
 	}
 	return filtered
 }
+
+func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagName, fileDigest string, logger *att_io.Handler) []*api.Attestation {
+	var filtered []*api.Attestation
+	for _, att := range attestations {
+		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
+		var statementData v1.Statement
+		err := protojson.Unmarshal([]byte(statement), &statementData)
+
+		if err != nil {
+			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
+			continue
+		}
+		subjects := statementData.Subject
+		for _, subject := range subjects {
+			digestMap := subject.GetDigest()
+			alg := "sha256"
+
+			digest := digestMap[alg]
+			if digest == fileDigest {
+				filtered = append(filtered, att)
+			}
+		}
+
+	}
+	return filtered
+}

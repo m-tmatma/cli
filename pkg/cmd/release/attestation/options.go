@@ -16,6 +16,17 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
+type VerifyAssetOptions struct {
+	IO         *iostreams.IOStreams
+	HttpClient func() (*http.Client, error)
+
+	BaseRepo func() (ghrepo.Interface, error)
+	Exporter cmdutil.Exporter
+
+	TagName  string
+	FilePath string
+}
+
 type VerifyOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
@@ -54,7 +65,8 @@ type AttestOptions struct {
 	Hostname         string
 	EC               verification.EnforcementCriteria
 	// Tenant is only set when tenancy is used
-	Tenant string
+	Tenant   string
+	FilePath string
 }
 
 // AreFlagsValid checks that the provided flag combination is valid
