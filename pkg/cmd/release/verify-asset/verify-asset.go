@@ -19,91 +19,76 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.VerifyAssetOptions) error) *cobra.Command {
-	opts := &attestation.VerifyAssetOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-	}
+func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions) error) *cobra.Command {
+	opts := &attestation.AttestOptions{}
 
 	cmd := &cobra.Command{
 		Use:   "verify-asset <tag> <file-path>",
 		Short: "Verify that a given asset originated from a specific GitHub Release.",
 		Args:  cobra.ExactArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.TagName = args[0]
+			opts.FilePath = args[1]
 
-			if len(args) > 0 {
-				opts.TagName = args[0]
-			}
-			if len(args) > 1 {
-				opts.FilePath = args[1]
-			}
-
-			if runF != nil {
-				return runF(opts)
-			}
-
-			httpClient, err := opts.HttpClient()
+			httpClient, err := f.HttpClient()
 			if err != nil {
 				return err
 			}
-
-			baseRepo, err := opts.BaseRepo()
+			baseRepo, err := f.BaseRepo()
 			if err != nil {
 				return err
 			}
-
-			logger := att_io.NewHandler(opts.IO)
+			logger := att_io.NewHandler(f.IOStreams)
 			hostname, _ := ghauth.DefaultHost()
-			option := attestation.AttestOptions{
+
+			*opts = attestation.AttestOptions{
+				TagName:       opts.TagName,
+				FilePath:      opts.FilePath,
 				Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
 				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
 				Limit:         10,
 				Owner:         baseRepo.RepoOwner(),
 				PredicateType: "https://in-toto.io/attestation/release/v0.1",
 				Logger:        logger,
+				HttpClient:    httpClient,
+				BaseRepo:      baseRepo,
+				IO:            f.IOStreams,
+				Exporter:      opts.Exporter,
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if runF != nil {
+				return runF(opts)
 			}
 
-			option.HttpClient = httpClient
-			option.BaseRepo = baseRepo
-			option.IO = opts.IO
-			option.TagName = opts.TagName
-			option.Exporter = opts.Exporter
-			option.FilePath = opts.FilePath
-
-			td, err := option.APIClient.GetTrustDomain()
+			td, err := opts.APIClient.GetTrustDomain()
 			if err != nil {
-				logger.Println(logger.ColorScheme.Red("✗ Failed to get trust domain"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
 				return err
 			}
 
-			ec, err := attestation.NewEnforcementCriteria(&option, logger)
+			ec, err := attestation.NewEnforcementCriteria(opts, opts.Logger)
 			if err != nil {
-				logger.Println(logger.ColorScheme.Red("✗ Failed to build policy information"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
 				return err
 			}
 
 			config := verification.SigstoreConfig{
-				TrustedRoot:  "",
-				Logger:       logger,
+				Logger:       opts.Logger,
 				NoPublicGood: true,
 				TrustDomain:  td,
 			}
 			sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
 			if err != nil {
-				logger.Println(logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
 				return err
 			}
 
-			option.SigstoreVerifier = sigstoreVerifier
-			option.EC = ec
+			opts.SigstoreVerifier = sigstoreVerifier
+			opts.EC = ec
 
-			// output ec
-			return verifyAssetRun(&option)
+			return verifyAssetRun(opts)
 		},
 	}
 
@@ -124,50 +109,56 @@ func verifyAssetRun(opts *attestation.AttestOptions) error {
 
 	opts.Logger.Printf("Loaded digest %s for %s\n", fileDigest.DigestWithAlg(), fileName)
 
-	sha, err := shared.FetchRefSHA(ctx, opts.HttpClient, opts.BaseRepo, opts.TagName)
+	ref, err := shared.FetchRefSHA(ctx, opts.HttpClient, opts.BaseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
-	releaseArtifact := artifact.NewDigestedArtifactForRelease(opts.TagName, sha, "sha1")
-	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, releaseArtifact.DigestWithAlg())
+	releaseRefDigest := artifact.NewDigestedArtifactForRelease(ref, "sha1")
+	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, releaseRefDigest.DigestWithAlg())
 
 	// Attestation fetching
-	attestations, logMsg, err := attestation.GetAttestations(opts, releaseArtifact.DigestWithAlg())
+	attestations, logMsg, err := attestation.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseArtifact.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
 			return err
 		}
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(logMsg))
 		return err
 	}
 
-	// Filter attestations by predicate PURL
-	filteredAttestations := attestation.FilterAttestationsByPURL(attestations, opts.Repo, opts.TagName, opts.Logger)
-	filteredAttestations = attestation.FilterAttestationsByFileDigest(filteredAttestations, opts.Repo, opts.TagName, fileDigest.Digest(), opts.Logger)
+	// Filter attestations by tag
+	filteredAttestations, err := attestation.FilterAttestationsByTag(attestations, opts.TagName)
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+		return err
+	}
+
+	filteredAttestations, err = attestation.FilterAttestationsByFileDigest(filteredAttestations, opts.Repo, opts.TagName, fileDigest.Digest())
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+		return err
+	}
+
+	if len(filteredAttestations) == 0 {
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for %s\n"), fileName)
+		return nil
+	}
 
 	opts.Logger.Printf("Loaded %s from GitHub API\n", text.Pluralize(len(filteredAttestations), "attestation"))
 
 	// Verify attestations
-	verified, errMsg, err := attestation.VerifyAttestations(*releaseArtifact, filteredAttestations, opts.SigstoreVerifier, opts.EC)
+	verified, errMsg, err := attestation.VerifyAttestations(*releaseRefDigest, filteredAttestations, opts.SigstoreVerifier, opts.EC)
 
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
-
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
-
-		// Release v1.0.0 does not contain bin-linux.tgz (sha256:0c2524c2b002fda89f8b766c7d3dd8e6ac1de183556728a83182c6137f19643d)
-
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.FilePath, fileDigest.DigestWithAlg())
 		return err
 	}
 
 	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
-
-	opts.Logger.Printf("Attestation found matching release %s (%s)\n", opts.TagName, releaseArtifact.DigestWithAlg())
-
-	// bin-linux.tgz is present in release v1.0.0
+	opts.Logger.Printf("Attestation found matching release %s (%s)\n", opts.TagName, releaseRefDigest.DigestWithAlg())
 	opts.Logger.Printf("%s is present in release %s\n", fileName, opts.TagName)
 
 	return nil

@@ -28,9 +28,11 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 		Short: "Verify the attestation for a GitHub Release.",
 		Args:  cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				opts.TagName = args[0]
+			if len(args) < 1 {
+				return cmdutil.FlagErrorf("You must specify a tag")
 			}
+
+			opts.TagName = args[0]
 
 			httpClient, err := f.HttpClient()
 			if err != nil {
@@ -41,29 +43,26 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			if err != nil {
 				return err
 			}
-
 			logger := att_io.NewHandler(f.IOStreams)
 			hostname, _ := ghauth.DefaultHost()
 
-			opts.Repo = baseRepo.RepoOwner() + "/" + baseRepo.RepoName()
-			opts.APIClient = api.NewLiveClient(httpClient, hostname, logger)
-			opts.Limit = 10
-			opts.Owner = baseRepo.RepoOwner()
-			opts.PredicateType = "https://in-toto.io/attestation/release/v0.1"
-			opts.Logger = logger
-
-			opts.HttpClient = httpClient
-			opts.BaseRepo = baseRepo
-
-			opts.HttpClient = httpClient
-
+			*opts = attestation.AttestOptions{
+				TagName:       opts.TagName,
+				Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
+				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
+				Limit:         10,
+				Owner:         baseRepo.RepoOwner(),
+				PredicateType: "https://in-toto.io/attestation/release/v0.1",
+				Logger:        logger,
+				HttpClient:    httpClient,
+				BaseRepo:      baseRepo,
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
 			}
-			//
 
 			td, err := opts.APIClient.GetTrustDomain()
 			if err != nil {
@@ -78,11 +77,11 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			}
 
 			config := verification.SigstoreConfig{
-				TrustedRoot:  "",
 				Logger:       opts.Logger,
 				NoPublicGood: true,
 				TrustDomain:  td,
 			}
+
 			sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
@@ -92,7 +91,6 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			opts.SigstoreVerifier = sigstoreVerifier
 			opts.EC = ec
 
-			// output ec
 			return verifyRun(opts)
 		},
 	}
@@ -105,38 +103,39 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 func verifyRun(opts *attestation.AttestOptions) error {
 	ctx := context.Background()
 
-	sha, err := shared.FetchRefSHA(ctx, opts.HttpClient, opts.BaseRepo, opts.TagName)
+	ref, err := shared.FetchRefSHA(ctx, opts.HttpClient, opts.BaseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
 
-	artifact := artifact.NewDigestedArtifactForRelease(opts.TagName, sha, "sha1")
-	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, artifact.DigestWithAlg())
+	releaseRefDigest := artifact.NewDigestedArtifactForRelease(ref, "sha1")
+	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, releaseRefDigest.DigestWithAlg())
 
 	// Attestation fetching
-	attestations, logMsg, err := attestation.GetAttestations(opts, artifact.DigestWithAlg())
+	attestations, logMsg, err := attestation.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), artifact.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
 			return err
 		}
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(logMsg))
 		return err
 	}
 
-	// Filter attestations by predicate PURL
-	filteredAttestations := attestation.FilterAttestationsByPURL(attestations, opts.Repo, opts.TagName, opts.Logger)
+	// Filter attestations by predicate tag
+	filteredAttestations, err := attestation.FilterAttestationsByTag(attestations, opts.TagName)
+	if err != nil {
+		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
+		return err
+	}
 
 	opts.Logger.Printf("Loaded %s from GitHub API\n", text.Pluralize(len(filteredAttestations), "attestation"))
 
 	// Verify attestations
-	verified, errMsg, err := attestation.VerifyAttestations(*artifact, filteredAttestations, opts.SigstoreVerifier, opts.EC)
+	verified, errMsg, err := attestation.VerifyAttestations(*releaseRefDigest, filteredAttestations, opts.SigstoreVerifier, opts.EC)
 
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
-
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Verification failed"))
-
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Failed to find an attestation for release %s in %s\n"), opts.TagName, opts.Repo)
 		return err
 	}
@@ -144,7 +143,7 @@ func verifyRun(opts *attestation.AttestOptions) error {
 	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))
 	opts.Logger.Println(opts.Logger.ColorScheme.Green("✓ Verification succeeded!\n"))
 
-	opts.Logger.Printf("Attestation found matching release %s (%s)\n", opts.TagName, artifact.Digest())
+	opts.Logger.Printf("Attestation found matching release %s (%s)\n", opts.TagName, releaseRefDigest.Digest())
 	printVerifiedSubjects(verified, opts.Logger)
 
 	return nil
@@ -164,14 +163,10 @@ func printVerifiedSubjects(verified []*verification.AttestationProcessingResult,
 			digest := s.Digest
 
 			if name != "" {
-				// digest is map[string]string and i want to be key:value
-				// so i need to iterate over the map and print key:value
 				digestStr := ""
 				for key, value := range digest {
 					digestStr += key + ":" + value
 				}
-				// output should like this
-				//   bin-linux.tgz          sha256:0c2524c2b002fda89f8b766c7d3dd8e6ac1de183556728a83182c6137f19643d
 				logger.Println("  " + name + "          " + digestStr)
 			}
 		}

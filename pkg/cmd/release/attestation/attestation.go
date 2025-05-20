@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 
-	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	v1 "github.com/in-toto/attestation/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -61,30 +60,25 @@ func VerifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, s
 	return sigstoreVerified, "", nil
 }
 
-func FilterAttestationsByPURL(attestations []*api.Attestation, repo, tagName string, logger *att_io.Handler) []*api.Attestation {
+func FilterAttestationsByTag(attestations []*api.Attestation, tagName string) ([]*api.Attestation, error) {
 	var filtered []*api.Attestation
-	expectedPURL := "pkg:github/" + repo + "@" + tagName
 	for _, att := range attestations {
 		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
 		var statementData v1.Statement
 		err := protojson.Unmarshal([]byte(statement), &statementData)
 		if err != nil {
-			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
-			continue
+			return nil, fmt.Errorf("failed to unmarshal statement: %w", err)
 		}
-		purlValue := statementData.Predicate.GetFields()["purl"]
-		var purl string
-		if purlValue != nil {
-			purl = purlValue.GetStringValue()
-		}
-		if purl == expectedPURL {
+		tagValue := statementData.Predicate.GetFields()["tag"].GetStringValue()
+
+		if tagValue == tagName {
 			filtered = append(filtered, att)
 		}
 	}
-	return filtered
+	return filtered, nil
 }
 
-func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagName, fileDigest string, logger *att_io.Handler) []*api.Attestation {
+func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagName, fileDigest string) ([]*api.Attestation, error) {
 	var filtered []*api.Attestation
 	for _, att := range attestations {
 		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
@@ -92,8 +86,7 @@ func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagNa
 		err := protojson.Unmarshal([]byte(statement), &statementData)
 
 		if err != nil {
-			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
-			continue
+			return nil, fmt.Errorf("failed to unmarshal statement: %w", err)
 		}
 		subjects := statementData.Subject
 		for _, subject := range subjects {
@@ -107,5 +100,5 @@ func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagNa
 		}
 
 	}
-	return filtered
+	return filtered, nil
 }
