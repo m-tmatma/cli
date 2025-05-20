@@ -52,7 +52,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
 				Limit:         10,
 				Owner:         baseRepo.RepoOwner(),
-				PredicateType: "https://in-toto.io/attestation/release/v0.1",
+				PredicateType: attestation.ReleasePredicateType,
 				Logger:        logger,
 				HttpClient:    httpClient,
 				BaseRepo:      baseRepo,
@@ -94,9 +94,6 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			return verifyRun(opts)
 		},
 	}
-
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.ReleaseFields)
-
 	return cmd
 }
 

@@ -27,6 +27,10 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 		Short: "Verify that a given asset originated from a specific GitHub Release.",
 		Args:  cobra.ExactArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 2 {
+				return cmdutil.FlagErrorf("You must specify a tag and a file path")
+			}
+
 			opts.TagName = args[0]
 			opts.FilePath = args[1]
 
@@ -48,12 +52,10 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
 				Limit:         10,
 				Owner:         baseRepo.RepoOwner(),
-				PredicateType: "https://in-toto.io/attestation/release/v0.1",
+				PredicateType: attestation.ReleasePredicateType,
 				Logger:        logger,
 				HttpClient:    httpClient,
 				BaseRepo:      baseRepo,
-				IO:            f.IOStreams,
-				Exporter:      opts.Exporter,
 			}
 			return nil
 		},
@@ -91,8 +93,6 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 			return verifyAssetRun(opts)
 		},
 	}
-
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.ReleaseFields)
 	return cmd
 }
 

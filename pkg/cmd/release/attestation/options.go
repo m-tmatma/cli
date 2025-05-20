@@ -16,24 +16,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
-type VerifyAssetOptions struct {
-	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
-
-	BaseRepo func() (ghrepo.Interface, error)
-	Exporter cmdutil.Exporter
-
-	TagName  string
-	FilePath string
-}
-
-type VerifyOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Exporter   cmdutil.Exporter
-	TagName    string
-}
+const ReleasePredicateType = "https://in-toto.io/attestation/release/v0.1"
 
 // AttestOptions captures the options for the verify command
 type AttestOptions struct {
@@ -61,7 +44,6 @@ type AttestOptions struct {
 	Logger           *io.Handler
 	OCIClient        oci.Client
 	SigstoreVerifier verification.SigstoreVerifier
-	exporter         cmdutil.Exporter
 	Hostname         string
 	EC               verification.EnforcementCriteria
 	// Tenant is only set when tenancy is used
