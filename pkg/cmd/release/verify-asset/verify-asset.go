@@ -141,7 +141,7 @@ func verifyAssetRun(opts *attestation.AttestOptions) error {
 	}
 
 	if len(filteredAttestations) == 0 {
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for %s\n"), fileName)
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.FilePath, fileDigest.DigestWithAlg())
 		return nil
 	}
 
