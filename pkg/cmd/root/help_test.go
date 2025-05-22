@@ -1,6 +1,7 @@
 package root
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/browser"
@@ -78,8 +79,9 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 
 	var walk func(*cobra.Command)
 	walk = func(cmd *cobra.Command) {
-		t.Run(cmd.UseLine(), func(t *testing.T) {
-			assertProperUsageOfPipes(t, cmd)
+		name := fmt.Sprintf("%q: test pipes are in code blocks", cmd.UseLine())
+		t.Run(name, func(t *testing.T) {
+			assertPipesAreInCodeBlocks(t, cmd)
 		})
 		for _, child := range cmd.Commands() {
 			walk(child)
@@ -89,15 +91,15 @@ func TestKramdownCompatibleDocs(t *testing.T) {
 	walk(cmd)
 }
 
-// If not in a code block, kramdown treats pipes ("|") as table column
-// separators, even if there's no table header, or left/right table row borders
-// (i.e. lines starting and ending with a pipe).
+// If not in a code block or a code span, kramdown treats pipes ("|") as table
+// column separators, even if there's no table header, or left/right table row
+// borders (i.e. lines starting and ending with a pipe).
 //
 // We need to assert there's no pipe in the text unless it's in a code-block or
 // code-span.
 //
 // (See https://github.com/cli/cli/issues/10348)
-func assertProperUsageOfPipes(t *testing.T, cmd *cobra.Command) {
+func assertPipesAreInCodeBlocks(t *testing.T, cmd *cobra.Command) {
 	md := goldmark.New()
 	reader := text.NewReader([]byte(cmd.Long))
 	doc := md.Parser().Parse(reader)
