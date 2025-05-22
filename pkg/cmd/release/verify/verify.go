@@ -94,6 +94,8 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			return verifyRun(opts)
 		},
 	}
+	cmdutil.AddFormatFlags(cmd, &opts.Exporter)
+
 	return cmd
 }
 
@@ -135,6 +137,16 @@ func verifyRun(opts *attestation.AttestOptions) error {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Failed to find an attestation for release %s in %s\n"), opts.TagName, opts.Repo)
 		return err
+	}
+
+	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
+	if opts.Exporter != nil {
+		// print the results to the terminal as an array of JSON objects
+		if err = opts.Exporter.Write(opts.Logger.IO, verified); err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
+			return err
+		}
+		return nil
 	}
 
 	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))

@@ -31,8 +31,8 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 				return cmdutil.FlagErrorf("You must specify a tag and a file path")
 			}
 
-			opts.TagName = args[0]
-			opts.FilePath = args[1]
+			tagName := args[0]
+			assetFilePath := args[1]
 
 			httpClient, err := f.HttpClient()
 			if err != nil {
@@ -46,8 +46,8 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 			hostname, _ := ghauth.DefaultHost()
 
 			*opts = attestation.AttestOptions{
-				TagName:       opts.TagName,
-				FilePath:      opts.FilePath,
+				TagName:       tagName,
+				AssetFilePath: assetFilePath,
 				Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
 				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
 				Limit:         10,
@@ -93,15 +93,17 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 			return verifyAssetRun(opts)
 		},
 	}
+	cmdutil.AddFormatFlags(cmd, &opts.Exporter)
+
 	return cmd
 }
 
 func verifyAssetRun(opts *attestation.AttestOptions) error {
 	ctx := context.Background()
-	fileName := getFileName(opts.FilePath)
+	fileName := getFileName(opts.AssetFilePath)
 
 	// calculate the digest of the file
-	fileDigest, err := artifact.NewDigestedArtifact(nil, opts.FilePath, "sha256")
+	fileDigest, err := artifact.NewDigestedArtifact(nil, opts.AssetFilePath, "sha256")
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to calculate file digest"))
 		return err
@@ -141,7 +143,7 @@ func verifyAssetRun(opts *attestation.AttestOptions) error {
 	}
 
 	if len(filteredAttestations) == 0 {
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.FilePath, fileDigest.DigestWithAlg())
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.AssetFilePath, fileDigest.DigestWithAlg())
 		return nil
 	}
 
@@ -152,8 +154,18 @@ func verifyAssetRun(opts *attestation.AttestOptions) error {
 
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.FilePath, fileDigest.DigestWithAlg())
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.AssetFilePath, fileDigest.DigestWithAlg())
 		return err
+	}
+
+	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
+	if opts.Exporter != nil {
+		// print the results to the terminal as an array of JSON objects
+		if err = opts.Exporter.Write(opts.Logger.IO, verified); err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
+			return err
+		}
+		return nil
 	}
 
 	opts.Logger.Printf("The following %s matched the policy criteria\n\n", text.Pluralize(len(verified), "attestation"))

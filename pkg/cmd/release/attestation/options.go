@@ -3,6 +3,7 @@ package attestation
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/cli/cli/v2/internal/gh"
@@ -47,8 +48,15 @@ type AttestOptions struct {
 	Hostname         string
 	EC               verification.EnforcementCriteria
 	// Tenant is only set when tenancy is used
-	Tenant   string
-	FilePath string
+	Tenant        string
+	AssetFilePath string
+}
+
+// Clean cleans the file path option values
+func (opts *AttestOptions) Clean() {
+	if opts.AssetFilePath != "" {
+		opts.AssetFilePath = filepath.Clean(opts.AssetFilePath)
+	}
 }
 
 // AreFlagsValid checks that the provided flag combination is valid
