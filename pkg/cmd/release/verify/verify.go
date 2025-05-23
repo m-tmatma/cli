@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/release/attestation"
@@ -24,9 +25,10 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 	opts := &attestation.AttestOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "verify [<tag>]",
-		Short: "Verify the attestation for a GitHub Release.",
-		Args:  cobra.ExactArgs(1),
+		Use:    "verify [<tag>]",
+		Short:  "Verify the attestation for a GitHub Release.",
+		Hidden: true,
+		Args:   cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return cmdutil.FlagErrorf("You must specify a tag")
@@ -46,6 +48,11 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			logger := att_io.NewHandler(f.IOStreams)
 			hostname, _ := ghauth.DefaultHost()
 
+			err = auth.IsHostSupported(hostname)
+			if err != nil {
+				return err
+			}
+
 			*opts = attestation.AttestOptions{
 				TagName:       opts.TagName,
 				Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
@@ -56,21 +63,23 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 				Logger:        logger,
 				HttpClient:    httpClient,
 				BaseRepo:      baseRepo,
+				Hostname:      hostname,
+			}
+
+			// Check that the given flag combination is valid
+			if err := opts.AreFlagsValid(); err != nil {
+				return err
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if runF != nil {
-				return runF(opts)
-			}
-
 			td, err := opts.APIClient.GetTrustDomain()
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
 				return err
 			}
 
-			ec, err := attestation.NewEnforcementCriteria(opts, opts.Logger)
+			ec, err := attestation.NewEnforcementCriteria(opts)
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
 				return err
@@ -90,6 +99,10 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 
 			opts.SigstoreVerifier = sigstoreVerifier
 			opts.EC = ec
+
+			if runF != nil {
+				return runF(opts)
+			}
 
 			return verifyRun(opts)
 		},

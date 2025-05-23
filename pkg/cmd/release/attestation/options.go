@@ -19,7 +19,6 @@ import (
 
 const ReleasePredicateType = "https://in-toto.io/attestation/release/v0.1"
 
-// AttestOptions captures the options for the verify command
 type AttestOptions struct {
 	Config           func() (gh.Config, error)
 	HttpClient       *http.Client
@@ -67,17 +66,11 @@ func (opts *AttestOptions) AreFlagsValid() error {
 		return fmt.Errorf("invalid value provided for repo: %s", opts.Repo)
 	}
 
-	// If provided, check that the SignerRepo option is in the expected format <OWNER>/<REPO>
-	if opts.SignerRepo != "" && !isProvidedRepoValid(opts.SignerRepo) {
-		return fmt.Errorf("invalid value provided for signer-repo: %s", opts.SignerRepo)
-	}
-
 	// Check that limit is between 1 and 1000
 	if opts.Limit < 1 || opts.Limit > 1000 {
 		return fmt.Errorf("limit %d not allowed, must be between 1 and 1000", opts.Limit)
 	}
 
-	// Verify provided hostname
 	if opts.Hostname != "" {
 		if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 			return fmt.Errorf("error parsing hostname: %w", err)

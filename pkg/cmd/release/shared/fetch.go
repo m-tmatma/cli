@@ -132,7 +132,7 @@ type fetchResult struct {
 }
 
 func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, tagName string) (string, error) {
-	path := fmt.Sprintf("repos/%s/%s/git/refs/tags/%s", repo.RepoOwner(), repo.RepoName(), tagName)
+	path := fmt.Sprintf("repos/%s/git/refs/tags/%s", repo.RepoOwner(), repo.RepoName(), tagName)
 	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+path, nil)
 	if err != nil {
 		return "", err

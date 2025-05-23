@@ -50,13 +50,6 @@ func VerifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, s
 		return nil, logMsg, err
 	}
 
-	// Verify extensions
-	// certExtVerified, err := verification.VerifyCertExtensions(sigstoreVerified, ec)
-	// if err != nil {
-	// 	logMsg := "✗ Policy verification failed"
-	// 	return nil, logMsg, err
-	// }
-
 	return sigstoreVerified, "", nil
 }
 

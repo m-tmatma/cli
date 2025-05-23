@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 
+	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 
 	"github.com/cli/cli/v2/internal/text"
@@ -23,9 +24,10 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 	opts := &attestation.AttestOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "verify-asset <tag> <file-path>",
-		Short: "Verify that a given asset originated from a specific GitHub Release.",
-		Args:  cobra.ExactArgs(2),
+		Use:    "verify-asset <tag> <file-path>",
+		Short:  "Verify that a given asset originated from a specific GitHub Release.",
+		Hidden: true,
+		Args:   cobra.ExactArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 2 {
 				return cmdutil.FlagErrorf("You must specify a tag and a file path")
@@ -45,6 +47,11 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 			logger := att_io.NewHandler(f.IOStreams)
 			hostname, _ := ghauth.DefaultHost()
 
+			err = auth.IsHostSupported(hostname)
+			if err != nil {
+				return err
+			}
+
 			*opts = attestation.AttestOptions{
 				TagName:       tagName,
 				AssetFilePath: assetFilePath,
@@ -56,21 +63,24 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 				Logger:        logger,
 				HttpClient:    httpClient,
 				BaseRepo:      baseRepo,
+				Hostname:      hostname,
 			}
+
+			// Check that the given flag combination is valid
+			if err := opts.AreFlagsValid(); err != nil {
+				return err
+			}
+
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if runF != nil {
-				return runF(opts)
-			}
-
 			td, err := opts.APIClient.GetTrustDomain()
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
 				return err
 			}
 
-			ec, err := attestation.NewEnforcementCriteria(opts, opts.Logger)
+			ec, err := attestation.NewEnforcementCriteria(opts)
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
 				return err
@@ -89,6 +99,10 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 
 			opts.SigstoreVerifier = sigstoreVerifier
 			opts.EC = ec
+
+			if runF != nil {
+				return runF(opts)
+			}
 
 			return verifyAssetRun(opts)
 		},

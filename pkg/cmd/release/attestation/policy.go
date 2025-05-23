@@ -3,7 +3,6 @@ package attestation
 import (
 	"fmt"
 
-	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 
@@ -18,12 +17,11 @@ func expandToGitHubURL(tenant, ownerOrRepo string) string {
 	return fmt.Sprintf("https://%s.ghe.com/%s", tenant, ownerOrRepo)
 }
 
-// TODO: revist this policy
-func NewEnforcementCriteria(opts *AttestOptions, logger *att_io.Handler) (verification.EnforcementCriteria, error) {
+func NewEnforcementCriteria(opts *AttestOptions) (verification.EnforcementCriteria, error) {
 	// initialize the enforcement criteria with the provided PredicateType and SAN
 	c := verification.EnforcementCriteria{
 		PredicateType: opts.PredicateType,
-		// if the proxima is provided, the default uses the proxima-specific SAN
+		// TODO: if the proxima is provided, the default uses the proxima-specific SAN
 		SAN: "https://dotcom.releases.github.com",
 	}
 
