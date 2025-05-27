@@ -55,7 +55,13 @@ var tasks = map[string]func(string) error{
 
 		buildTags, _ := os.LookupEnv("GO_BUILDTAGS")
 
-		return run("go", "build", "-trimpath", "-tags", buildTags, "-ldflags", ldflags, "-o", exe, "./cmd/gh")
+		args := []string{"go", "build", "-trimpath"}
+		if buildTags != "" {
+			args = append(args, "-tags", buildTags)
+		}
+		args = append(args, "-ldflags", ldflags, "-o", exe, "./cmd/gh")
+
+		return run(args...)
 	},
 	"manpages": func(_ string) error {
 		return run("go", "run", "./cmd/gen-docs", "--man-page", "--doc-path", "./share/man/man1/")
