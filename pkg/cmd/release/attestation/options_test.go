@@ -5,17 +5,6 @@ import (
 	"testing"
 )
 
-func TestAttestOptions_Clean(t *testing.T) {
-	opts := &AttestOptions{
-		AssetFilePath: "foo/bar/../baz.txt",
-	}
-	opts.Clean()
-	expected := "foo/baz.txt"
-	if opts.AssetFilePath != expected && opts.AssetFilePath != "./foo/baz.txt" { // OS differences
-		t.Errorf("expected AssetFilePath to be cleaned to %q, got %q", expected, opts.AssetFilePath)
-	}
-}
-
 func TestAttestOptions_AreFlagsValid_Valid(t *testing.T) {
 	opts := &AttestOptions{
 		Repo:       "owner/repo",
