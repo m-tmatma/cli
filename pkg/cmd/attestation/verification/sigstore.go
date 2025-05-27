@@ -306,7 +306,7 @@ func newCustomVerifier(trustedRoot *root.TrustedRoot) (*verify.Verifier, error) 
 		verifierConfig = append(verifierConfig, verify.WithTransparencyLog(1))
 	}
 
-	gv, err := verify.NewSignedEntityVerifier(trustedRoot, verifierConfig...)
+	gv, err := verify.NewVerifier(trustedRoot, verifierConfig...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create custom verifier: %v", err)
 	}
@@ -340,7 +340,7 @@ func newGitHubVerifier(trustDomain string, tufMetadataDir o.Option[string]) (*ve
 }
 
 func newGitHubVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Verifier, error) {
-	gv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedTimestamps(1))
+	gv, err := verify.NewVerifier(trustedRoot, verify.WithSignedTimestamps(1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GitHub verifier: %v", err)
 	}
@@ -363,7 +363,7 @@ func newPublicGoodVerifier(tufMetadataDir o.Option[string]) (*verify.Verifier, e
 }
 
 func newPublicGoodVerifierWithTrustedRoot(trustedRoot *root.TrustedRoot) (*verify.Verifier, error) {
-	sv, err := verify.NewSignedEntityVerifier(trustedRoot, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
+	sv, err := verify.NewVerifier(trustedRoot, verify.WithSignedCertificateTimestamps(1), verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Public Good verifier: %v", err)
 	}
