@@ -158,6 +158,11 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		table := tableprinter.New(io, tableprinter.NoHeader)
 		for _, a := range release.Assets {
 			table.AddField(a.Name)
+			if a.Digest == nil {
+				table.AddField("")
+			} else {
+				table.AddField(*a.Digest)
+			}
 			table.AddField(humanFileSize(a.Size))
 			table.EndRow()
 		}
