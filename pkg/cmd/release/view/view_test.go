@@ -150,6 +150,7 @@ func Test_viewRun(t *testing.T) {
 				
 				
 				Assets
+				NAME         DIGEST           SIZE
 				windows.zip  sha256:deadc0de  12 B
 				linux.tgz                     34 B
 				
@@ -174,6 +175,7 @@ func Test_viewRun(t *testing.T) {
 
 
 				Assets
+				NAME         DIGEST           SIZE
 				windows.zip  sha256:deadc0de  12 B
 				linux.tgz                     34 B
 
