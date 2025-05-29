@@ -154,7 +154,6 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 
 	if len(release.Assets) > 0 {
 		fmt.Fprintln(w, cs.Bold("Assets"))
-		//nolint:staticcheck // SA1019: Showing NAME|SIZE headers adds nothing to table.
 		table := tableprinter.New(io, tableprinter.WithHeader("Name", "Digest", "Size"))
 		for _, a := range release.Assets {
 			table.AddField(a.Name)
