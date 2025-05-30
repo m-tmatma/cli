@@ -25,6 +25,6 @@ jobs:
         run: go mod download
 
       - name: Run unit and integration tests
-        run: go test -v ./pkg/cmd/release/verify-asset/...
+        run: go test -v ./pkg/cmd/release/verify-asset ./pkg/cmd/attestation/artifact
       - name: Build
         run: go build -v ./cmd/gh
