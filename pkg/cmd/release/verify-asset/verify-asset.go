@@ -89,11 +89,17 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 				return err
 			}
 
+			// Avoid creating a Sigstore verifier if the runF function is provided for testing purposes
+			if runF != nil {
+				return runF(opts)
+			}
+
 			config := verification.SigstoreConfig{
 				Logger:       opts.Logger,
 				NoPublicGood: true,
 				TrustDomain:  td,
 			}
+
 			sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
@@ -102,10 +108,6 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 
 			opts.SigstoreVerifier = sigstoreVerifier
 			opts.EC = ec
-
-			if runF != nil {
-				return runF(opts)
-			}
 
 			return verifyAssetRun(opts)
 		},

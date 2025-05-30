@@ -83,6 +83,11 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 				return err
 			}
 
+			// Avoid creating a Sigstore verifier if the runF function is provided for testing purposes
+			if runF != nil {
+				return runF(opts)
+			}
+
 			config := verification.SigstoreConfig{
 				Logger:       opts.Logger,
 				NoPublicGood: true,
@@ -97,10 +102,6 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 
 			opts.SigstoreVerifier = sigstoreVerifier
 			opts.EC = ec
-
-			if runF != nil {
-				return runF(opts)
-			}
 
 			return verifyRun(opts)
 		},

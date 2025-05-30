@@ -30,15 +30,15 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 	}{
 		{
 			name:     "valid args",
-			args:     []string{"v1.2.3", "../../attestation/test/data/a.zip"},
+			args:     []string{"v1.2.3", "../../attestation/test/data/github_release_artifact.zip"},
 			wantTag:  "v1.2.3",
-			wantFile: "../../attestation/test/data/a.zip",
+			wantFile: "../../attestation/test/data/github_release_artifact.zip",
 		},
 		{
 			name: "valid flag with no tag",
 
-			args:     []string{"../../attestation/test/data/a.zip"},
-			wantFile: "../../attestation/test/data/a.zip",
+			args:     []string{"../../attestation/test/data/github_release_artifact.zip"},
+			wantFile: "../../attestation/test/data/github_release_artifact.zip",
 		},
 		{
 			name:    "no args",
@@ -107,7 +107,7 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 
 	opts := &attestation.AttestOptions{
 		TagName:          tagName,
-		AssetFilePath:    "../../attestation/test/data/a.zip",
+		AssetFilePath:    "../../attestation/test/data/github_release_artifact.zip",
 		Repo:             "owner/repo",
 		Owner:            "owner",
 		Limit:            10,
