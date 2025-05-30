@@ -77,34 +77,19 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
 				return err
 			}
+			opts.TrustedRoot = td
 
 			ec, err := attestation.NewEnforcementCriteria(opts)
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
 				return err
 			}
+			opts.EC = ec
 
 			// Avoid creating a Sigstore verifier if the runF function is provided for testing purposes
 			if runF != nil {
 				return runF(opts)
 			}
-
-			config := verification.SigstoreConfig{
-				HttpClient:   opts.HttpClient,
-				Logger:       opts.Logger,
-				NoPublicGood: true,
-				TrustDomain:  td,
-			}
-
-			sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
-			if err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
-				return err
-			}
-
-			opts.SigstoreVerifier = sigstoreVerifier
-			opts.EC = ec
-
 			return verifyRun(opts)
 		},
 	}
@@ -115,6 +100,23 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 
 func verifyRun(opts *attestation.AttestOptions) error {
 	ctx := context.Background()
+
+	if opts.SigstoreVerifier == nil {
+		config := verification.SigstoreConfig{
+			HttpClient:   opts.HttpClient,
+			Logger:       opts.Logger,
+			NoPublicGood: true,
+			TrustDomain:  opts.TrustedRoot,
+		}
+
+		sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
+		if err != nil {
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
+			return err
+		}
+
+		opts.SigstoreVerifier = sigstoreVerifier
+	}
 
 	if opts.TagName == "" {
 		release, err := shared.FetchLatestRelease(ctx, opts.HttpClient, opts.BaseRepo)

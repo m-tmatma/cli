@@ -146,7 +146,7 @@ func FetchRefSHA(ctx context.Context, httpClient *http.Client, repo ghrepo.Inter
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode == http.StatusNotFound {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		// ErrRefNotFound
 		return "", ErrReleaseNotFound
@@ -248,7 +248,7 @@ func fetchReleasePath(ctx context.Context, httpClient *http.Client, host string,
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
+	if resp.StatusCode == http.StatusNotFound {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, ErrReleaseNotFound
 	} else if resp.StatusCode > 299 {
