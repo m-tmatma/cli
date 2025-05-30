@@ -164,7 +164,7 @@ func Test_verifyAssetRun_Failed_With_Wrong_tag(t *testing.T) {
 
 func Test_verifyAssetRun_Failed_With_Invalid_Artifact(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	tagName := "v1.2.3"
+	tagName := "v5"
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)
