@@ -3,6 +3,7 @@ package verify
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	v1 "github.com/in-toto/attestation/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -89,6 +90,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			}
 
 			config := verification.SigstoreConfig{
+				HttpClient:   opts.HttpClient,
 				Logger:       opts.Logger,
 				NoPublicGood: true,
 				TrustDomain:  td,
@@ -146,6 +148,11 @@ func verifyRun(opts *attestation.AttestOptions) error {
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 		return err
+	}
+
+	if len(filteredAttestations) == 0 {
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for release %s in %s\n"), opts.TagName, opts.Repo)
+		return fmt.Errorf("no attestations found for release %s in %s", opts.TagName, opts.Repo)
 	}
 
 	opts.Logger.Printf("Loaded %s from GitHub API\n", text.Pluralize(len(filteredAttestations), "attestation"))

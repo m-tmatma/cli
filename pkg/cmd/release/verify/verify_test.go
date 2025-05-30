@@ -79,7 +79,7 @@ func TestNewCmdVerify_Args(t *testing.T) {
 
 func Test_verifyRun_Success(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	tagName := "v1.2.3"
+	tagName := "v5"
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)
@@ -99,6 +99,7 @@ func Test_verifyRun_Success(t *testing.T) {
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 		HttpClient:       &http.Client{Transport: fakeHTTP},
 		BaseRepo:         baseRepo,
+		PredicateType:    attestation.ReleasePredicateType,
 	}
 
 	ec, err := attestation.NewEnforcementCriteria(opts)
@@ -109,7 +110,41 @@ func Test_verifyRun_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_verifyRun_NoAttestation(t *testing.T) {
+func Test_verifyRun_Failed_With_Invalid_Tag(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tagName := "v1.2.3"
+
+	fakeHTTP := &httpmock.Registry{}
+	defer fakeHTTP.Verify(t)
+	fakeSHA := "1234567890abcdef1234567890abcdef12345678"
+	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
+
+	baseRepo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	opts := &attestation.AttestOptions{
+		TagName:          tagName,
+		Repo:             "owner/repo",
+		Owner:            "owner",
+		Limit:            10,
+		Logger:           io.NewHandler(ios),
+		APIClient:        api.NewFailTestClient(),
+		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+		PredicateType:    attestation.ReleasePredicateType,
+
+		HttpClient: &http.Client{Transport: fakeHTTP},
+		BaseRepo:   baseRepo,
+	}
+
+	ec, err := attestation.NewEnforcementCriteria(opts)
+	require.NoError(t, err)
+	opts.EC = ec
+
+	err = verifyRun(opts)
+	require.Error(t, err, "failed to fetch attestations from owner/repo")
+}
+
+func Test_verifyRun_Failed_NoAttestation(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	tagName := "v1.2.3"
 
@@ -131,6 +166,7 @@ func Test_verifyRun_NoAttestation(t *testing.T) {
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 		HttpClient:       &http.Client{Transport: fakeHTTP},
 		BaseRepo:         baseRepo,
+		PredicateType:    attestation.ReleasePredicateType,
 	}
 
 	ec, err := attestation.NewEnforcementCriteria(opts)

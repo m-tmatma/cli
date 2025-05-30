@@ -95,7 +95,7 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 
 func Test_verifyAssetRun_Success(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	tagName := "v1.2.3"
+	tagName := "v5"
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)
@@ -114,12 +114,81 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 		Logger:           io.NewHandler(ios),
 		APIClient:        api.NewTestClient(),
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+		PredicateType:    attestation.ReleasePredicateType,
+		HttpClient:       &http.Client{Transport: fakeHTTP},
+		BaseRepo:         baseRepo,
+	}
+
+	ec, err := attestation.NewEnforcementCriteria(opts)
+	require.NoError(t, err)
+	opts.EC = ec
+
+	err = verifyAssetRun(opts)
+	require.NoError(t, err)
+}
+
+func Test_verifyAssetRun_Failed_With_Wrong_tag(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tagName := "v1"
+
+	fakeHTTP := &httpmock.Registry{}
+	defer fakeHTTP.Verify(t)
+	fakeSHA := "1234567890abcdef1234567890abcdef12345678"
+	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
+
+	baseRepo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	opts := &attestation.AttestOptions{
+		TagName:          tagName,
+		AssetFilePath:    "../../attestation/test/data/github_release_artifact.zip",
+		Repo:             "owner/repo",
+		Owner:            "owner",
+		Limit:            10,
+		Logger:           io.NewHandler(ios),
+		APIClient:        api.NewTestClient(),
+		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+		PredicateType:    attestation.ReleasePredicateType,
+		HttpClient:       &http.Client{Transport: fakeHTTP},
+		BaseRepo:         baseRepo,
+	}
+
+	ec, err := attestation.NewEnforcementCriteria(opts)
+	require.NoError(t, err)
+	opts.EC = ec
+
+	err = verifyAssetRun(opts)
+	require.Error(t, err, "no attestations found for github_release_artifact.zip in release v1")
+}
+
+func Test_verifyAssetRun_Failed_With_Invalid_Artifact(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tagName := "v1.2.3"
+
+	fakeHTTP := &httpmock.Registry{}
+	defer fakeHTTP.Verify(t)
+	fakeSHA := "1234567890abcdef1234567890abcdef12345678"
+	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
+
+	baseRepo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	opts := &attestation.AttestOptions{
+		TagName:          tagName,
+		AssetFilePath:    "../../attestation/test/data/github_release_artifact_invalid.zip",
+		Repo:             "owner/repo",
+		Owner:            "owner",
+		Limit:            10,
+		Logger:           io.NewHandler(ios),
+		APIClient:        api.NewTestClient(),
+		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
+		PredicateType:    attestation.ReleasePredicateType,
 		HttpClient:       &http.Client{Transport: fakeHTTP},
 		BaseRepo:         baseRepo,
 	}
 
 	err = verifyAssetRun(opts)
-	require.NoError(t, err)
+	require.Error(t, err, "no attestations found for github_release_artifact_invalid.zip in release v1.2.3")
 }
 
 func Test_verifyAssetRun_NoAttestation(t *testing.T) {
@@ -133,7 +202,9 @@ func Test_verifyAssetRun_NoAttestation(t *testing.T) {
 		IO:               ios,
 		APIClient:        api.NewTestClient(),
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
-		EC:               verification.EnforcementCriteria{},
+		PredicateType:    attestation.ReleasePredicateType,
+
+		EC: verification.EnforcementCriteria{},
 	}
 
 	err := verifyAssetRun(opts)

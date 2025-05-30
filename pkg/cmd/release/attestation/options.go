@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact/oci"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -27,22 +26,12 @@ type AttestOptions struct {
 	Exporter         cmdutil.Exporter
 	TagName          string
 	TrustedRoot      string
-	DigestAlgorithm  string
 	Limit            int
-	OIDCIssuer       string
 	Owner            string
 	PredicateType    string
 	Repo             string
-	SAN              string
-	SANRegex         string
-	SignerDigest     string
-	SignerRepo       string
-	SignerWorkflow   string
-	SourceDigest     string
-	SourceRef        string
 	APIClient        api.Client
 	Logger           *io.Handler
-	OCIClient        oci.Client
 	SigstoreVerifier verification.SigstoreVerifier
 	Hostname         string
 	EC               verification.EnforcementCriteria

@@ -7,9 +7,8 @@ import (
 
 func TestAttestOptions_AreFlagsValid_Valid(t *testing.T) {
 	opts := &AttestOptions{
-		Repo:       "owner/repo",
-		SignerRepo: "signer/repo",
-		Limit:      10,
+		Repo:  "owner/repo",
+		Limit: 10,
 	}
 	if err := opts.AreFlagsValid(); err != nil {
 		t.Errorf("expected no error, got %v", err)
