@@ -33,13 +33,13 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 			name:     "valid args",
 			args:     []string{"v1.2.3", "../../attestation/test/data/github_release_artifact.zip"},
 			wantTag:  "v1.2.3",
-			wantFile: "../../attestation/test/data/github_release_artifact.zip",
+			wantFile: test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip"),
 		},
 		{
 			name: "valid flag with no tag",
 
 			args:     []string{"../../attestation/test/data/github_release_artifact.zip"},
-			wantFile: "../../attestation/test/data/github_release_artifact.zip",
+			wantFile: test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip"),
 		},
 		{
 			name:    "no args",
@@ -96,7 +96,7 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 
 func Test_verifyAssetRun_Success(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	tagName := "v5"
+	tagName := "v6"
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)
@@ -128,7 +128,7 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_verifyAssetRun_Failed_With_Wrong_tag(t *testing.T) {
+func Test_verifyAssetRun_Failed_With_Invalid_tag(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	tagName := "v1"
 
@@ -164,7 +164,7 @@ func Test_verifyAssetRun_Failed_With_Wrong_tag(t *testing.T) {
 
 func Test_verifyAssetRun_Failed_With_Invalid_Artifact(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	tagName := "v5"
+	tagName := "v6"
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)

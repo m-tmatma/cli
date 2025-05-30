@@ -79,7 +79,7 @@ func TestNewCmdVerify_Args(t *testing.T) {
 
 func Test_verifyRun_Success(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	tagName := "v5"
+	tagName := "v6"
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)

@@ -12,7 +12,7 @@ func Test_digestLocalFileArtifact_withRealZip(t *testing.T) {
 	artifactPath := test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip")
 
 	// Calculate expected digest using the same algorithm as the function under test
-	expectedDigest := "f7165848f9f5ddc578d7adbd1f566a394169385c73bd88bf60df7e759db8e08d"
+	expectedDigest := "e15b593c6ab8d7725a3cc82226ef816cac6bf9c70eed383bd459295cc65f5ec3"
 
 	// Call the function under test
 	artifact, err := digestLocalFileArtifact(artifactPath, "sha256")
