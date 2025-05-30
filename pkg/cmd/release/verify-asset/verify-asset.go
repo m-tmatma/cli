@@ -111,6 +111,8 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 			opts.SigstoreVerifier = sigstoreVerifier
 			opts.EC = ec
 
+			opts.Clean()
+
 			return verifyAssetRun(opts)
 		},
 	}
