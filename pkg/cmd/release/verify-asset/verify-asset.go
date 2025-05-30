@@ -27,14 +27,17 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 		Use:    "verify-asset <tag> <file-path>",
 		Short:  "Verify that a given asset originated from a specific GitHub Release.",
 		Hidden: true,
-		Args:   cobra.ExactArgs(2),
+		Args:   cobra.MaximumNArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 2 {
-				return cmdutil.FlagErrorf("You must specify a tag and a file path")
-			}
 
-			tagName := args[0]
-			assetFilePath := args[1]
+			if len(args) == 2 {
+				opts.TagName = args[0]
+				opts.AssetFilePath = args[1]
+			} else if len(args) == 1 {
+				opts.AssetFilePath = args[0]
+			} else {
+				return cmdutil.FlagErrorf("you must specify an asset filepath")
+			}
 
 			httpClient, err := f.HttpClient()
 			if err != nil {
@@ -53,8 +56,8 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 			}
 
 			*opts = attestation.AttestOptions{
-				TagName:       tagName,
-				AssetFilePath: assetFilePath,
+				TagName:       opts.TagName,
+				AssetFilePath: opts.AssetFilePath,
 				Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
 				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
 				Limit:         10,
@@ -114,6 +117,15 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*attestation.AttestOptions)
 
 func verifyAssetRun(opts *attestation.AttestOptions) error {
 	ctx := context.Background()
+
+	if opts.TagName == "" {
+		release, err := shared.FetchLatestRelease(ctx, opts.HttpClient, opts.BaseRepo)
+		if err != nil {
+			return err
+		}
+		opts.TagName = release.TagName
+	}
+
 	fileName := getFileName(opts.AssetFilePath)
 
 	// calculate the digest of the file

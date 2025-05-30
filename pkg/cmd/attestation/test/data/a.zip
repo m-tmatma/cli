@@ -1,0 +1,28 @@
+a # frozen_string_literal: true
+
+source "https://rubygems.org"
+
+source "https://rubygems.pkg.github.com/github" do
+  gem "entitlements-aad-plugin", "~> 1.0"
+  gem "entitlements-app", "~> 1.2"
+  gem "entitlements-github-plugin", "~> 1.2"
+  gem "entitlements-gitrepo-auditor-plugin", "~> 1.0"
+  gem "entitlements-jit-github-plugin", "~> 1.0"
+  gem "entitlements-lib", "~> 0.2"
+  gem "entitlements-stafftools-plugin", "~> 1.0"
+end
+
+group :development do
+  gem "base64", "~> 0.2.0"
+  gem "irb", "~> 1.15"
+  gem "pry", "~> 0.14"
+  gem "pry-byebug", "~> 3.9"
+  gem "pry-rescue", "~> 1.6"
+  gem "rspec", "~> 3.13"
+  gem "rubocop", "~> 1.71"
+  gem "rubocop-github", "~> 0.20.0"
+  gem "rubocop-performance"
+  gem "rubocop-rspec", "~> 3.4.0"
+  gem "simplecov", "~> 0.21"
+  gem "simplecov-erb", "~> 1.0.0"
+end

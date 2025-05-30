@@ -28,13 +28,11 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 		Use:    "verify [<tag>]",
 		Short:  "Verify the attestation for a GitHub Release.",
 		Hidden: true,
-		Args:   cobra.ExactArgs(1),
+		Args:   cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) < 1 {
-				return cmdutil.FlagErrorf("You must specify a tag")
+			if len(args) > 0 {
+				opts.TagName = args[0]
 			}
-
-			opts.TagName = args[0]
 
 			httpClient, err := f.HttpClient()
 			if err != nil {
@@ -114,6 +112,14 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 
 func verifyRun(opts *attestation.AttestOptions) error {
 	ctx := context.Background()
+
+	if opts.TagName == "" {
+		release, err := shared.FetchLatestRelease(ctx, opts.HttpClient, opts.BaseRepo)
+		if err != nil {
+			return err
+		}
+		opts.TagName = release.TagName
+	}
 
 	ref, err := shared.FetchRefSHA(ctx, opts.HttpClient, opts.BaseRepo, opts.TagName)
 	if err != nil {

@@ -281,3 +281,11 @@ func StubFetchRelease(t *testing.T, reg *httpmock.Registry, owner, repoName, tag
 		)
 	}
 }
+
+func StubFetchRefSHA(t *testing.T, reg *httpmock.Registry, owner, repoName, tagName, sha string) {
+	path := fmt.Sprintf("repos/%s/%s/git/refs/tags/%s", owner, repoName, tagName)
+	reg.Register(
+		httpmock.REST("GET", path),
+		httpmock.StringResponse(fmt.Sprintf(`{"object": {"sha": "%s"}}`, sha)),
+	)
+}
