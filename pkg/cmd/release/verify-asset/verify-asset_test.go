@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/release/attestation"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -107,7 +108,7 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 
 	opts := &attestation.AttestOptions{
 		TagName:          tagName,
-		AssetFilePath:    "../../attestation/test/data/github_release_artifact.zip",
+		AssetFilePath:    test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip"),
 		Repo:             "owner/repo",
 		Owner:            "owner",
 		Limit:            10,
@@ -141,7 +142,7 @@ func Test_verifyAssetRun_Failed_With_Wrong_tag(t *testing.T) {
 
 	opts := &attestation.AttestOptions{
 		TagName:          tagName,
-		AssetFilePath:    "../../attestation/test/data/github_release_artifact.zip",
+		AssetFilePath:    test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip"),
 		Repo:             "owner/repo",
 		Owner:            "owner",
 		Limit:            10,
@@ -175,7 +176,7 @@ func Test_verifyAssetRun_Failed_With_Invalid_Artifact(t *testing.T) {
 
 	opts := &attestation.AttestOptions{
 		TagName:          tagName,
-		AssetFilePath:    "../../attestation/test/data/github_release_artifact_invalid.zip",
+		AssetFilePath:    test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip"),
 		Repo:             "owner/repo",
 		Owner:            "owner",
 		Limit:            10,
