@@ -176,7 +176,7 @@ func verifyAssetRun(opts *attestation.AttestOptions) error {
 
 	if len(filteredAttestations) == 0 {
 		opts.Logger.Printf(opts.Logger.ColorScheme.Red("Release %s does not contain %s (%s)\n"), opts.TagName, opts.AssetFilePath, fileDigest.DigestWithAlg())
-		return fmt.Errorf("no attestations found for %s in release %s", fileName, opts.TagName)
+		return fmt.Errorf("release %s does not contain %s (%s)", opts.TagName, opts.AssetFilePath, fileDigest.DigestWithAlg())
 	}
 
 	opts.Logger.Printf("Loaded %s from GitHub API\n", text.Pluralize(len(filteredAttestations), "attestation"))
