@@ -79,7 +79,7 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*shared.AttestOptions) erro
 		RunE: func(cmd *cobra.Command, args []string) error {
 			td, err := opts.APIClient.GetTrustDomain()
 			if err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to get trust domain"))
 				return err
 			}
 
@@ -87,7 +87,7 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*shared.AttestOptions) erro
 
 			ec, err := shared.NewEnforcementCriteria(opts)
 			if err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to build policy information"))
 				return err
 			}
 
@@ -121,7 +121,7 @@ func verifyAssetRun(opts *shared.AttestOptions) error {
 
 		sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
 		if err != nil {
-			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to create Sigstore verifier"))
 			return err
 		}
 
@@ -141,7 +141,7 @@ func verifyAssetRun(opts *shared.AttestOptions) error {
 	// calculate the digest of the file
 	fileDigest, err := artifact.NewDigestedArtifact(nil, opts.AssetFilePath, "sha256")
 	if err != nil {
-		opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to calculate file digest"))
+		opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to calculate file digest"))
 		return err
 	}
 
@@ -158,7 +158,7 @@ func verifyAssetRun(opts *shared.AttestOptions) error {
 	attestations, logMsg, err := shared.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("X No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
 			return err
 		}
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(logMsg))
@@ -198,7 +198,7 @@ func verifyAssetRun(opts *shared.AttestOptions) error {
 	if opts.Exporter != nil {
 		// print the results to the terminal as an array of JSON objects
 		if err = opts.Exporter.Write(opts.Logger.IO, verified); err != nil {
-			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to write JSON output"))
 			return err
 		}
 		return nil

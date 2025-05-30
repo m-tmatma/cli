@@ -73,14 +73,14 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*shared.AttestOptions) error) *c
 		RunE: func(cmd *cobra.Command, args []string) error {
 			td, err := opts.APIClient.GetTrustDomain()
 			if err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to get trust domain"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to get trust domain"))
 				return err
 			}
 			opts.TrustedRoot = td
 
 			ec, err := shared.NewEnforcementCriteria(opts)
 			if err != nil {
-				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
+				opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to build policy information"))
 				return err
 			}
 			opts.EC = ec
@@ -110,7 +110,7 @@ func verifyRun(opts *shared.AttestOptions) error {
 
 		sigstoreVerifier, err := verification.NewLiveSigstoreVerifier(config)
 		if err != nil {
-			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to create Sigstore verifier"))
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to create Sigstore verifier"))
 			return err
 		}
 
@@ -137,7 +137,7 @@ func verifyRun(opts *shared.AttestOptions) error {
 	attestations, logMsg, err := shared.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
-			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
+			opts.Logger.Printf(opts.Logger.ColorScheme.Red("X No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
 			return err
 		}
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(logMsg))
@@ -152,7 +152,7 @@ func verifyRun(opts *shared.AttestOptions) error {
 	}
 
 	if len(filteredAttestations) == 0 {
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for release %s in %s\n"), opts.TagName, opts.Repo)
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("X No attestations found for release %s in %s\n"), opts.TagName, opts.Repo)
 		return fmt.Errorf("no attestations found for release %s in %s", opts.TagName, opts.Repo)
 	}
 
@@ -163,7 +163,7 @@ func verifyRun(opts *shared.AttestOptions) error {
 
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))
-		opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ Failed to find an attestation for release %s in %s\n"), opts.TagName, opts.Repo)
+		opts.Logger.Printf(opts.Logger.ColorScheme.Red("X Failed to find an attestation for release %s in %s\n"), opts.TagName, opts.Repo)
 		return err
 	}
 
@@ -171,7 +171,7 @@ func verifyRun(opts *shared.AttestOptions) error {
 	if opts.Exporter != nil {
 		// print the results to the terminal as an array of JSON objects
 		if err = opts.Exporter.Write(opts.Logger.IO, verified); err != nil {
-			opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to write JSON output"))
+			opts.Logger.Println(opts.Logger.ColorScheme.Red("X Failed to write JSON output"))
 			return err
 		}
 		return nil
@@ -192,7 +192,7 @@ func printVerifiedSubjects(verified []*verification.AttestationProcessingResult,
 		var statementData v1.Statement
 		err := protojson.Unmarshal([]byte(statement), &statementData)
 		if err != nil {
-			logger.Println(logger.ColorScheme.Red("✗ Failed to unmarshal statement"))
+			logger.Println(logger.ColorScheme.Red("X Failed to unmarshal statement"))
 			continue
 		}
 		for _, s := range statementData.Subject {

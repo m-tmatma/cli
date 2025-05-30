@@ -15,7 +15,7 @@ import (
 
 func GetAttestations(o *AttestOptions, sha string) ([]*api.Attestation, string, error) {
 	if o.APIClient == nil {
-		errMsg := "✗ No APIClient provided"
+		errMsg := "X No APIClient provided"
 		return nil, errMsg, errors.New(errMsg)
 	}
 
@@ -29,7 +29,7 @@ func GetAttestations(o *AttestOptions, sha string) ([]*api.Attestation, string, 
 
 	attestations, err := o.APIClient.GetByDigest(params)
 	if err != nil {
-		msg := "✗ Loading attestations from GitHub API failed"
+		msg := "X Loading attestations from GitHub API failed"
 		return nil, msg, err
 	}
 	pluralAttestation := text.Pluralize(len(attestations), "attestation")
@@ -40,13 +40,13 @@ func GetAttestations(o *AttestOptions, sha string) ([]*api.Attestation, string, 
 func VerifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, sgVerifier verification.SigstoreVerifier, ec verification.EnforcementCriteria) ([]*verification.AttestationProcessingResult, string, error) {
 	sgPolicy, err := buildSigstoreVerifyPolicy(ec, art)
 	if err != nil {
-		logMsg := "✗ Failed to build Sigstore verification policy"
+		logMsg := "X Failed to build Sigstore verification policy"
 		return nil, logMsg, err
 	}
 
 	sigstoreVerified, err := sgVerifier.Verify(att, sgPolicy)
 	if err != nil {
-		logMsg := "✗ Sigstore verification failed"
+		logMsg := "X Sigstore verification failed"
 		return nil, logMsg, err
 	}
 
