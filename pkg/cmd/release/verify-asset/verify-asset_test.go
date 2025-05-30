@@ -122,7 +122,7 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 	ec, err := attestation.NewEnforcementCriteria(opts)
 	require.NoError(t, err)
 	opts.EC = ec
-
+	opts.Clean()
 	err = verifyAssetRun(opts)
 	require.NoError(t, err)
 }
