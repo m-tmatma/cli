@@ -9,7 +9,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/test"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
-	"github.com/cli/cli/v2/pkg/cmd/release/attestation"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 
-	"github.com/cli/cli/v2/pkg/cmd/release/shared"
+	attestation "github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
@@ -72,8 +72,8 @@ func TestNewCmdVerifyAsset_Args(t *testing.T) {
 				},
 			}
 
-			var opts *attestation.AttestOptions
-			cmd := NewCmdVerifyAsset(f, func(o *attestation.AttestOptions) error {
+			var opts *shared.AttestOptions
+			cmd := NewCmdVerifyAsset(f, func(o *shared.AttestOptions) error {
 				opts = o
 				return nil
 			})
@@ -106,7 +106,7 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 	baseRepo, err := ghrepo.FromFullName("owner/repo")
 	require.NoError(t, err)
 
-	opts := &attestation.AttestOptions{
+	opts := &shared.AttestOptions{
 		TagName:          tagName,
 		AssetFilePath:    test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip"),
 		Repo:             "owner/repo",
@@ -115,12 +115,12 @@ func Test_verifyAssetRun_Success(t *testing.T) {
 		Logger:           io.NewHandler(ios),
 		APIClient:        api.NewTestClient(),
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
-		PredicateType:    attestation.ReleasePredicateType,
+		PredicateType:    shared.ReleasePredicateType,
 		HttpClient:       &http.Client{Transport: fakeHTTP},
 		BaseRepo:         baseRepo,
 	}
 
-	ec, err := attestation.NewEnforcementCriteria(opts)
+	ec, err := shared.NewEnforcementCriteria(opts)
 	require.NoError(t, err)
 	opts.EC = ec
 	opts.Clean()

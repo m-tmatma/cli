@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/auth"
 	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
-	"github.com/cli/cli/v2/pkg/cmd/release/attestation"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,8 +21,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) error) *cobra.Command {
-	opts := &attestation.AttestOptions{}
+func NewCmdVerify(f *cmdutil.Factory, runF func(*shared.AttestOptions) error) *cobra.Command {
+	opts := &shared.AttestOptions{}
 
 	cmd := &cobra.Command{
 		Use:    "verify [<tag>]",
@@ -52,13 +51,13 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 				return err
 			}
 
-			*opts = attestation.AttestOptions{
+			*opts = shared.AttestOptions{
 				TagName:       opts.TagName,
 				Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
 				APIClient:     api.NewLiveClient(httpClient, hostname, logger),
 				Limit:         10,
 				Owner:         baseRepo.RepoOwner(),
-				PredicateType: attestation.ReleasePredicateType,
+				PredicateType: shared.ReleasePredicateType,
 				Logger:        logger,
 				HttpClient:    httpClient,
 				BaseRepo:      baseRepo,
@@ -79,7 +78,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 			}
 			opts.TrustedRoot = td
 
-			ec, err := attestation.NewEnforcementCriteria(opts)
+			ec, err := shared.NewEnforcementCriteria(opts)
 			if err != nil {
 				opts.Logger.Println(opts.Logger.ColorScheme.Red("✗ Failed to build policy information"))
 				return err
@@ -98,7 +97,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(*attestation.AttestOptions) erro
 	return cmd
 }
 
-func verifyRun(opts *attestation.AttestOptions) error {
+func verifyRun(opts *shared.AttestOptions) error {
 	ctx := context.Background()
 
 	if opts.SigstoreVerifier == nil {
@@ -135,7 +134,7 @@ func verifyRun(opts *attestation.AttestOptions) error {
 	opts.Logger.Printf("Resolved %s to %s\n", opts.TagName, releaseRefDigest.DigestWithAlg())
 
 	// Attestation fetching
-	attestations, logMsg, err := attestation.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
+	attestations, logMsg, err := shared.GetAttestations(opts, releaseRefDigest.DigestWithAlg())
 	if err != nil {
 		if errors.Is(err, api.ErrNoAttestationsFound) {
 			opts.Logger.Printf(opts.Logger.ColorScheme.Red("✗ No attestations found for subject %s\n"), releaseRefDigest.DigestWithAlg())
@@ -146,7 +145,7 @@ func verifyRun(opts *attestation.AttestOptions) error {
 	}
 
 	// Filter attestations by predicate tag
-	filteredAttestations, err := attestation.FilterAttestationsByTag(attestations, opts.TagName)
+	filteredAttestations, err := shared.FilterAttestationsByTag(attestations, opts.TagName)
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(err.Error()))
 		return err
@@ -160,7 +159,7 @@ func verifyRun(opts *attestation.AttestOptions) error {
 	opts.Logger.Printf("Loaded %s from GitHub API\n", text.Pluralize(len(filteredAttestations), "attestation"))
 
 	// Verify attestations
-	verified, errMsg, err := attestation.VerifyAttestations(*releaseRefDigest, filteredAttestations, opts.SigstoreVerifier, opts.EC)
+	verified, errMsg, err := shared.VerifyAttestations(*releaseRefDigest, filteredAttestations, opts.SigstoreVerifier, opts.EC)
 
 	if err != nil {
 		opts.Logger.Println(opts.Logger.ColorScheme.Red(errMsg))

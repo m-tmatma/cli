@@ -1,4 +1,4 @@
-package attestation
+package shared
 
 import (
 	"testing"

@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
-	"github.com/cli/cli/v2/pkg/cmd/release/attestation"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -61,8 +60,8 @@ func TestNewCmdVerify_Args(t *testing.T) {
 				},
 			}
 
-			var opts *attestation.AttestOptions
-			cmd := NewCmdVerify(f, func(o *attestation.AttestOptions) error {
+			var opts *shared.AttestOptions
+			cmd := NewCmdVerify(f, func(o *shared.AttestOptions) error {
 				opts = o
 				return nil
 			})
@@ -89,7 +88,7 @@ func Test_verifyRun_Success(t *testing.T) {
 	baseRepo, err := ghrepo.FromFullName("owner/repo")
 	require.NoError(t, err)
 
-	opts := &attestation.AttestOptions{
+	opts := &shared.AttestOptions{
 		TagName:          tagName,
 		Repo:             "owner/repo",
 		Owner:            "owner",
@@ -99,10 +98,10 @@ func Test_verifyRun_Success(t *testing.T) {
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 		HttpClient:       &http.Client{Transport: fakeHTTP},
 		BaseRepo:         baseRepo,
-		PredicateType:    attestation.ReleasePredicateType,
+		PredicateType:    shared.ReleasePredicateType,
 	}
 
-	ec, err := attestation.NewEnforcementCriteria(opts)
+	ec, err := shared.NewEnforcementCriteria(opts)
 	require.NoError(t, err)
 	opts.EC = ec
 
@@ -122,7 +121,7 @@ func Test_verifyRun_Failed_With_Invalid_Tag(t *testing.T) {
 	baseRepo, err := ghrepo.FromFullName("owner/repo")
 	require.NoError(t, err)
 
-	opts := &attestation.AttestOptions{
+	opts := &shared.AttestOptions{
 		TagName:          tagName,
 		Repo:             "owner/repo",
 		Owner:            "owner",
@@ -130,13 +129,13 @@ func Test_verifyRun_Failed_With_Invalid_Tag(t *testing.T) {
 		Logger:           io.NewHandler(ios),
 		APIClient:        api.NewFailTestClient(),
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
-		PredicateType:    attestation.ReleasePredicateType,
+		PredicateType:    shared.ReleasePredicateType,
 
 		HttpClient: &http.Client{Transport: fakeHTTP},
 		BaseRepo:   baseRepo,
 	}
 
-	ec, err := attestation.NewEnforcementCriteria(opts)
+	ec, err := shared.NewEnforcementCriteria(opts)
 	require.NoError(t, err)
 	opts.EC = ec
 
@@ -156,7 +155,7 @@ func Test_verifyRun_Failed_NoAttestation(t *testing.T) {
 	baseRepo, err := ghrepo.FromFullName("owner/repo")
 	require.NoError(t, err)
 
-	opts := &attestation.AttestOptions{
+	opts := &shared.AttestOptions{
 		TagName:          tagName,
 		Repo:             "owner/repo",
 		Owner:            "owner",
@@ -166,10 +165,10 @@ func Test_verifyRun_Failed_NoAttestation(t *testing.T) {
 		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
 		HttpClient:       &http.Client{Transport: fakeHTTP},
 		BaseRepo:         baseRepo,
-		PredicateType:    attestation.ReleasePredicateType,
+		PredicateType:    shared.ReleasePredicateType,
 	}
 
-	ec, err := attestation.NewEnforcementCriteria(opts)
+	ec, err := shared.NewEnforcementCriteria(opts)
 	require.NoError(t, err)
 	opts.EC = ec
 
