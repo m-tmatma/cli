@@ -341,9 +341,11 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive",
 			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
-					URL: "https://github.com/OWNER/REPO/pull/123",
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -403,9 +405,11 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive skip reviewers",
 			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
-					URL: "https://github.com/OWNER/REPO/pull/123",
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -459,9 +463,11 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive remove all reviewers",
 			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
-					URL: "https://github.com/OWNER/REPO/pull/123",
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -520,9 +526,11 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive",
 			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
-					URL: "https://github.com/OWNER/REPO/pull/123",
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{},
@@ -542,9 +550,11 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive skip reviewers",
 			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
-					URL: "https://github.com/OWNER/REPO/pull/123",
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{skipReviewers: true},
@@ -563,9 +573,11 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "interactive remove all reviewers",
 			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
-					URL: "https://github.com/OWNER/REPO/pull/123",
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive:     true,
 				Surveyor:        testSurveyor{removeAllReviewers: true},
