@@ -532,8 +532,31 @@ func Test_editRun(t *testing.T) {
 					URL:                "https://github.com/OWNER/REPO/pull/123",
 					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
-				Interactive:     true,
-				Surveyor:        testSurveyor{},
+				Interactive: true,
+				Surveyor: testSurveyor{
+					fieldsToEdit: func(e *shared.Editable) error {
+						e.Title.Edited = true
+						e.Body.Edited = true
+						e.Reviewers.Edited = true
+						e.Assignees.Edited = true
+						e.Labels.Edited = true
+						e.Projects.Edited = true
+						e.Milestone.Edited = true
+						return nil
+					},
+					editFields: func(e *shared.Editable, _ string) error {
+						e.Title.Value = "new title"
+						e.Body.Value = "new body"
+						e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
+						e.Assignees.Value = []string{"monalisa", "hubot"}
+						e.Labels.Value = []string{"feature", "TODO", "bug"}
+						e.Labels.Add = []string{"feature", "TODO", "bug"}
+						e.Labels.Remove = []string{"docs"}
+						e.Projects.Value = []string{"Cleanup", "CleanupV2"}
+						e.Milestone.Value = "GA"
+						return nil
+					},
+				},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
@@ -556,8 +579,29 @@ func Test_editRun(t *testing.T) {
 					URL:                "https://github.com/OWNER/REPO/pull/123",
 					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
-				Interactive:     true,
-				Surveyor:        testSurveyor{skipReviewers: true},
+				Interactive: true,
+				Surveyor: testSurveyor{
+					fieldsToEdit: func(e *shared.Editable) error {
+						e.Title.Edited = true
+						e.Body.Edited = true
+						e.Assignees.Edited = true
+						e.Labels.Edited = true
+						e.Projects.Edited = true
+						e.Milestone.Edited = true
+						return nil
+					},
+					editFields: func(e *shared.Editable, _ string) error {
+						e.Title.Value = "new title"
+						e.Body.Value = "new body"
+						e.Assignees.Value = []string{"monalisa", "hubot"}
+						e.Labels.Value = []string{"feature", "TODO", "bug"}
+						e.Labels.Add = []string{"feature", "TODO", "bug"}
+						e.Labels.Remove = []string{"docs"}
+						e.Projects.Value = []string{"Cleanup", "CleanupV2"}
+						e.Milestone.Value = "GA"
+						return nil
+					},
+				},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
@@ -579,8 +623,30 @@ func Test_editRun(t *testing.T) {
 					URL:                "https://github.com/OWNER/REPO/pull/123",
 					AssignedActorsUsed: true,
 				}, ghrepo.New("OWNER", "REPO")),
-				Interactive:     true,
-				Surveyor:        testSurveyor{removeAllReviewers: true},
+				Interactive: true,
+				Surveyor: testSurveyor{
+					fieldsToEdit: func(e *shared.Editable) error {
+						e.Title.Edited = true
+						e.Body.Edited = true
+						e.Assignees.Edited = true
+						e.Labels.Edited = true
+						e.Projects.Edited = true
+						e.Milestone.Edited = true
+						return nil
+					},
+					editFields: func(e *shared.Editable, _ string) error {
+						e.Title.Value = "new title"
+						e.Body.Value = "new body"
+						e.Reviewers.Remove = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external", "dependabot"}
+						e.Assignees.Value = []string{"monalisa", "hubot"}
+						e.Labels.Value = []string{"feature", "TODO", "bug"}
+						e.Labels.Add = []string{"feature", "TODO", "bug"}
+						e.Labels.Remove = []string{"docs"}
+						e.Projects.Value = []string{"Cleanup", "CleanupV2"}
+						e.Milestone.Value = "GA"
+						return nil
+					},
+				},
 				Fetcher:         testFetcher{},
 				EditorRetriever: testEditorRetriever{},
 			},
@@ -659,6 +725,59 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
+func Test_editRun_actors(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "suggestedActors": {
+				"nodes": [
+					{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+					{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+	mockPullRequestUpdate(reg)
+	mockPullRequestUpdateActorAssignees(reg)
+
+	httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+	baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+
+	input := &EditOptions{
+		Detector:    &fd.EnabledDetectorMock{},
+		SelectorArg: "123",
+		Finder: shared.NewMockFinder("123", &api.PullRequest{
+			URL: "https://github.com/OWNER/REPO/pull/123",
+		}, ghrepo.New("OWNER", "REPO")),
+		Interactive: false,
+		Editable: shared.Editable{
+			Assignees: shared.EditableAssignees{
+				EditableSlice: shared.EditableSlice{
+					Add:    []string{"monalisa", "hubot"},
+					Remove: []string{"octocat"},
+					Edited: true,
+				},
+			},
+		},
+		Fetcher: testFetcher{},
+	}
+	input.IO = ios
+	input.HttpClient = httpClient
+	input.BaseRepo = baseRepo
+
+	err := editRun(input)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/123\n", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
 func mockRepoMetadata(reg *httpmock.Registry, skipReviewers bool) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
@@ -666,7 +785,7 @@ func mockRepoMetadata(reg *httpmock.Registry, skipReviewers bool) {
 			{ "data": { "repository": { "suggestedActors": {
 				"nodes": [
 					{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-					{ "login": "MonaLisa", "id": "MONAID", "__typename": "User" }
+					{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
 				],
 				"pageInfo": { "hasNextPage": false }
 			} } } }
@@ -813,47 +932,25 @@ func mockProjectV2ItemUpdate(reg *httpmock.Registry) {
 }
 
 type testFetcher struct{}
-type testSurveyor struct {
-	skipReviewers      bool
-	removeAllReviewers bool
-}
-type testEditorRetriever struct{}
 
 func (f testFetcher) EditableOptionsFetch(client *api.Client, repo ghrepo.Interface, opts *shared.Editable) error {
 	return shared.FetchOptions(client, repo, opts)
 }
 
-func (s testSurveyor) FieldsToEdit(e *shared.Editable) error {
-	e.Title.Edited = true
-	e.Body.Edited = true
-	if !s.skipReviewers {
-		e.Reviewers.Edited = true
-	}
-	e.Assignees.Edited = true
-	e.Labels.Edited = true
-	e.Projects.Edited = true
-	e.Milestone.Edited = true
-	return nil
+type testSurveyor struct {
+	fieldsToEdit func(e *shared.Editable) error
+	editFields   func(e *shared.Editable, editorCmd string) error
 }
 
-func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
-	e.Title.Value = "new title"
-	e.Body.Value = "new body"
-	if !s.skipReviewers {
-		if s.removeAllReviewers {
-			e.Reviewers.Remove = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external", "dependabot"}
-		} else {
-			e.Reviewers.Value = []string{"monalisa", "hubot", "OWNER/core", "OWNER/external"}
-		}
-	}
-	e.Assignees.Value = []string{"monalisa", "hubot"}
-	e.Labels.Value = []string{"feature", "TODO", "bug"}
-	e.Labels.Add = []string{"feature", "TODO", "bug"}
-	e.Labels.Remove = []string{"docs"}
-	e.Projects.Value = []string{"Cleanup", "CleanupV2"}
-	e.Milestone.Value = "GA"
-	return nil
+func (s testSurveyor) FieldsToEdit(e *shared.Editable) error {
+	return s.fieldsToEdit(e)
 }
+
+func (s testSurveyor) EditFields(e *shared.Editable, editorCmd string) error {
+	return s.editFields(e, editorCmd)
+}
+
+type testEditorRetriever struct{}
 
 func (t testEditorRetriever) Retrieve() (string, error) {
 	return "vim", nil
