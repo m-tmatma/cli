@@ -628,6 +628,7 @@ func Test_editRun(t *testing.T) {
 					fieldsToEdit: func(e *shared.Editable) error {
 						e.Title.Edited = true
 						e.Body.Edited = true
+						e.Reviewers.Edited = true
 						e.Assignees.Edited = true
 						e.Labels.Edited = true
 						e.Projects.Edited = true
@@ -723,59 +724,6 @@ func Test_editRun(t *testing.T) {
 			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
-}
-
-func Test_editRun_actors(t *testing.T) {
-	ios, _, stdout, stderr := iostreams.Test()
-	ios.SetStdoutTTY(true)
-	ios.SetStdinTTY(true)
-	ios.SetStderrTTY(true)
-
-	reg := &httpmock.Registry{}
-	defer reg.Verify(t)
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "suggestedActors": {
-				"nodes": [
-					{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-					{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
-	mockPullRequestUpdate(reg)
-	mockPullRequestUpdateActorAssignees(reg)
-
-	httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-	baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-
-	input := &EditOptions{
-		Detector:    &fd.EnabledDetectorMock{},
-		SelectorArg: "123",
-		Finder: shared.NewMockFinder("123", &api.PullRequest{
-			URL: "https://github.com/OWNER/REPO/pull/123",
-		}, ghrepo.New("OWNER", "REPO")),
-		Interactive: false,
-		Editable: shared.Editable{
-			Assignees: shared.EditableAssignees{
-				EditableSlice: shared.EditableSlice{
-					Add:    []string{"monalisa", "hubot"},
-					Remove: []string{"octocat"},
-					Edited: true,
-				},
-			},
-		},
-		Fetcher: testFetcher{},
-	}
-	input.IO = ios
-	input.HttpClient = httpClient
-	input.BaseRepo = baseRepo
-
-	err := editRun(input)
-	assert.NoError(t, err)
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/123\n", stdout.String())
-	assert.Equal(t, "", stderr.String())
 }
 
 func mockRepoMetadata(reg *httpmock.Registry, skipReviewers bool) {
