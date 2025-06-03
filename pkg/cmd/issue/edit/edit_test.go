@@ -631,8 +631,8 @@ func Test_editRun(t *testing.T) {
 				},
 				EditFieldsSurvey: func(p prShared.EditPrompter, eo *prShared.Editable, _ string) error {
 					// Checking that the display name is being used in the prompt.
-					require.Equal(t, eo.Assignees.Default, []string{"hubot"})
-					require.Equal(t, eo.Assignees.DefaultLogins, []string{"hubot"})
+					require.Equal(t, []string{"hubot"}, eo.Assignees.Default)
+					require.Equal(t, []string{"hubot"}, eo.Assignees.DefaultLogins)
 
 					// Adding MonaLisa as PR assignee, should preserve hubot.
 					eo.Assignees.Value = []string{"hubot", "MonaLisa (Mona Display Name)"}

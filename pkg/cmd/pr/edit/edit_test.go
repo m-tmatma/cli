@@ -662,6 +662,71 @@ func Test_editRun(t *testing.T) {
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
 		{
+			name: "interactive prompts with actor assignee display names when actors available",
+			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL:                "https://github.com/OWNER/REPO/pull/123",
+					AssignedActorsUsed: true,
+					AssignedActors: api.AssignedActors{
+						Nodes: []api.Actor{
+							{
+								ID:       "HUBOTID",
+								Login:    "hubot",
+								TypeName: "Bot",
+							},
+						},
+						TotalCount: 1,
+					},
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: true,
+				Surveyor: testSurveyor{
+					fieldsToEdit: func(e *shared.Editable) error {
+						e.Assignees.Edited = true
+						return nil
+					},
+					editFields: func(e *shared.Editable, _ string) error {
+						// Checking that the display name is being used in the prompt.
+						require.Equal(t, []string{"hubot"}, e.Assignees.Default)
+						require.Equal(t, []string{"hubot"}, e.Assignees.DefaultLogins)
+
+						// Adding MonaLisa as PR assignee, should preserve hubot.
+						e.Assignees.Value = []string{"hubot", "MonaLisa (Mona Display Name)"}
+						return nil
+					},
+				},
+				Fetcher:         testFetcher{},
+				EditorRetriever: testEditorRetriever{},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "suggestedActors": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				mockPullRequestUpdate(reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {
+							// Checking that despite the display name being returned
+							// from the EditFieldsSurvey, the ID is still
+							// used in the mutation.
+							require.Subset(t, inputs["actorIds"], []string{"MONAID", "HUBOTID"})
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
+		{
 			name: "Legacy assignee users are fetched and updated on unsupported GitHub Hosts",
 			input: &EditOptions{
 				Detector:    &fd.DisabledDetectorMock{},
