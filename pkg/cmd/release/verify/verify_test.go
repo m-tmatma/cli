@@ -7,7 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -38,40 +38,30 @@ func TestNewCmdVerify_Args(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testIO, _, _, _ := iostreams.Test()
-			var testReg httpmock.Registry
-			var metaResp = api.MetaResponse{
-				Domains: api.Domain{
-					ArtifactAttestations: api.ArtifactAttestations{},
-				},
-			}
-			testReg.Register(httpmock.REST(http.MethodGet, "meta"),
-				httpmock.StatusJSONResponse(200, &metaResp))
-
 			f := &cmdutil.Factory{
 				IOStreams: testIO,
 				HttpClient: func() (*http.Client, error) {
-					reg := &testReg
-					client := &http.Client{}
-					httpmock.ReplaceTripper(client, reg)
-					return client, nil
+					return nil, nil
 				},
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
 			}
 
-			var opts *shared.AttestOptions
-			cmd := NewCmdVerify(f, func(o *shared.AttestOptions) error {
-				opts = o
+			var cfg *VerifyConfig
+			cmd := NewCmdVerify(f, func(c *VerifyConfig) error {
+				cfg = c
 				return nil
 			})
 			cmd.SetArgs(tt.args)
 			cmd.SetIn(&bytes.Buffer{})
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
+
 			_, err := cmd.ExecuteC()
+
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantTag, opts.TagName)
+			assert.Equal(t, tt.wantTag, cfg.Opts.TagName)
 		})
 	}
 }
@@ -82,35 +72,72 @@ func Test_verifyRun_Success(t *testing.T) {
 
 	fakeHTTP := &httpmock.Registry{}
 	defer fakeHTTP.Verify(t)
+
 	fakeSHA := "1234567890abcdef1234567890abcdef12345678"
 	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
 
 	baseRepo, err := ghrepo.FromFullName("owner/repo")
 	require.NoError(t, err)
 
-	opts := &shared.AttestOptions{
-		TagName:          tagName,
-		Repo:             "owner/repo",
-		Owner:            "owner",
-		Limit:            10,
-		Logger:           io.NewHandler(ios),
-		APIClient:        api.NewTestClient(),
-		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
-		HttpClient:       &http.Client{Transport: fakeHTTP},
-		BaseRepo:         baseRepo,
-		PredicateType:    shared.ReleasePredicateType,
+	result := &verification.AttestationProcessingResult{
+		Attestation: &api.Attestation{
+			Bundle:    data.GitHubReleaseBundle(t),
+			BundleURL: "https://example.com",
+		},
+		VerificationResult: nil,
 	}
 
-	ec, err := shared.NewEnforcementCriteria(opts)
-	require.NoError(t, err)
-	opts.EC = ec
+	cfg := &VerifyConfig{
+		Opts: &VerifyOptions{
+			TagName:  tagName,
+			BaseRepo: baseRepo,
+			Exporter: nil,
+		},
+		IO:          ios,
+		HttpClient:  &http.Client{Transport: fakeHTTP},
+		AttClient:   api.NewTestClient(),
+		AttVerifier: shared.NewMockVerifier(result),
+	}
 
-	err = verifyRun(opts)
+	err = verifyRun(cfg)
 	require.NoError(t, err)
 }
 
-func Test_verifyRun_Failed_With_Invalid_Tag(t *testing.T) {
+func Test_verifyRun_FailedNoAttestations(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
+	tagName := "v1"
+
+	fakeHTTP := &httpmock.Registry{}
+	defer fakeHTTP.Verify(t)
+	fakeSHA := "1234567890abcdef1234567890abcdef12345678"
+	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
+
+	baseRepo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	cfg := &VerifyConfig{
+		Opts: &VerifyOptions{
+			TagName:  tagName,
+			BaseRepo: baseRepo,
+			Exporter: nil,
+		},
+		IO:          ios,
+		HttpClient:  &http.Client{Transport: fakeHTTP},
+		AttClient:   api.NewFailTestClient(),
+		AttVerifier: nil,
+	}
+
+	err = verifyRun(cfg)
+	require.ErrorContains(t, err, "no attestations for tag v1")
+}
+
+func Test_verifyRun_FailedTagNotInAttestation(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	// Tag name does not match the one present in the attestation which
+	// will be returned by the mock client. Simulates a scenario where
+	// multiple releases may point to the same commit SHA, but not all
+	// of them are attested.
 	tagName := "v1.2.3"
 
 	fakeHTTP := &httpmock.Registry{}
@@ -121,57 +148,18 @@ func Test_verifyRun_Failed_With_Invalid_Tag(t *testing.T) {
 	baseRepo, err := ghrepo.FromFullName("owner/repo")
 	require.NoError(t, err)
 
-	opts := &shared.AttestOptions{
-		TagName:          tagName,
-		Repo:             "owner/repo",
-		Owner:            "owner",
-		Limit:            10,
-		Logger:           io.NewHandler(ios),
-		APIClient:        api.NewFailTestClient(),
-		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
-		PredicateType:    shared.ReleasePredicateType,
-
-		HttpClient: &http.Client{Transport: fakeHTTP},
-		BaseRepo:   baseRepo,
+	cfg := &VerifyConfig{
+		Opts: &VerifyOptions{
+			TagName:  tagName,
+			BaseRepo: baseRepo,
+			Exporter: nil,
+		},
+		IO:          ios,
+		HttpClient:  &http.Client{Transport: fakeHTTP},
+		AttClient:   api.NewTestClient(),
+		AttVerifier: nil,
 	}
 
-	ec, err := shared.NewEnforcementCriteria(opts)
-	require.NoError(t, err)
-	opts.EC = ec
-
-	err = verifyRun(opts)
-	require.Error(t, err, "failed to fetch attestations from owner/repo")
-}
-
-func Test_verifyRun_Failed_NoAttestation(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
-	tagName := "v1.2.3"
-
-	fakeHTTP := &httpmock.Registry{}
-	defer fakeHTTP.Verify(t)
-	fakeSHA := "1234567890abcdef1234567890abcdef12345678"
-	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
-
-	baseRepo, err := ghrepo.FromFullName("owner/repo")
-	require.NoError(t, err)
-
-	opts := &shared.AttestOptions{
-		TagName:          tagName,
-		Repo:             "owner/repo",
-		Owner:            "owner",
-		Limit:            10,
-		Logger:           io.NewHandler(ios),
-		APIClient:        api.NewFailTestClient(),
-		SigstoreVerifier: verification.NewMockSigstoreVerifier(t),
-		HttpClient:       &http.Client{Transport: fakeHTTP},
-		BaseRepo:         baseRepo,
-		PredicateType:    shared.ReleasePredicateType,
-	}
-
-	ec, err := shared.NewEnforcementCriteria(opts)
-	require.NoError(t, err)
-	opts.EC = ec
-
-	err = verifyRun(opts)
-	require.Error(t, err, "failed to fetch attestations from owner/repo")
+	err = verifyRun(cfg)
+	require.ErrorContains(t, err, "no attestations found for release v1.2.3")
 }

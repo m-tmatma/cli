@@ -1,56 +1,58 @@
 package shared
 
 import (
-	"errors"
 	"fmt"
+	"net/http"
 
-	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
+	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
+	"github.com/cli/cli/v2/pkg/cmd/attestation/test/data"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
+	"github.com/sigstore/sigstore-go/pkg/verify"
 
 	v1 "github.com/in-toto/attestation/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func GetAttestations(o *AttestOptions, sha string) ([]*api.Attestation, string, error) {
-	if o.APIClient == nil {
-		errMsg := "X No APIClient provided"
-		return nil, errMsg, errors.New(errMsg)
-	}
+const ReleasePredicateType = "https://in-toto.io/attestation/release/v0.1"
 
-	params := api.FetchParams{
-		Digest:        sha,
-		Limit:         o.Limit,
-		Owner:         o.Owner,
-		PredicateType: o.PredicateType,
-		Repo:          o.Repo,
-	}
-
-	attestations, err := o.APIClient.GetByDigest(params)
-	if err != nil {
-		msg := "X Loading attestations from GitHub API failed"
-		return nil, msg, err
-	}
-	pluralAttestation := text.Pluralize(len(attestations), "attestation")
-	msg := fmt.Sprintf("Loaded %s from GitHub API", pluralAttestation)
-	return attestations, msg, nil
+type Verifier interface {
+	// VerifyAttestation verifies the attestation for a given artifact
+	VerifyAttestation(art *artifact.DigestedArtifact, att *api.Attestation) (*verification.AttestationProcessingResult, error)
 }
 
-func VerifyAttestations(art artifact.DigestedArtifact, att []*api.Attestation, sgVerifier verification.SigstoreVerifier, ec verification.EnforcementCriteria) ([]*verification.AttestationProcessingResult, string, error) {
-	sgPolicy, err := buildSigstoreVerifyPolicy(ec, art)
+type AttestationVerifier struct {
+	AttClient  api.Client
+	HttpClient *http.Client
+	IO         *iostreams.IOStreams
+}
+
+func (v *AttestationVerifier) VerifyAttestation(art *artifact.DigestedArtifact, att *api.Attestation) (*verification.AttestationProcessingResult, error) {
+	td, err := v.AttClient.GetTrustDomain()
 	if err != nil {
-		logMsg := "X Failed to build Sigstore verification policy"
-		return nil, logMsg, err
+		return nil, err
 	}
 
-	sigstoreVerified, err := sgVerifier.Verify(att, sgPolicy)
+	verifier, err := verification.NewLiveSigstoreVerifier(verification.SigstoreConfig{
+		HttpClient:   v.HttpClient,
+		Logger:       att_io.NewHandler(v.IO),
+		NoPublicGood: true,
+		TrustDomain:  td,
+	})
 	if err != nil {
-		logMsg := "X Sigstore verification failed"
-		return nil, logMsg, err
+		return nil, err
 	}
 
-	return sigstoreVerified, "", nil
+	policy := buildVerificationPolicy(*art)
+	sigstoreVerified, err := verifier.Verify([]*api.Attestation{att}, policy)
+	if err != nil {
+		return nil, err
+	}
+
+	return sigstoreVerified[0], nil
 }
 
 func FilterAttestationsByTag(attestations []*api.Attestation, tagName string) ([]*api.Attestation, error) {
@@ -71,7 +73,7 @@ func FilterAttestationsByTag(attestations []*api.Attestation, tagName string) ([
 	return filtered, nil
 }
 
-func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagName, fileDigest string) ([]*api.Attestation, error) {
+func FilterAttestationsByFileDigest(attestations []*api.Attestation, fileDigest string) ([]*api.Attestation, error) {
 	var filtered []*api.Attestation
 	for _, att := range attestations {
 		statement := att.Bundle.Bundle.GetDsseEnvelope().Payload
@@ -94,4 +96,33 @@ func FilterAttestationsByFileDigest(attestations []*api.Attestation, repo, tagNa
 
 	}
 	return filtered, nil
+}
+
+// buildVerificationPolicy constructs a verification policy for GitHub releases
+func buildVerificationPolicy(a artifact.DigestedArtifact) verify.PolicyBuilder {
+	// SAN must match the GitHub releases domain. No issuer extension (match anything)
+	sanMatcher, _ := verify.NewSANMatcher("", "^https://.*\\.releases\\.github\\.com$")
+	issuerMatcher, _ := verify.NewIssuerMatcher("", ".*")
+	certId, _ := verify.NewCertificateIdentity(sanMatcher, issuerMatcher, certificate.Extensions{})
+
+	artifactDigestPolicyOption, _ := verification.BuildDigestPolicyOption(a)
+	return verify.NewPolicy(artifactDigestPolicyOption, verify.WithCertificateIdentity(certId))
+}
+
+type MockVerifier struct {
+	mockResult *verification.AttestationProcessingResult
+}
+
+func NewMockVerifier(mockResult *verification.AttestationProcessingResult) *MockVerifier {
+	return &MockVerifier{mockResult: mockResult}
+}
+
+func (v *MockVerifier) VerifyAttestation(art *artifact.DigestedArtifact, att *api.Attestation) (*verification.AttestationProcessingResult, error) {
+	return &verification.AttestationProcessingResult{
+		Attestation: &api.Attestation{
+			Bundle:    data.GitHubReleaseBundle(nil),
+			BundleURL: "https://example.com",
+		},
+		VerificationResult: nil,
+	}, nil
 }

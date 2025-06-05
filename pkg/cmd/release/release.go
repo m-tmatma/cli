@@ -10,7 +10,6 @@ import (
 	cmdUpload "github.com/cli/cli/v2/pkg/cmd/release/upload"
 	cmdVerify "github.com/cli/cli/v2/pkg/cmd/release/verify"
 	cmdVerifyAsset "github.com/cli/cli/v2/pkg/cmd/release/verify-asset"
-
 	cmdView "github.com/cli/cli/v2/pkg/cmd/release/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"

@@ -1,59 +1,62 @@
-package verify
+package verifyasset
 
 import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
-	v1 "github.com/in-toto/attestation/go/v1"
-	"google.golang.org/protobuf/encoding/protojson"
+	"github.com/cli/cli/v2/pkg/iostreams"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/api"
 	"github.com/cli/cli/v2/pkg/cmd/attestation/artifact"
 	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
-	"github.com/cli/cli/v2/pkg/cmd/attestation/verification"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
-	"github.com/cli/cli/v2/pkg/iostreams"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-type VerifyOptions struct {
-	TagName  string
-	BaseRepo ghrepo.Interface
-	Exporter cmdutil.Exporter
+type VerifyAssetOptions struct {
+	TagName       string
+	BaseRepo      ghrepo.Interface
+	Exporter      cmdutil.Exporter
+	AssetFilePath string
 }
 
-type VerifyConfig struct {
+type VerifyAssetConfig struct {
 	HttpClient  *http.Client
 	IO          *iostreams.IOStreams
-	Opts        *VerifyOptions
+	Opts        *VerifyAssetOptions
 	AttClient   api.Client
 	AttVerifier shared.Verifier
 }
 
-func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *cobra.Command {
-	opts := &VerifyOptions{}
+func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*VerifyAssetConfig) error) *cobra.Command {
+	opts := &VerifyAssetOptions{}
 
 	cmd := &cobra.Command{
-		Use:    "verify [<tag>]",
-		Short:  "Verify the attestation for a GitHub Release.",
+		Use:    "verify-asset <tag> <file-path>",
+		Short:  "Verify that a given asset originated from a specific GitHub Release.",
 		Hidden: true,
-		Args:   cobra.MaximumNArgs(1),
-
+		Args:   cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
+			if len(args) == 2 {
 				opts.TagName = args[0]
+				opts.AssetFilePath = args[1]
+			} else if len(args) == 1 {
+				opts.AssetFilePath = args[0]
+			} else {
+				return cmdutil.FlagErrorf("you must specify an asset filepath")
 			}
+
+			opts.AssetFilePath = filepath.Clean(opts.AssetFilePath)
 
 			baseRepo, err := f.BaseRepo()
 			if err != nil {
 				return fmt.Errorf("failed to determine base repository: %w", err)
 			}
-
 			opts.BaseRepo = baseRepo
 
 			httpClient, err := f.HttpClient()
@@ -70,7 +73,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 				IO:         io,
 			}
 
-			config := &VerifyConfig{
+			config := &VerifyAssetConfig{
 				Opts:        opts,
 				HttpClient:  httpClient,
 				AttClient:   attClient,
@@ -81,7 +84,8 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 			if runF != nil {
 				return runF(config)
 			}
-			return verifyRun(config)
+
+			return verifyAssetRun(config)
 		},
 	}
 	cmdutil.AddFormatFlags(cmd, &opts.Exporter)
@@ -89,7 +93,7 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 	return cmd
 }
 
-func verifyRun(config *VerifyConfig) error {
+func verifyAssetRun(config *VerifyAssetConfig) error {
 	ctx := context.Background()
 	opts := config.Opts
 	baseRepo := opts.BaseRepo
@@ -103,7 +107,14 @@ func verifyRun(config *VerifyConfig) error {
 		tagName = release.TagName
 	}
 
-	// Retrieve the ref for the release tag
+	fileName := getFileName(opts.AssetFilePath)
+
+	// Calculate the digest of the file
+	fileDigest, err := artifact.NewDigestedArtifact(nil, opts.AssetFilePath, "sha256")
+	if err != nil {
+		return err
+	}
+
 	ref, err := shared.FetchRefSHA(ctx, config.HttpClient, baseRepo, tagName)
 	if err != nil {
 		return err
@@ -120,27 +131,33 @@ func verifyRun(config *VerifyConfig) error {
 		Limit:         10,
 	})
 	if err != nil {
-		return fmt.Errorf("no attestations for tag %s (%s)", tagName, releaseRefDigest.DigestWithAlg())
+		return fmt.Errorf("no attestations found for tag %s (%s)", tagName, releaseRefDigest.DigestWithAlg())
 	}
 
 	// Filter attestations by tag name
-	filteredAttestations, err := shared.FilterAttestationsByTag(attestations, tagName)
+	filteredAttestations, err := shared.FilterAttestationsByTag(attestations, opts.TagName)
 	if err != nil {
 		return fmt.Errorf("error parsing attestations for tag %s: %w", tagName, err)
 	}
 
 	if len(filteredAttestations) == 0 {
-		return fmt.Errorf("no attestations found for release %s in %s", tagName, baseRepo.RepoName())
+		return fmt.Errorf("no attestations found for release %s in %s/%s", tagName, baseRepo.RepoOwner(), baseRepo.RepoName())
 	}
 
-	if len(filteredAttestations) > 1 {
-		return fmt.Errorf("duplicate attestations found for release %s in %s", tagName, baseRepo.RepoName())
+	// Filter attestations by subject digest
+	filteredAttestations, err = shared.FilterAttestationsByFileDigest(filteredAttestations, fileDigest.Digest())
+	if err != nil {
+		return fmt.Errorf("error parsing attestations for digest %s: %w", fileDigest.DigestWithAlg(), err)
+	}
+
+	if len(filteredAttestations) == 0 {
+		return fmt.Errorf("attestation for %s does not contain subject %s", tagName, fileDigest.DigestWithAlg())
 	}
 
 	// Verify attestation
 	verified, err := config.AttVerifier.VerifyAttestation(releaseRefDigest, filteredAttestations[0])
 	if err != nil {
-		return fmt.Errorf("failed to verify attestations for tag %s: %w", tagName, err)
+		return fmt.Errorf("failed to verify attestation for tag %s: %w", tagName, err)
 	}
 
 	// If an exporter is provided with the --json flag, write the results to the terminal in JSON format
@@ -150,58 +167,16 @@ func verifyRun(config *VerifyConfig) error {
 
 	io := config.IO
 	cs := io.ColorScheme()
-	fmt.Fprintf(io.Out, "Resolved tag %s to %s\n", tagName, releaseRefDigest.DigestWithAlg())
-	fmt.Fprint(io.Out, "Loaded attestation from GitHub API\n")
-	fmt.Fprintf(io.Out, cs.Green("%s Release %s verified!\n"), cs.SuccessIcon(), tagName)
-	fmt.Fprintln(io.Out)
-
-	if err := printVerifiedSubjects(io, verified); err != nil {
-		return err
-	}
+	fmt.Fprintf(io.Out, "Calculated digest for %s: %s\n", fileName, fileDigest.DigestWithAlg())
+	fmt.Fprintf(io.Out, "Resolved tag %s to %s\n", opts.TagName, releaseRefDigest.DigestWithAlg())
+	fmt.Fprint(io.Out, "Loaded attestation from GitHub API\n\n")
+	fmt.Fprintf(io.Out, cs.Green("%s Verification succeeded! %s is present in release %s\n"), cs.SuccessIcon(), fileName, opts.TagName)
 
 	return nil
 }
 
-func printVerifiedSubjects(io *iostreams.IOStreams, att *verification.AttestationProcessingResult) error {
-	cs := io.ColorScheme()
-	w := io.Out
-
-	statement := att.Attestation.Bundle.GetDsseEnvelope().Payload
-	var statementData v1.Statement
-
-	err := protojson.Unmarshal([]byte(statement), &statementData)
-	if err != nil {
-		return err
-	}
-
-	// If there aren't at least two subjects, there are no assets to display
-	if len(statementData.Subject) < 2 {
-		return nil
-	}
-
-	fmt.Fprintln(w, cs.Bold("Assets"))
-	table := tableprinter.New(io, tableprinter.WithHeader("Name", "Digest"))
-
-	for _, s := range statementData.Subject {
-		name := s.Name
-		digest := s.Digest
-
-		if name != "" {
-			digestStr := ""
-			for key, value := range digest {
-				digestStr = key + ":" + value
-			}
-
-			table.AddField(name)
-			table.AddField(digestStr)
-			table.EndRow()
-		}
-	}
-	err = table.Render()
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(w)
-
-	return nil
+func getFileName(filePath string) string {
+	// Get the file name from the file path
+	_, fileName := filepath.Split(filePath)
+	return fileName
 }
