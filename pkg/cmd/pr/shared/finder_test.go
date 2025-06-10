@@ -728,7 +728,7 @@ func TestFindAssignableActors(t *testing.T) {
 		pr, _, err := f.Find(FindOptions{
 			Detector: &fd.DisabledDetectorMock{},
 			Fields:   []string{"assignees"},
-			Selector: "https://github.com/cli/cli/pull/123",
+			Selector: "https://github.com/cli/cli/pull/13",
 		})
 		require.NoError(t, err)
 
@@ -772,7 +772,7 @@ func TestFindAssignableActors(t *testing.T) {
 		pr, _, err := f.Find(FindOptions{
 			Detector: &fd.EnabledDetectorMock{},
 			Fields:   []string{"assignees"},
-			Selector: "https://github.com/cli/cli/pull/123",
+			Selector: "https://github.com/cli/cli/pull/13",
 		})
 		require.NoError(t, err)
 
