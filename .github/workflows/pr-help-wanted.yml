@@ -12,6 +12,9 @@ jobs:
   check-help-wanted:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Check for issues without help-wanted label
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
