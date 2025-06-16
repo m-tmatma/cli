@@ -26,4 +26,4 @@ jobs:
           fi
 
           # Run the script to check for issues without help-wanted label
-          bash .github/scripts/check-help-wanted.sh ${{ github.event.pull_request.html_url }}
+          bash .github/workflows/scripts/check-help-wanted.sh ${{ github.event.pull_request.html_url }}
