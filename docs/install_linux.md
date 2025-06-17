@@ -165,7 +165,7 @@ pkg install gh
 
 ### MidnightBSD
 
-MidnightBSD users can install from mports
+MidnightBSD users can install from [mports](https://www.midnightbsd.org/documentation/mports/index.html)
 
 ```bash
 cd /usr/mports/devel/gh/ && make install clean
