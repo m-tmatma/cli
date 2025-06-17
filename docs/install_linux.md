@@ -164,6 +164,20 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 pkg install gh
 ```
 
+### MidnightBSD
+
+MidnightBSD users can install from [mports](https://www.midnightbsd.org/documentation/mports/index.html)
+
+```bash
+cd /usr/mports/devel/gh/ && make install clean
+```
+
+Or via [mport(1)](http://man.midnightbsd.org/cgi-bin/man.cgi/mport):
+
+```bash
+mport install gh
+```
+
 ### NetBSD/pkgsrc
 
 NetBSD users and those on [platforms supported by pkgsrc](https://pkgsrc.org/#index4h1) can install the [gh package](https://pkgsrc.se/net/gh):
