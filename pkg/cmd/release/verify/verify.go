@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/MakeNowJust/heredoc"
 	v1 "github.com/in-toto/attestation/go/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -43,7 +44,28 @@ func NewCmdVerify(f *cmdutil.Factory, runF func(config *VerifyConfig) error) *co
 		Short:  "Verify the attestation for a GitHub Release.",
 		Hidden: true,
 		Args:   cobra.MaximumNArgs(1),
+		Long: heredoc.Doc(`
+			Verify that a GitHub Release is accompanied by a valid cryptographically signed attestation.
 
+			## Understanding Verification
+
+			An attestation is a claim made by GitHub regarding a release and its assets.
+
+			## What This Command Does
+
+			This command checks that the specified release (or the latest release, if no tag is given) has a valid attestation.
+			It fetches the attestation for the release and prints out metadata about all assets referenced in the attestation, including their digests.
+		`),
+		Example: heredoc.Doc(`
+			# Verify the latest release
+			gh release verify
+			
+			# Verify a specific release by tag
+			gh release verify v1.2.3
+
+			# Verify a specific release by tag and output the attestation in JSON format
+			gh release verify v1.2.3 --format json
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.TagName = args[0]
@@ -111,13 +133,17 @@ func verifyRun(config *VerifyConfig) error {
 
 	releaseRefDigest := artifact.NewDigestedArtifactForRelease(ref, "sha1")
 
-	// Find attestaitons for the release tag SHA
+	// Find all the attestations for the release tag SHA
 	attestations, err := config.AttClient.GetByDigest(api.FetchParams{
 		Digest:        releaseRefDigest.DigestWithAlg(),
 		PredicateType: shared.ReleasePredicateType,
 		Owner:         baseRepo.RepoOwner(),
 		Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
-		Limit:         10,
+		// TODO: Allow this value to be set via a flag.
+		// The limit is set to 100 to ensure we fetch all attestations for a given SHA.
+		// While multiple attestations can exist for a single SHA,
+		// only one attestation is associated with each release tag.
+		Limit: 100,
 	})
 	if err != nil {
 		return fmt.Errorf("no attestations for tag %s (%s)", tagName, releaseRefDigest.DigestWithAlg())

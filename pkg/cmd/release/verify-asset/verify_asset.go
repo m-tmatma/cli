@@ -14,6 +14,7 @@ import (
 	att_io "github.com/cli/cli/v2/pkg/cmd/attestation/io"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -37,10 +38,34 @@ func NewCmdVerifyAsset(f *cmdutil.Factory, runF func(*VerifyAssetConfig) error) 
 	opts := &VerifyAssetOptions{}
 
 	cmd := &cobra.Command{
-		Use:    "verify-asset <tag> <file-path>",
-		Short:  "Verify that a given asset originated from a specific GitHub Release.",
+		Use:   "verify-asset [<tag>] <file-path>",
+		Short: "Verify that a given asset originated from a specific GitHub Release.",
+		Long: heredoc.Doc(`
+			Verify that a given asset file originated from a specific GitHub Release using cryptographically signed attestations.
+
+			## Understanding Verification
+
+			An attestation is a claim made by GitHub regarding a release and its assets.
+
+			## What This Command Does
+
+			This command checks that the asset you provide matches an attestation produced by GitHub for a particular release. 
+			It ensures the asset's integrity by validating:
+			* The asset's digest matches the subject in the attestation
+			* The attestation is associated with the specified release
+		`),
 		Hidden: true,
 		Args:   cobra.MaximumNArgs(2),
+		Example: heredoc.Doc(`
+			# Verify an asset from the latest release
+			$ gh release verify-asset ./dist/my-asset.zip
+
+			# Verify an asset from a specific release tag
+			$ gh release verify-asset v1.2.3 ./dist/my-asset.zip
+
+			# Verify an asset from a specific release tag and output the attestation in JSON format
+			$ gh release verify-asset v1.2.3 ./dist/my-asset.zip --format json
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 2 {
 				opts.TagName = args[0]
@@ -122,13 +147,17 @@ func verifyAssetRun(config *VerifyAssetConfig) error {
 
 	releaseRefDigest := artifact.NewDigestedArtifactForRelease(ref, "sha1")
 
-	// Find attestaitons for the release tag SHA
+	// Find attestations for the release tag SHA
 	attestations, err := config.AttClient.GetByDigest(api.FetchParams{
 		Digest:        releaseRefDigest.DigestWithAlg(),
 		PredicateType: shared.ReleasePredicateType,
 		Owner:         baseRepo.RepoOwner(),
 		Repo:          baseRepo.RepoOwner() + "/" + baseRepo.RepoName(),
-		Limit:         10,
+		// TODO: Allow this value to be set via a flag.
+		// The limit is set to 100 to ensure we fetch all attestations for a given SHA.
+		// While multiple attestations can exist for a single SHA,
+		// only one attestation is associated with each release tag.
+		Limit: 100,
 	})
 	if err != nil {
 		return fmt.Errorf("no attestations found for tag %s (%s)", tagName, releaseRefDigest.DigestWithAlg())
