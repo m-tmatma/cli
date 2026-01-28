@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -323,6 +324,19 @@ func (r RequestedReviewer) LoginOrSlug() string {
 	return r.Login
 }
 
+// DisplayName returns a user-friendly name for the reviewer.
+// For Copilot bot, returns "Copilot (AI)". For teams, returns "org/slug".
+// For users, returns login (could be extended to show name if available).
+func (r RequestedReviewer) DisplayName() string {
+	if r.TypeName == teamTypeName {
+		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
+	}
+	if r.TypeName == "Bot" && r.Login == CopilotReviewerLogin {
+		return "Copilot (AI)"
+	}
+	return r.Login
+}
+
 const teamTypeName = "Team"
 
 func (r ReviewRequests) Logins() []string {
@@ -331,6 +345,15 @@ func (r ReviewRequests) Logins() []string {
 		logins[i] = r.RequestedReviewer.LoginOrSlug()
 	}
 	return logins
+}
+
+// DisplayNames returns user-friendly display names for all requested reviewers.
+func (r ReviewRequests) DisplayNames() []string {
+	names := make([]string, len(r.Nodes))
+	for i, r := range r.Nodes {
+		names[i] = r.RequestedReviewer.DisplayName()
+	}
+	return names
 }
 
 func (pr PullRequest) HeadLabel() string {
@@ -632,6 +655,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 }
 
 // AddPullRequestReviews adds the given user and team reviewers to a pull request using the REST API.
+// Team identifiers can be in "org/slug" format.
 func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
 	if len(users) == 0 && len(teams) == 0 {
 		return nil
@@ -641,8 +665,15 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 	if users == nil {
 		users = []string{}
 	}
-	if teams == nil {
-		teams = []string{}
+
+	// Extract just the slug from org/slug format
+	teamSlugs := make([]string, 0, len(teams))
+	for _, t := range teams {
+		if idx := strings.Index(t, "/"); idx >= 0 {
+			teamSlugs = append(teamSlugs, t[idx+1:])
+		} else if t != "" {
+			teamSlugs = append(teamSlugs, t)
+		}
 	}
 
 	path := fmt.Sprintf(
@@ -656,7 +687,7 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 		TeamReviewers []string `json:"team_reviewers"`
 	}{
 		Reviewers:     users,
-		TeamReviewers: teams,
+		TeamReviewers: teamSlugs,
 	}
 	buf := &bytes.Buffer{}
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
@@ -667,6 +698,7 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 }
 
 // RemovePullRequestReviews removes requested reviewers from a pull request using the REST API.
+// Team identifiers can be in "org/slug" format.
 func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
 	if len(users) == 0 && len(teams) == 0 {
 		return nil
@@ -676,8 +708,15 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 	if users == nil {
 		users = []string{}
 	}
-	if teams == nil {
-		teams = []string{}
+
+	// Extract just the slug from org/slug format
+	teamSlugs := make([]string, 0, len(teams))
+	for _, t := range teams {
+		if idx := strings.Index(t, "/"); idx >= 0 {
+			teamSlugs = append(teamSlugs, t[idx+1:])
+		} else if t != "" {
+			teamSlugs = append(teamSlugs, t)
+		}
 	}
 
 	path := fmt.Sprintf(
@@ -691,7 +730,7 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		TeamReviewers []string `json:"team_reviewers"`
 	}{
 		Reviewers:     users,
-		TeamReviewers: teams,
+		TeamReviewers: teamSlugs,
 	}
 	buf := &bytes.Buffer{}
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
@@ -699,6 +738,70 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 	}
 	// The endpoint responds with the updated pull request object; we don't need it here.
 	return client.REST(repo.RepoHost(), "DELETE", path, buf, nil)
+}
+
+// RequestReviewsByLogin sets requested reviewers on a pull request using the GraphQL mutation.
+// This mutation replaces existing reviewers with the provided set unless union is true.
+// Only available on github.com, not GHES.
+// Bot logins should include the [bot] suffix (e.g., "copilot-pull-request-reviewer[bot]").
+// Team slugs should be in the format "org/team-slug".
+// When union is false (replace mode), passing empty slices will remove all reviewers.
+func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, userLogins, botLogins, teamSlugs []string, union bool) error {
+	// In union mode (additive), nothing to do if all lists are empty.
+	// In replace mode, we may still need to call the mutation to clear reviewers.
+	if union && len(userLogins) == 0 && len(botLogins) == 0 && len(teamSlugs) == 0 {
+		return nil
+	}
+
+	var mutation struct {
+		RequestReviewsByLogin struct {
+			ClientMutationID string
+		} `graphql:"requestReviewsByLogin(input: $input)"`
+	}
+
+	type RequestReviewsByLoginInput struct {
+		PullRequestID githubv4.ID        `json:"pullRequestId"`
+		UserLogins    *[]githubv4.String `json:"userLogins,omitempty"`
+		BotLogins     *[]githubv4.String `json:"botLogins,omitempty"`
+		TeamSlugs     *[]githubv4.String `json:"teamSlugs,omitempty"`
+		Union         githubv4.Boolean   `json:"union"`
+	}
+
+	input := RequestReviewsByLoginInput{
+		PullRequestID: githubv4.ID(prID),
+		Union:         githubv4.Boolean(union),
+	}
+
+	if len(userLogins) > 0 {
+		logins := make([]githubv4.String, len(userLogins))
+		for i, l := range userLogins {
+			logins[i] = githubv4.String(l)
+		}
+		input.UserLogins = &logins
+	}
+
+	if len(botLogins) > 0 {
+		logins := make([]githubv4.String, len(botLogins))
+		for i, l := range botLogins {
+			// Bot logins require the [bot] suffix for the mutation
+			logins[i] = githubv4.String(l + "[bot]")
+		}
+		input.BotLogins = &logins
+	}
+
+	if len(teamSlugs) > 0 {
+		slugs := make([]githubv4.String, len(teamSlugs))
+		for i, s := range teamSlugs {
+			slugs[i] = githubv4.String(s)
+		}
+		input.TeamSlugs = &slugs
+	}
+
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	return client.Mutate(repo.RepoHost(), "RequestReviewsByLogin", &mutation, variables)
 }
 
 // SuggestedAssignableActors fetches up to 10 suggested actors for a specific assignable
@@ -791,6 +894,196 @@ func SuggestedAssignableActors(client *Client, repo ghrepo.Interface, assignable
 	}
 
 	return actors, availableAssigneesCount, nil
+}
+
+// ReviewerCandidate represents a potential reviewer for a pull request.
+// This can be a User, Bot, or Team.
+type ReviewerCandidate interface {
+	DisplayName() string
+	Login() string
+
+	sealedReviewerCandidate()
+}
+
+// ReviewerUser is a user who can review a pull request.
+type ReviewerUser struct {
+	AssignableUser
+}
+
+func NewReviewerUser(login, name string) ReviewerUser {
+	return ReviewerUser{
+		AssignableUser: NewAssignableUser("", login, name),
+	}
+}
+
+func (r ReviewerUser) sealedReviewerCandidate() {}
+
+// ReviewerBot is a bot who can review a pull request.
+type ReviewerBot struct {
+	AssignableBot
+}
+
+func NewReviewerBot(login string) ReviewerBot {
+	return ReviewerBot{
+		AssignableBot: NewAssignableBot("", login),
+	}
+}
+
+func (b ReviewerBot) DisplayName() string {
+	if b.login == CopilotReviewerLogin {
+		return fmt.Sprintf("%s (AI)", CopilotActorName)
+	}
+	return b.Login()
+}
+
+func (r ReviewerBot) sealedReviewerCandidate() {}
+
+// ReviewerTeam is a team that can review a pull request.
+// The slug is stored as "org/team-slug" format.
+type ReviewerTeam struct {
+	slug string
+}
+
+// NewReviewerTeam creates a new ReviewerTeam with the full "org/slug" format.
+func NewReviewerTeam(orgName, teamSlug string) ReviewerTeam {
+	return ReviewerTeam{slug: fmt.Sprintf("%s/%s", orgName, teamSlug)}
+}
+
+func (r ReviewerTeam) DisplayName() string {
+	return r.slug
+}
+
+func (r ReviewerTeam) Login() string {
+	return r.slug
+}
+
+func (r ReviewerTeam) Slug() string {
+	return r.slug
+}
+
+func (r ReviewerTeam) sealedReviewerCandidate() {}
+
+// SuggestedReviewerActors fetches suggested reviewers for a pull request.
+// It combines results from:
+// - suggestedReviewerActors (10 max) - suggested based on activity
+// - repository collaborators (10 max) - all collaborators
+// - organization teams (10 max for org repos) - all teams (if owner is an org)
+// Results are returned in that order with duplicates removed.
+// Returns the candidates, a MoreResults count, and an error.
+func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string, query string) ([]ReviewerCandidate, int, error) {
+	// Use a single query that includes organization.teams - if the owner is not an org,
+	// we'll get a "Could not resolve to an Organization" error which we handle gracefully.
+	type responseData struct {
+		Node struct {
+			PullRequest struct {
+				SuggestedActors struct {
+					Nodes []struct {
+						IsAuthor    bool
+						IsCommenter bool
+						Reviewer    struct {
+							TypeName string `graphql:"__typename"`
+							User     struct {
+								Login string
+								Name  string
+							} `graphql:"... on User"`
+							Bot struct {
+								Login string
+							} `graphql:"... on Bot"`
+						}
+					}
+				} `graphql:"suggestedReviewerActors(first: 5, query: $query)"`
+			} `graphql:"... on PullRequest"`
+		} `graphql:"node(id: $id)"`
+		Repository struct {
+			Collaborators struct {
+				TotalCount int
+				Nodes      []struct {
+					Login string
+					Name  string
+				}
+			} `graphql:"collaborators(first: 5, query: $query)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+		Organization struct {
+			Teams struct {
+				TotalCount int
+				Nodes      []struct {
+					Slug string
+				}
+			} `graphql:"teams(first: 5, query: $query)"`
+		} `graphql:"organization(login: $owner)"`
+	}
+
+	variables := map[string]interface{}{
+		"id":    githubv4.ID(prID),
+		"query": githubv4.String(query),
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	var result responseData
+	err := client.Query(repo.RepoHost(), "SuggestedReviewerActors", &result, variables)
+	// Handle the case where the owner is not an organization - the query still returns
+	// partial data (repository, node), so we can continue processing.
+	if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
+		return nil, 0, err
+	}
+
+	ownerName := repo.RepoOwner()
+	seen := make(map[string]bool)
+	var candidates []ReviewerCandidate
+
+	// Add suggested reviewers first (excluding author)
+	for _, n := range result.Node.PullRequest.SuggestedActors.Nodes {
+		if n.IsAuthor {
+			continue
+		}
+		var candidate ReviewerCandidate
+		if n.Reviewer.TypeName == "User" && n.Reviewer.User.Login != "" {
+			candidate = NewReviewerUser(n.Reviewer.User.Login, n.Reviewer.User.Name)
+		} else if n.Reviewer.TypeName == "Bot" && n.Reviewer.Bot.Login != "" {
+			candidate = NewReviewerBot(n.Reviewer.Bot.Login)
+		} else {
+			continue
+		}
+
+		login := candidate.Login()
+		if !seen[login] {
+			seen[login] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	// Add collaborators (deduped against suggested)
+	for _, c := range result.Repository.Collaborators.Nodes {
+		if c.Login == "" {
+			continue
+		}
+		candidate := NewReviewerUser(c.Login, c.Name)
+		login := candidate.Login()
+		if !seen[login] {
+			seen[login] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	// Add teams (will be empty if owner is not an org)
+	for _, t := range result.Organization.Teams.Nodes {
+		if t.Slug == "" {
+			continue
+		}
+		candidate := NewReviewerTeam(ownerName, t.Slug)
+		login := candidate.Login()
+		if !seen[login] {
+			seen[login] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	// MoreResults is the sum of collaborators and teams total counts
+	// (teams will be 0 for personal repos)
+	moreResults := result.Repository.Collaborators.TotalCount + result.Organization.Teams.TotalCount
+
+	return candidates, moreResults, nil
 }
 
 func UpdatePullRequestBranch(client *Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestBranchInput) error {
