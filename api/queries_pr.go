@@ -958,13 +958,16 @@ func (r ReviewerTeam) Slug() string {
 func (r ReviewerTeam) sealedReviewerCandidate() {}
 
 // SuggestedReviewerActors fetches suggested reviewers for a pull request.
-// It combines results from:
-// - suggestedReviewerActors (10 max) - suggested based on activity
-// - repository collaborators (10 max) - all collaborators
-// - organization teams (10 max for org repos) - all teams (if owner is an org)
-// Results are returned in that order with duplicates removed.
+// It combines results from three sources using a cascading quota system:
+// - suggestedReviewerActors - suggested based on PR activity (base quota: 5)
+// - repository collaborators - all collaborators (base quota: 5 + unfilled from suggestions)
+// - organization teams - all teams for org repos (base quota: 5 + unfilled from collaborators)
+//
+// This ensures we show up to 15 total candidates, with each source filling any
+// unfilled quota from the previous source. Results are deduplicated.
 // Returns the candidates, a MoreResults count, and an error.
 func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string, query string) ([]ReviewerCandidate, int, error) {
+	// Fetch 10 from each source to allow cascading quota to fill from available results.
 	// Use a single query that includes organization.teams - if the owner is not an org,
 	// we'll get a "Could not resolve to an Organization" error which we handle gracefully.
 	type responseData struct {
@@ -985,7 +988,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 							} `graphql:"... on Bot"`
 						}
 					}
-				} `graphql:"suggestedReviewerActors(first: 5, query: $query)"`
+				} `graphql:"suggestedReviewerActors(first: 10, query: $query)"`
 			} `graphql:"... on PullRequest"`
 		} `graphql:"node(id: $id)"`
 		Repository struct {
@@ -995,7 +998,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 					Login string
 					Name  string
 				}
-			} `graphql:"collaborators(first: 5, query: $query)"`
+			} `graphql:"collaborators(first: 10, query: $query)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 		Organization struct {
 			Teams struct {
@@ -1003,7 +1006,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 				Nodes      []struct {
 					Slug string
 				}
-			} `graphql:"teams(first: 5, query: $query)"`
+			} `graphql:"teams(first: 10, query: $query)"`
 		} `graphql:"organization(login: $owner)"`
 	}
 
@@ -1022,54 +1025,73 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 		return nil, 0, err
 	}
 
-	ownerName := repo.RepoOwner()
+	// Build candidates using cascading quota logic:
+	// Each source has a base quota of 5, plus any unfilled quota from previous sources.
+	// This ensures we show up to 15 total candidates, filling gaps when earlier sources have fewer.
 	seen := make(map[string]bool)
 	var candidates []ReviewerCandidate
+	const baseQuota = 5
 
-	// Add suggested reviewers first (excluding author)
+	// Suggested reviewers (excluding author)
+	suggestionsAdded := 0
 	for _, n := range result.Node.PullRequest.SuggestedActors.Nodes {
+		if suggestionsAdded >= baseQuota {
+			break
+		}
 		if n.IsAuthor {
 			continue
 		}
 		var candidate ReviewerCandidate
+		var login string
 		if n.Reviewer.TypeName == "User" && n.Reviewer.User.Login != "" {
-			candidate = NewReviewerUser(n.Reviewer.User.Login, n.Reviewer.User.Name)
+			login = n.Reviewer.User.Login
+			candidate = NewReviewerUser(login, n.Reviewer.User.Name)
 		} else if n.Reviewer.TypeName == "Bot" && n.Reviewer.Bot.Login != "" {
-			candidate = NewReviewerBot(n.Reviewer.Bot.Login)
+			login = n.Reviewer.Bot.Login
+			candidate = NewReviewerBot(login)
 		} else {
 			continue
 		}
-
-		login := candidate.Login()
 		if !seen[login] {
 			seen[login] = true
 			candidates = append(candidates, candidate)
+			suggestionsAdded++
 		}
 	}
 
-	// Add collaborators (deduped against suggested)
+	// Collaborators: quota = base + unfilled from suggestions
+	collaboratorsQuota := baseQuota + (baseQuota - suggestionsAdded)
+	collaboratorsAdded := 0
 	for _, c := range result.Repository.Collaborators.Nodes {
+		if collaboratorsAdded >= collaboratorsQuota {
+			break
+		}
 		if c.Login == "" {
 			continue
 		}
-		candidate := NewReviewerUser(c.Login, c.Name)
-		login := candidate.Login()
-		if !seen[login] {
-			seen[login] = true
-			candidates = append(candidates, candidate)
+		if !seen[c.Login] {
+			seen[c.Login] = true
+			candidates = append(candidates, NewReviewerUser(c.Login, c.Name))
+			collaboratorsAdded++
 		}
 	}
 
-	// Add teams (will be empty if owner is not an org)
+	// Teams: quota = base + unfilled from collaborators
+	teamsQuota := baseQuota + (collaboratorsQuota - collaboratorsAdded)
+	teamsAdded := 0
+	ownerName := repo.RepoOwner()
 	for _, t := range result.Organization.Teams.Nodes {
+		if teamsAdded >= teamsQuota {
+			break
+		}
 		if t.Slug == "" {
 			continue
 		}
-		candidate := NewReviewerTeam(ownerName, t.Slug)
-		login := candidate.Login()
-		if !seen[login] {
-			seen[login] = true
-			candidates = append(candidates, candidate)
+		teamLogin := fmt.Sprintf("%s/%s", ownerName, t.Slug)
+		if !seen[teamLogin] {
+			seen[teamLogin] = true
+			candidates = append(candidates, NewReviewerTeam(ownerName, t.Slug))
+			teamsAdded++
 		}
 	}
 
