@@ -49,23 +49,39 @@ echo "  → toolchain : $TOOLCHAIN_VERSION"
 
 # ---- Prepare Git branch ---------------------------------------------------
 CURRENT_GO_DIRECTIVE=$(grep -E '^go ' "$GO_MOD" | cut -d ' ' -f2)
-CURRENT_TOOLCHAIN_DIRECTIVE=$(grep -E '^toolchain ' "$GO_MOD" | cut -d ' ' -f2)
-
-if [[ "$CURRENT_GO_DIRECTIVE" = "$GO_DIRECTIVE_VERSION" && \
-      "$CURRENT_TOOLCHAIN_DIRECTIVE" = "go$TOOLCHAIN_VERSION" ]]; then
-  echo "Already on latest Go version: $CURRENT_GO_DIRECTIVE (toolchain: $CURRENT_TOOLCHAIN_DIRECTIVE)"
-  exit 0
-fi
+CURRENT_TOOLCHAIN_DIRECTIVE=$(grep -E '^toolchain ' "$GO_MOD" | cut -d ' ' -f2 || true)
 
 BRANCH="bump-go-$TOOLCHAIN_VERSION"
+BRANCH_CREATED=0
+
+# Set up cleanup trap early (before any potential exits)
 cleanup() {
-  git checkout - >/dev/null 2>&1 || true
-  git branch -D "$BRANCH" >/dev/null 2>&1 || true
+  if [[ $BRANCH_CREATED -eq 1 ]]; then
+    git checkout - >/dev/null 2>&1 || true
+    git branch -D "$BRANCH" >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 
+# Check if we're already up to date
+# Note: toolchain directive may be missing when go directive == latest toolchain.
+# This is expected behavior - `go mod tidy` removes the toolchain line when
+# the minimum Go version matches the latest toolchain, as it's redundant.
+if [[ "$CURRENT_GO_DIRECTIVE" = "$GO_DIRECTIVE_VERSION" ]]; then
+  if [[ -z "$CURRENT_TOOLCHAIN_DIRECTIVE" ]]; then
+    # No toolchain directive present - this is expected when go version == latest
+    echo "Already on latest Go version: $CURRENT_GO_DIRECTIVE"
+    echo "  → Note: No toolchain directive (expected when go version matches latest toolchain)"
+    exit 0
+  elif [[ "$CURRENT_TOOLCHAIN_DIRECTIVE" = "go$TOOLCHAIN_VERSION" ]]; then
+    echo "Already on latest Go version: $CURRENT_GO_DIRECTIVE (toolchain: $CURRENT_TOOLCHAIN_DIRECTIVE)"
+    exit 0
+  fi
+fi
+
 echo "Creating branch $BRANCH"
 git switch -c "$BRANCH" >/dev/null 2>&1
+BRANCH_CREATED=1
 
 # ---- Patch go.mod -----------------------------------------------------------
 if [[ "$CURRENT_GO_DIRECTIVE" != "$GO_DIRECTIVE_VERSION" ]]; then
@@ -73,7 +89,20 @@ if [[ "$CURRENT_GO_DIRECTIVE" != "$GO_DIRECTIVE_VERSION" ]]; then
   echo "  • go directive $CURRENT_GO_DIRECTIVE → $GO_DIRECTIVE_VERSION"
 fi
 
-if [[ "$CURRENT_TOOLCHAIN_DIRECTIVE" != "go$TOOLCHAIN_VERSION" ]]; then
+# Handle toolchain directive - may need to add, update, or skip
+if [[ -z "$CURRENT_TOOLCHAIN_DIRECTIVE" ]]; then
+  # No toolchain directive exists
+  if [[ "$GO_DIRECTIVE_VERSION" = "$(cut -d. -f1-2 <<< "$TOOLCHAIN_VERSION").0" ]]; then
+    # go directive matches latest toolchain - toolchain line is redundant
+    echo "  • toolchain directive not needed (go version matches latest toolchain)"
+  else
+    # go directive is older than latest toolchain - add toolchain directive after go line
+    sed -Ei.bak "/^go [0-9]+\.[0-9]+/a\\
+toolchain go$TOOLCHAIN_VERSION" "$GO_MOD"
+    echo "  • toolchain directive added: go$TOOLCHAIN_VERSION"
+  fi
+elif [[ "$CURRENT_TOOLCHAIN_DIRECTIVE" != "go$TOOLCHAIN_VERSION" ]]; then
+  # Toolchain directive exists but needs updating
   sed -Ei.bak "s/^toolchain go[0-9]+\.[0-9]+\.[0-9]+.*$/toolchain go$TOOLCHAIN_VERSION/" "$GO_MOD"
   echo "  • toolchain $CURRENT_TOOLCHAIN_DIRECTIVE → go$TOOLCHAIN_VERSION"
 fi
