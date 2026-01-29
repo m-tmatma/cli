@@ -52,10 +52,6 @@ GO_MOD_JSON=$(go mod edit -json "$GO_MOD")
 CURRENT_GO_DIRECTIVE=$(jq -r '.Go // ""' <<< "$GO_MOD_JSON")
 CURRENT_TOOLCHAIN_DIRECTIVE=$(jq -r '.Toolchain // ""' <<< "$GO_MOD_JSON")
 
-# Handle empty values from jq
-[[ "$CURRENT_GO_DIRECTIVE" == "null" || -z "$CURRENT_GO_DIRECTIVE" ]] && CURRENT_GO_DIRECTIVE=""
-[[ "$CURRENT_TOOLCHAIN_DIRECTIVE" == "null" || -z "$CURRENT_TOOLCHAIN_DIRECTIVE" ]] && CURRENT_TOOLCHAIN_DIRECTIVE=""
-
 CURRENT_MAJOR_MINOR="$(cut -d. -f1-2 <<< "$CURRENT_GO_DIRECTIVE")"
 
 BRANCH="bump-go-$TOOLCHAIN_VERSION"
@@ -155,9 +151,6 @@ fi
 FINAL_GO_MOD_JSON=$(go mod edit -json "$GO_MOD")
 FINAL_GO_DIRECTIVE=$(jq -r '.Go // ""' <<< "$FINAL_GO_MOD_JSON")
 FINAL_TOOLCHAIN_DIRECTIVE=$(jq -r '.Toolchain // ""' <<< "$FINAL_GO_MOD_JSON")
-
-# Handle empty/null values
-[[ "$FINAL_TOOLCHAIN_DIRECTIVE" == "null" || -z "$FINAL_TOOLCHAIN_DIRECTIVE" ]] && FINAL_TOOLCHAIN_DIRECTIVE=""
 
 if [[ -n "$FINAL_TOOLCHAIN_DIRECTIVE" ]]; then
   PR_BODY=$(cat <<EOF
