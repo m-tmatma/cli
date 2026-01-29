@@ -772,30 +772,24 @@ func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, u
 		Union:         githubv4.Boolean(union),
 	}
 
-	if len(userLogins) > 0 {
-		logins := make([]githubv4.String, len(userLogins))
-		for i, l := range userLogins {
-			logins[i] = githubv4.String(l)
-		}
-		input.UserLogins = &logins
+	userLoginValues := make([]githubv4.String, len(userLogins))
+	for i, l := range userLogins {
+		userLoginValues[i] = githubv4.String(l)
 	}
+	input.UserLogins = &userLoginValues
 
-	if len(botLogins) > 0 {
-		logins := make([]githubv4.String, len(botLogins))
-		for i, l := range botLogins {
-			// Bot logins require the [bot] suffix for the mutation
-			logins[i] = githubv4.String(l + "[bot]")
-		}
-		input.BotLogins = &logins
+	botLoginValues := make([]githubv4.String, len(botLogins))
+	for i, l := range botLogins {
+		// Bot logins require the [bot] suffix for the mutation
+		botLoginValues[i] = githubv4.String(l + "[bot]")
 	}
+	input.BotLogins = &botLoginValues
 
-	if len(teamSlugs) > 0 {
-		slugs := make([]githubv4.String, len(teamSlugs))
-		for i, s := range teamSlugs {
-			slugs[i] = githubv4.String(s)
-		}
-		input.TeamSlugs = &slugs
+	teamSlugValues := make([]githubv4.String, len(teamSlugs))
+	for i, s := range teamSlugs {
+		teamSlugValues[i] = githubv4.String(s)
 	}
+	input.TeamSlugs = &teamSlugValues
 
 	variables := map[string]interface{}{
 		"input": input,

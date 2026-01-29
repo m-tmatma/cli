@@ -556,6 +556,61 @@ func Test_editRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
+		{
+			name: "remove all reviewers sends empty slices to mutation",
+			input: &EditOptions{
+				Detector:    &fd.EnabledDetectorMock{},
+				SelectorArg: "123",
+				Finder: shared.NewMockFinder("123", &api.PullRequest{
+					URL: "https://github.com/OWNER/REPO/pull/123",
+					ReviewRequests: api.ReviewRequests{
+						Nodes: []struct{ RequestedReviewer api.RequestedReviewer }{
+							{
+								RequestedReviewer: api.RequestedReviewer{
+									TypeName: "Team",
+									Slug:     "core",
+									Organization: struct {
+										Login string `json:"login"`
+									}{Login: "OWNER"},
+								},
+							},
+							{
+								RequestedReviewer: api.RequestedReviewer{
+									TypeName: "User",
+									Login:    "monalisa",
+								},
+							},
+						},
+					},
+				}, ghrepo.New("OWNER", "REPO")),
+				Interactive: false,
+				Editable: shared.Editable{
+					Reviewers: shared.EditableReviewers{EditableSlice: shared.EditableSlice{
+						Default: []string{"OWNER/core", "monalisa"},
+						Remove:  []string{"OWNER/core", "monalisa"},
+						Edited:  true,
+					}},
+				},
+				Fetcher: testFetcher{},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockRepoMetadata(reg, mockRepoMetadataOptions{})
+				mockPullRequestUpdate(reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation RequestReviewsByLogin\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "requestReviewsByLogin": { "clientMutationId": "" } } }`,
+						func(inputs map[string]interface{}) {
+							// Verify that empty slices are sent to properly clear all reviewer types
+							require.Equal(t, []interface{}{}, inputs["userLogins"], "userLogins should be an empty slice")
+							require.Equal(t, []interface{}{}, inputs["botLogins"], "botLogins should be an empty slice")
+							require.Equal(t, []interface{}{}, inputs["teamSlugs"], "teamSlugs should be an empty slice")
+							require.Equal(t, false, inputs["union"], "union should be false for replace mode")
+						}),
+				)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123\n",
+		},
 		// Conditional team fetching cases
 		{
 			name: "non-interactive add only user reviewers skips team fetch",
