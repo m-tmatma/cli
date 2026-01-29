@@ -973,6 +973,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 	// Fetch 10 from each source to allow cascading quota to fill from available results.
 	// Use a single query that includes organization.teams - if the owner is not an org,
 	// we'll get a "Could not resolve to an Organization" error which we handle gracefully.
+	// We also fetch unfiltered total counts via aliases for the "X more" display.
 	type responseData struct {
 		Node struct {
 			PullRequest struct {
@@ -996,20 +997,24 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 		} `graphql:"node(id: $id)"`
 		Repository struct {
 			Collaborators struct {
-				TotalCount int
-				Nodes      []struct {
+				Nodes []struct {
 					Login string
 					Name  string
 				}
 			} `graphql:"collaborators(first: 10, query: $query)"`
+			CollaboratorsTotalCount struct {
+				TotalCount int
+			} `graphql:"collaboratorsTotalCount: collaborators(first: 0)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 		Organization struct {
 			Teams struct {
-				TotalCount int
-				Nodes      []struct {
+				Nodes []struct {
 					Slug string
 				}
 			} `graphql:"teams(first: 10, query: $query)"`
+			TeamsTotalCount struct {
+				TotalCount int
+			} `graphql:"teamsTotalCount: teams(first: 0)"`
 		} `graphql:"organization(login: $owner)"`
 	}
 
@@ -1098,9 +1103,8 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 		}
 	}
 
-	// MoreResults is the sum of collaborators and teams total counts
-	// (teams will be 0 for personal repos)
-	moreResults := result.Repository.Collaborators.TotalCount + result.Organization.Teams.TotalCount
+	// MoreResults uses unfiltered total counts (teams will be 0 for personal repos)
+	moreResults := result.Repository.CollaboratorsTotalCount.TotalCount + result.Organization.TeamsTotalCount.TotalCount
 
 	return candidates, moreResults, nil
 }

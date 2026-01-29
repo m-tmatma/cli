@@ -141,7 +141,7 @@ func Test_Logins(t *testing.T) {
 
 // mockReviewerResponse generates a GraphQL response for SuggestedReviewerActors tests.
 // It creates suggestions (s1, s2...), collaborators (c1, c2...), and teams (team1, team2...).
-// totalCollabs and totalTeams set the TotalCount fields (for "more results" calculation).
+// totalCollabs and totalTeams set the unfiltered TotalCount fields (for "more results" calculation).
 func mockReviewerResponse(suggestions, collabs, teams, totalCollabs, totalTeams int) string {
 	var suggestionNodes, collabNodes, teamNodes []string
 
@@ -161,11 +161,17 @@ func mockReviewerResponse(suggestions, collabs, teams, totalCollabs, totalTeams 
 	return fmt.Sprintf(`{
 		"data": {
 			"node": {"suggestedReviewerActors": {"nodes": [%s]}},
-			"repository": {"collaborators": {"totalCount": %d, "nodes": [%s]}},
-			"organization": {"teams": {"totalCount": %d, "nodes": [%s]}}
+			"repository": {
+				"collaborators": {"nodes": [%s]},
+				"collaboratorsTotalCount": {"totalCount": %d}
+			},
+			"organization": {
+				"teams": {"nodes": [%s]},
+				"teamsTotalCount": {"totalCount": %d}
+			}
 		}
-	}`, strings.Join(suggestionNodes, ","), totalCollabs, strings.Join(collabNodes, ","),
-		totalTeams, strings.Join(teamNodes, ","))
+	}`, strings.Join(suggestionNodes, ","), strings.Join(collabNodes, ","), totalCollabs,
+		strings.Join(teamNodes, ","), totalTeams)
 }
 
 func TestSuggestedReviewerActors(t *testing.T) {
@@ -234,8 +240,14 @@ func TestSuggestedReviewerActors(t *testing.T) {
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}},
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s2", "name": "S2"}}
 							]}},
-							"repository": {"collaborators": {"totalCount": 5, "nodes": [{"login": "c1", "name": "C1"}]}},
-							"organization": {"teams": {"totalCount": 3, "nodes": [{"slug": "team1"}]}}
+							"repository": {
+								"collaborators": {"nodes": [{"login": "c1", "name": "C1"}]},
+								"collaboratorsTotalCount": {"totalCount": 5}
+							},
+							"organization": {
+								"teams": {"nodes": [{"slug": "team1"}]},
+								"teamsTotalCount": {"totalCount": 3}
+							}
 						}
 					}`))
 			},
@@ -254,11 +266,17 @@ func TestSuggestedReviewerActors(t *testing.T) {
 							"node": {"suggestedReviewerActors": {"nodes": [
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "shareduser", "name": "Shared"}}
 							]}},
-							"repository": {"collaborators": {"totalCount": 10, "nodes": [
-								{"login": "shareduser", "name": "Shared"},
-								{"login": "c1", "name": "C1"}
-							]}},
-							"organization": {"teams": {"totalCount": 5, "nodes": [{"slug": "team1"}]}}
+							"repository": {
+								"collaborators": {"nodes": [
+									{"login": "shareduser", "name": "Shared"},
+									{"login": "c1", "name": "C1"}
+								]},
+								"collaboratorsTotalCount": {"totalCount": 10}
+							},
+							"organization": {
+								"teams": {"nodes": [{"slug": "team1"}]},
+								"teamsTotalCount": {"totalCount": 5}
+							}
 						}
 					}`))
 			},
@@ -276,7 +294,10 @@ func TestSuggestedReviewerActors(t *testing.T) {
 							"node": {"suggestedReviewerActors": {"nodes": [
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
 							]}},
-							"repository": {"collaborators": {"totalCount": 3, "nodes": [{"login": "c1", "name": "C1"}]}},
+							"repository": {
+								"collaborators": {"nodes": [{"login": "c1", "name": "C1"}]},
+								"collaboratorsTotalCount": {"totalCount": 3}
+							},
 							"organization": null
 						},
 						"errors": [{"message": "Could not resolve to an Organization with the login of 'OWNER'."}]
@@ -297,8 +318,14 @@ func TestSuggestedReviewerActors(t *testing.T) {
 								{"isAuthor": false, "reviewer": {"__typename": "Bot", "login": "copilot-pull-request-reviewer"}},
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
 							]}},
-							"repository": {"collaborators": {"totalCount": 5, "nodes": []}},
-							"organization": {"teams": {"totalCount": 0, "nodes": []}}
+							"repository": {
+								"collaborators": {"nodes": []},
+								"collaboratorsTotalCount": {"totalCount": 5}
+							},
+							"organization": {
+								"teams": {"nodes": []},
+								"teamsTotalCount": {"totalCount": 0}
+							}
 						}
 					}`))
 			},
