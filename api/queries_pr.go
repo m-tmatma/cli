@@ -939,26 +939,26 @@ func (b ReviewerBot) DisplayName() string {
 func (r ReviewerBot) sealedReviewerCandidate() {}
 
 // ReviewerTeam is a team that can review a pull request.
-// The slug is stored as "org/team-slug" format.
 type ReviewerTeam struct {
-	slug string
+	org      string
+	teamSlug string
 }
 
-// NewReviewerTeam creates a new ReviewerTeam with the full "org/slug" format.
+// NewReviewerTeam creates a new ReviewerTeam.
 func NewReviewerTeam(orgName, teamSlug string) ReviewerTeam {
-	return ReviewerTeam{slug: fmt.Sprintf("%s/%s", orgName, teamSlug)}
+	return ReviewerTeam{org: orgName, teamSlug: teamSlug}
 }
 
 func (r ReviewerTeam) DisplayName() string {
-	return r.slug
+	return fmt.Sprintf("%s/%s", r.org, r.teamSlug)
 }
 
 func (r ReviewerTeam) Login() string {
-	return r.slug
+	return fmt.Sprintf("%s/%s", r.org, r.teamSlug)
 }
 
 func (r ReviewerTeam) Slug() string {
-	return r.slug
+	return r.teamSlug
 }
 
 func (r ReviewerTeam) sealedReviewerCandidate() {}
