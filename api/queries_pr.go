@@ -326,13 +326,16 @@ func (r RequestedReviewer) LoginOrSlug() string {
 
 // DisplayName returns a user-friendly name for the reviewer.
 // For Copilot bot, returns "Copilot (AI)". For teams, returns "org/slug".
-// For users, returns login (could be extended to show name if available).
+// For users, returns "login (Name)" if name is available, otherwise just login.
 func (r RequestedReviewer) DisplayName() string {
 	if r.TypeName == teamTypeName {
 		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
 	}
 	if r.TypeName == "Bot" && r.Login == CopilotReviewerLogin {
 		return "Copilot (AI)"
+	}
+	if r.Name != "" {
+		return fmt.Sprintf("%s (%s)", r.Login, r.Name)
 	}
 	return r.Login
 }

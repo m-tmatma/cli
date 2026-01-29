@@ -102,7 +102,7 @@ var prReviewRequests = shortenQuery(`
 		nodes {
 			requestedReviewer {
 				__typename,
-				...on User{login},
+				...on User{login,name},
 				...on Bot{login},
 				...on Team{
 					organization{login}
