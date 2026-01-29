@@ -66,13 +66,13 @@ cleanup() {
 trap cleanup EXIT
 
 # Check if we're already up to date
-# Note: toolchain directive may be missing when go directive >= latest toolchain.
+# Note: toolchain directive may be missing when go directive matches latest toolchain.
 # This is expected behavior - `go mod tidy` removes the toolchain line when
-# the minimum Go version matches or exceeds the latest toolchain, as it's redundant.
+# the minimum Go version matches the latest toolchain, as it's redundant.
 if [[ "$CURRENT_MAJOR_MINOR" = "$LATEST_MAJOR_MINOR" ]]; then
   # Current go directive is at the same major.minor as latest
   if [[ -z "$CURRENT_TOOLCHAIN_DIRECTIVE" ]]; then
-    # No toolchain directive present - this is expected when go version >= latest
+    # No toolchain directive present - this is expected when go version matches latest
     echo "Already on latest Go version: $CURRENT_GO_DIRECTIVE (latest toolchain: $TOOLCHAIN_VERSION)"
     echo "  → Note: No toolchain directive (expected when go version matches latest toolchain)"
     exit 0
@@ -151,14 +151,25 @@ fi
 # ---- Push & PR --------------------------------------------------------------
 # Get the actual go directive from the updated go.mod
 FINAL_GO_DIRECTIVE=$(grep -E '^go ' "$GO_MOD" | cut -d ' ' -f2)
+FINAL_TOOLCHAIN_DIRECTIVE=$(grep -E '^toolchain ' "$GO_MOD" | cut -d ' ' -f2 || true)
 
-PR_BODY=$(cat <<EOF
+if [[ -n "$FINAL_TOOLCHAIN_DIRECTIVE" ]]; then
+  PR_BODY=$(cat <<EOF
 This PR updates Go to the latest stable release.
 
 * **go directive:** \`$FINAL_GO_DIRECTIVE\`
-* **toolchain:** \`$TOOLCHAIN_VERSION\`
+* **toolchain:** \`$FINAL_TOOLCHAIN_DIRECTIVE\`
 EOF
 )
+else
+  PR_BODY=$(cat <<EOF
+This PR updates Go to the latest stable release.
+
+* **go directive:** \`$FINAL_GO_DIRECTIVE\`
+* **toolchain:** (not specified - go version matches latest toolchain \`$TOOLCHAIN_VERSION\`)
+EOF
+)
+fi
 
 git push -u origin "$BRANCH"
 
