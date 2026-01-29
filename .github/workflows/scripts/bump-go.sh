@@ -47,9 +47,14 @@ LATEST_MAJOR_MINOR="$(cut -d. -f1-2 <<< "$TOOLCHAIN_VERSION")"
 
 echo "  → latest toolchain : $TOOLCHAIN_VERSION"
 
-# ---- Prepare Git branch ---------------------------------------------------
-CURRENT_GO_DIRECTIVE=$(grep -E '^go ' "$GO_MOD" | cut -d ' ' -f2)
-CURRENT_TOOLCHAIN_DIRECTIVE=$(grep -E '^toolchain ' "$GO_MOD" | cut -d ' ' -f2 || true)
+# ---- Read current go.mod state using go mod edit ----------------------------
+GO_MOD_JSON=$(go mod edit -json "$GO_MOD")
+CURRENT_GO_DIRECTIVE=$(jq -r '.Go // ""' <<< "$GO_MOD_JSON")
+CURRENT_TOOLCHAIN_DIRECTIVE=$(jq -r '.Toolchain // ""' <<< "$GO_MOD_JSON")
+
+# Handle empty values from jq
+[[ "$CURRENT_GO_DIRECTIVE" == "null" || -z "$CURRENT_GO_DIRECTIVE" ]] && CURRENT_GO_DIRECTIVE=""
+[[ "$CURRENT_TOOLCHAIN_DIRECTIVE" == "null" || -z "$CURRENT_TOOLCHAIN_DIRECTIVE" ]] && CURRENT_TOOLCHAIN_DIRECTIVE=""
 
 CURRENT_MAJOR_MINOR="$(cut -d. -f1-2 <<< "$CURRENT_GO_DIRECTIVE")"
 
@@ -87,12 +92,12 @@ echo "Creating branch $BRANCH"
 git switch -c "$BRANCH" >/dev/null 2>&1
 BRANCH_CREATED=1
 
-# ---- Patch go.mod -----------------------------------------------------------
+# ---- Patch go.mod using go mod edit -----------------------------------------
 # Only update go directive if we're not already at the latest major.minor version
 if [[ "$CURRENT_MAJOR_MINOR" != "$LATEST_MAJOR_MINOR" ]]; then
   # Bump to the latest major.minor.0 (preserves the convention of X.Y.0 for go directive)
   NEW_GO_DIRECTIVE="$LATEST_MAJOR_MINOR.0"
-  sed -Ei.bak "s/^go [0-9]+\.[0-9]+.*$/go $NEW_GO_DIRECTIVE/" "$GO_MOD"
+  go mod edit -go="$NEW_GO_DIRECTIVE" "$GO_MOD"
   echo "  • go directive $CURRENT_GO_DIRECTIVE → $NEW_GO_DIRECTIVE"
   # After updating, the current go directive is now the new one for toolchain logic
   CURRENT_GO_DIRECTIVE="$NEW_GO_DIRECTIVE"
@@ -106,18 +111,15 @@ if [[ -z "$CURRENT_TOOLCHAIN_DIRECTIVE" ]]; then
     # go directive is at latest major.minor - toolchain line is redundant
     echo "  • toolchain directive not needed (go version matches latest toolchain)"
   else
-    # go directive is older than latest toolchain - add toolchain directive after go line
-    sed -Ei.bak "/^go [0-9]+\.[0-9]+/a\\
-toolchain go$TOOLCHAIN_VERSION" "$GO_MOD"
+    # go directive is older than latest toolchain - add toolchain directive
+    go mod edit -toolchain="go$TOOLCHAIN_VERSION" "$GO_MOD"
     echo "  • toolchain directive added: go$TOOLCHAIN_VERSION"
   fi
 elif [[ "$CURRENT_TOOLCHAIN_DIRECTIVE" != "go$TOOLCHAIN_VERSION" ]]; then
   # Toolchain directive exists but needs updating
-  sed -Ei.bak "s/^toolchain go[0-9]+\.[0-9]+\.[0-9]+.*$/toolchain go$TOOLCHAIN_VERSION/" "$GO_MOD"
+  go mod edit -toolchain="go$TOOLCHAIN_VERSION" "$GO_MOD"
   echo "  • toolchain $CURRENT_TOOLCHAIN_DIRECTIVE → go$TOOLCHAIN_VERSION"
 fi
-
-rm -f "$GO_MOD.bak"
 
 git add "$GO_MOD"
 
@@ -149,9 +151,13 @@ if [[ $APPLY -eq 0 ]]; then
 fi
 
 # ---- Push & PR --------------------------------------------------------------
-# Get the actual go directive from the updated go.mod
-FINAL_GO_DIRECTIVE=$(grep -E '^go ' "$GO_MOD" | cut -d ' ' -f2)
-FINAL_TOOLCHAIN_DIRECTIVE=$(grep -E '^toolchain ' "$GO_MOD" | cut -d ' ' -f2 || true)
+# Get the actual go directive from the updated go.mod using go mod edit
+FINAL_GO_MOD_JSON=$(go mod edit -json "$GO_MOD")
+FINAL_GO_DIRECTIVE=$(jq -r '.Go // ""' <<< "$FINAL_GO_MOD_JSON")
+FINAL_TOOLCHAIN_DIRECTIVE=$(jq -r '.Toolchain // ""' <<< "$FINAL_GO_MOD_JSON")
+
+# Handle empty/null values
+[[ "$FINAL_TOOLCHAIN_DIRECTIVE" == "null" || -z "$FINAL_TOOLCHAIN_DIRECTIVE" ]] && FINAL_TOOLCHAIN_DIRECTIVE=""
 
 if [[ -n "$FINAL_TOOLCHAIN_DIRECTIVE" ]]; then
   PR_BODY=$(cat <<EOF
