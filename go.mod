@@ -1,6 +1,6 @@
 module github.com/cli/cli/v2
 
-go 1.25.5
+go 1.25.6
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -15,7 +15,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/cli/go-gh/v2 v2.13.0
 	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
-	github.com/cli/oauth v1.2.1
+	github.com/cli/oauth v1.2.2
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.7
 	github.com/creack/pty v1.1.24
