@@ -50,10 +50,9 @@ type EditableAssignees struct {
 }
 
 // EditableReviewers is a special case of EditableSlice.
-// It tracks both display names (for UI) and logins (for API mutations).
 type EditableReviewers struct {
 	EditableSlice
-	DefaultLogins []string // Logins for computing add/remove sets
+	DefaultLogins []string // For disambiguating actors from display names
 }
 
 // ProjectsV2 mutations require a mapping of an item ID to a project ID.
