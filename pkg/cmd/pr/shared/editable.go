@@ -459,7 +459,7 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 			fetchReviewers = true
 		}
 		// Note: Non-interactive flows (with Add/Remove) don't need to fetch reviewers/teams
-		// because the REST API accepts logins and team slugs directly.
+		// because the APIs in use for both GHES and GitHub.com accept user logins and team slugs directly.
 	}
 
 	fetchAssignees := false
