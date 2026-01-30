@@ -465,7 +465,6 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 	fetchAssignees := false
 	if editable.Assignees.Edited {
 		// Similar as above, this is likely an interactive flow if no Add/Remove slices are set.
-		// The addition here is that we also check for an assignee search func.
 		// If we have a search func, we don't need to fetch assignees since we
 		// assume that will be done dynamically in the prompting flow.
 		if len(editable.Assignees.Add) == 0 && len(editable.Assignees.Remove) == 0 && editable.AssigneeSearchFunc == nil {
@@ -473,6 +472,8 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 		}
 		// However, if we have Add/Remove operations (non-interactive flow),
 		// we do need to fetch the assignees.
+		// TODO: KW noninteractive assignees need to migrate to directly use
+		// new logins input with ReplaceActorsForAssignable to prevent fetching.
 		if len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0 {
 			fetchAssignees = true
 		}

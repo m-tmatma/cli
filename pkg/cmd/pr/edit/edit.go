@@ -297,7 +297,8 @@ func editRun(opts *EditOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	// Wire up search functions for assignees and reviewers.
-	// Only enabled on github.com.
+	// When these aren't wired up, it triggers a downstream fallback
+	// to legacy reviewer/assignee fetching.
 	if issueFeatures.ActorIsAssignable {
 		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, &editable, pr.ID)
 		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
