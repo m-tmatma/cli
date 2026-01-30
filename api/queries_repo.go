@@ -1080,8 +1080,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 	return projects, nil
 }
 
-// Expected login for Copilot when retrieved as an Actor
-// This is returned from assignable actors and issue/pr assigned actors.
+// Expected login for Copilot when retrieved as an assignee
 const CopilotAssigneeLogin = "copilot-swe-agent"
 
 // Expected login for Copilot when retrieved as a Pull Request Reviewer.
