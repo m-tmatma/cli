@@ -317,6 +317,9 @@ type RequestedReviewer struct {
 	} `json:"organization"`
 }
 
+const teamTypeName = "Team"
+const botTypeName = "Bot"
+
 func (r RequestedReviewer) LoginOrSlug() string {
 	if r.TypeName == teamTypeName {
 		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
@@ -331,7 +334,7 @@ func (r RequestedReviewer) DisplayName() string {
 	if r.TypeName == teamTypeName {
 		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
 	}
-	if r.TypeName == "Bot" && r.Login == CopilotReviewerLogin {
+	if r.TypeName == botTypeName && r.Login == CopilotReviewerLogin {
 		return "Copilot (AI)"
 	}
 	if r.Name != "" {
@@ -339,8 +342,6 @@ func (r RequestedReviewer) DisplayName() string {
 	}
 	return r.Login
 }
-
-const teamTypeName = "Team"
 
 func (r ReviewRequests) Logins() []string {
 	logins := make([]string, len(r.Nodes))
@@ -669,6 +670,20 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	return pr, nil
 }
 
+// extractTeamSlugs extracts just the slug portion from team identifiers.
+// Team identifiers can be in "org/slug" format; this returns just the slug.
+func extractTeamSlugs(teams []string) []string {
+	slugs := make([]string, 0, len(teams))
+	for _, t := range teams {
+		if t == "" {
+			continue
+		}
+		s := strings.SplitN(t, "/", 2)
+		slugs = append(slugs, s[len(s)-1])
+	}
+	return slugs
+}
+
 // AddPullRequestReviews adds the given user and team reviewers to a pull request using the REST API.
 // Team identifiers can be in "org/slug" format.
 func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
@@ -679,16 +694,6 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 	// The API requires empty arrays instead of null values
 	if users == nil {
 		users = []string{}
-	}
-
-	// Extract just the slug from org/slug format
-	teamSlugs := make([]string, 0, len(teams))
-	for _, t := range teams {
-		if idx := strings.Index(t, "/"); idx >= 0 {
-			teamSlugs = append(teamSlugs, t[idx+1:])
-		} else if t != "" {
-			teamSlugs = append(teamSlugs, t)
-		}
 	}
 
 	path := fmt.Sprintf(
@@ -702,7 +707,7 @@ func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, 
 		TeamReviewers []string `json:"team_reviewers"`
 	}{
 		Reviewers:     users,
-		TeamReviewers: teamSlugs,
+		TeamReviewers: extractTeamSlugs(teams),
 	}
 	buf := &bytes.Buffer{}
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
@@ -724,16 +729,6 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		users = []string{}
 	}
 
-	// Extract just the slug from org/slug format
-	teamSlugs := make([]string, 0, len(teams))
-	for _, t := range teams {
-		if idx := strings.Index(t, "/"); idx >= 0 {
-			teamSlugs = append(teamSlugs, t[idx+1:])
-		} else if t != "" {
-			teamSlugs = append(teamSlugs, t)
-		}
-	}
-
 	path := fmt.Sprintf(
 		"repos/%s/%s/pulls/%d/requested_reviewers",
 		url.PathEscape(repo.RepoOwner()),
@@ -745,7 +740,7 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 		TeamReviewers []string `json:"team_reviewers"`
 	}{
 		Reviewers:     users,
-		TeamReviewers: teamSlugs,
+		TeamReviewers: extractTeamSlugs(teams),
 	}
 	buf := &bytes.Buffer{}
 	if err := json.NewEncoder(buf).Encode(body); err != nil {
@@ -770,7 +765,7 @@ func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, u
 
 	var mutation struct {
 		RequestReviewsByLogin struct {
-			ClientMutationID string
+			ClientMutationId string `graphql:"clientMutationId"`
 		} `graphql:"requestReviewsByLogin(input: $input)"`
 	}
 
