@@ -684,6 +684,16 @@ func extractTeamSlugs(teams []string) []string {
 	return slugs
 }
 
+// toGitHubV4Strings converts a string slice to a githubv4.String slice,
+// optionally appending a suffix to each element.
+func toGitHubV4Strings(strs []string, suffix string) []githubv4.String {
+	result := make([]githubv4.String, len(strs))
+	for i, s := range strs {
+		result[i] = githubv4.String(s + suffix)
+	}
+	return result
+}
+
 // AddPullRequestReviews adds the given user and team reviewers to a pull request using the REST API.
 // Team identifiers can be in "org/slug" format.
 func AddPullRequestReviews(client *Client, repo ghrepo.Interface, prNumber int, users, teams []string) error {
@@ -782,23 +792,14 @@ func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, u
 		Union:         githubv4.Boolean(union),
 	}
 
-	userLoginValues := make([]githubv4.String, len(userLogins))
-	for i, l := range userLogins {
-		userLoginValues[i] = githubv4.String(l)
-	}
+	userLoginValues := toGitHubV4Strings(userLogins, "")
 	input.UserLogins = &userLoginValues
 
-	botLoginValues := make([]githubv4.String, len(botLogins))
-	for i, l := range botLogins {
-		// Bot logins require the [bot] suffix for the mutation
-		botLoginValues[i] = githubv4.String(l + "[bot]")
-	}
+	// Bot logins require the [bot] suffix for the mutation
+	botLoginValues := toGitHubV4Strings(botLogins, "[bot]")
 	input.BotLogins = &botLoginValues
 
-	teamSlugValues := make([]githubv4.String, len(teamSlugs))
-	for i, s := range teamSlugs {
-		teamSlugValues[i] = githubv4.String(s)
-	}
+	teamSlugValues := toGitHubV4Strings(teamSlugs, "")
 	input.TeamSlugs = &teamSlugValues
 
 	variables := map[string]interface{}{
