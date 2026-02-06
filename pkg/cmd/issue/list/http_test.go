@@ -214,3 +214,22 @@ func TestSearchIssuesAndAdvancedSearch(t *testing.T) {
 		})
 	}
 }
+
+func TestSearchIssues_rejectsPullRequestQualifiers(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	httpClient := &http.Client{Transport: reg}
+	client := api.NewClientFromHTTP(httpClient)
+
+	_, err := searchIssues(
+		client,
+		fd.AdvancedIssueSearchSupportedAsOnlyBackend(),
+		ghrepo.New("OWNER", "REPO"),
+		prShared.FilterOptions{Search: "is:pr"},
+		30,
+	)
+
+	assert.EqualError(t, err, "cannot use pull request search qualifiers with `gh issue list`; use `gh pr list` instead")
+	assert.Len(t, reg.Requests, 0)
+}
