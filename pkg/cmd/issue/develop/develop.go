@@ -4,6 +4,8 @@ import (
 	ctx "context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -174,7 +176,6 @@ func developRun(opts *DevelopOptions) error {
 
 func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrepo.Interface, issue *api.Issue) error {
 	branchRepo := issueRepo
-	var repoID string
 	if opts.BranchRepo != "" {
 		var err error
 		branchRepo, err = ghrepo.FromFullName(opts.BranchRepo)
@@ -183,24 +184,66 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		}
 	}
 
-	opts.IO.StartProgressIndicator()
-	repoID, branchID, err := api.FindRepoBranchID(apiClient, branchRepo, opts.BaseBranch)
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return err
+	branchName := ""
+	reusedExisting := false
+	if opts.Name != "" {
+		opts.IO.StartProgressIndicator()
+		branches, err := api.ListLinkedBranches(apiClient, issueRepo, issue.Number)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		branchName = findExistingLinkedBranchName(branches, branchRepo, opts.Name)
+		reusedExisting = branchName != ""
 	}
 
-	opts.IO.StartProgressIndicator()
-	branchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, opts.Name)
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return err
+	repoID := ""
+	branchID := ""
+	baseValidated := false
+	if opts.BaseBranch != "" {
+		opts.IO.StartProgressIndicator()
+		foundRepoID, foundBranchID, err := api.FindRepoBranchID(apiClient, branchRepo, opts.BaseBranch)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		repoID = foundRepoID
+		branchID = foundBranchID
+		baseValidated = true
+	}
+
+	if branchName == "" {
+		if !baseValidated {
+			opts.IO.StartProgressIndicator()
+			foundRepoID, foundBranchID, err := api.FindRepoBranchID(apiClient, branchRepo, opts.BaseBranch)
+			opts.IO.StopProgressIndicator()
+			if err != nil {
+				return err
+			}
+			repoID = foundRepoID
+			branchID = foundBranchID
+		}
+
+		opts.IO.StartProgressIndicator()
+		createdBranchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, opts.Name)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		branchName = createdBranchName
+	}
+
+	if branchName == "" {
+		return fmt.Errorf("failed to create linked branch: API returned empty branch name")
+	}
+
+	if reusedExisting && opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.ErrOut, "Using existing linked branch %q\n", branchName)
 	}
 
 	// Remember which branch to target when creating a PR.
 	if opts.BaseBranch != "" {
-		err = opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch)
-		if err != nil {
+		if err := opts.GitClient.SetBranchConfig(ctx.Background(), branchName, git.MergeBaseConfig, opts.BaseBranch); err != nil {
 			return err
 		}
 	}
@@ -208,6 +251,35 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	fmt.Fprintf(opts.IO.Out, "%s/%s/tree/%s\n", branchRepo.RepoHost(), ghrepo.FullName(branchRepo), branchName)
 
 	return checkoutBranch(opts, branchRepo, branchName)
+}
+
+func findExistingLinkedBranchName(branches []api.LinkedBranch, branchRepo ghrepo.Interface, branchName string) string {
+	for _, branch := range branches {
+		if branch.BranchName != branchName {
+			continue
+		}
+		linkedRepo, err := linkedBranchRepoFromURL(branch.URL)
+		if err != nil {
+			continue
+		}
+		if ghrepo.IsSame(linkedRepo, branchRepo) {
+			return branch.BranchName
+		}
+	}
+	return ""
+}
+
+func linkedBranchRepoFromURL(branchURL string) (ghrepo.Interface, error) {
+	u, err := url.Parse(branchURL)
+	if err != nil {
+		return nil, err
+	}
+	pathParts := strings.SplitN(strings.Trim(u.Path, "/"), "/", 3)
+	if len(pathParts) < 2 {
+		return nil, fmt.Errorf("invalid linked branch URL: %q", branchURL)
+	}
+	u.Path = "/" + strings.Join(pathParts[0:2], "/")
+	return ghrepo.FromURL(u)
 }
 
 func developRunList(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrepo.Interface, issue *api.Issue) error {
