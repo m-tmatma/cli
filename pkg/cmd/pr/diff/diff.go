@@ -2,10 +2,12 @@ package diff
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -36,6 +38,7 @@ type DiffOptions struct {
 	Patch       bool
 	NameOnly    bool
 	BrowserMode bool
+	Exclude     []string
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
@@ -92,6 +95,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in the browser")
+	cmd.Flags().StringSliceVarP(&opts.Exclude, "exclude", "e", nil, "Exclude files matching glob `patterns` from the diff")
 
 	return cmd
 }
@@ -135,6 +139,13 @@ func diffRun(opts *DiffOptions) error {
 	defer diffReadCloser.Close()
 
 	var diff io.Reader = diffReadCloser
+	if len(opts.Exclude) > 0 {
+		filtered, err := filterDiff(diff, opts.Exclude)
+		if err != nil {
+			return err
+		}
+		diff = filtered
+	}
 	if opts.IO.IsStdoutTTY() {
 		diff = sanitizedReader(diff)
 	}
@@ -356,4 +367,66 @@ func (t sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err e
 // isPrint reports if a rune is safe to be printed to a terminal
 func isPrint(r rune) bool {
 	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
+}
+
+var diffHeaderRegexp = regexp.MustCompile(`diff\s--git.*\s(["]?)b/(.*)`)
+
+// filterDiff reads a unified diff and returns a new reader with file entries
+// matching any of the exclude patterns removed.
+func filterDiff(r io.Reader, patterns []string) (io.Reader, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var result bytes.Buffer
+	for _, section := range splitDiffSections(string(data)) {
+		name := extractFileName([]byte(section))
+		if name != "" && matchesAny(name, patterns) {
+			continue
+		}
+		result.WriteString(section)
+	}
+	return &result, nil
+}
+
+// splitDiffSections splits a unified diff string into per-file sections.
+// Each section starts with "diff --git" and includes all content up to (but
+// not including) the next "diff --git" line.
+func splitDiffSections(diff string) []string {
+	marker := "\ndiff --git "
+	var sections []string
+	for {
+		idx := strings.Index(diff, marker)
+		if idx == -1 {
+			if len(diff) > 0 {
+				sections = append(sections, diff)
+			}
+			break
+		}
+		sections = append(sections, diff[:idx+1]) // include the trailing \n
+		diff = diff[idx+1:]                        // next section starts at "diff --git"
+	}
+	return sections
+}
+
+func extractFileName(section []byte) string {
+	m := diffHeaderRegexp.FindSubmatch(section)
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSpace(string(m[1]) + string(m[2]))
+}
+
+func matchesAny(name string, patterns []string) bool {
+	for _, p := range patterns {
+		if matched, _ := filepath.Match(p, name); matched {
+			return true
+		}
+		// Also match against the basename so "*.yml" matches "dir/file.yml"
+		if matched, _ := filepath.Match(p, filepath.Base(name)); matched {
+			return true
+		}
+	}
+	return false
 }
