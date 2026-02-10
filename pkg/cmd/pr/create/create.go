@@ -399,7 +399,7 @@ func createRun(opts *CreateOptions) error {
 	client := ctx.Client
 
 	// Detect ActorIsAssignable feature to determine if we can use search-based
-	// reviewer selection (github.com) or need to use traditional ID-based selection (GHES)
+	// reviewer selection (github.com) or need to use legacy ID-based selection (GHES)
 	issueFeatures, _ := opts.Detector.IssueFeatures()
 	var reviewerSearchFunc func(string) prompter.MultiSelectSearchResult
 	if issueFeatures.ActorIsAssignable {
