@@ -400,7 +400,10 @@ func createRun(opts *CreateOptions) error {
 
 	// Detect ActorIsAssignable feature to determine if we can use search-based
 	// reviewer selection (github.com) or need to use legacy ID-based selection (GHES)
-	issueFeatures, _ := opts.Detector.IssueFeatures()
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
 	var reviewerSearchFunc func(string) prompter.MultiSelectSearchResult
 	if issueFeatures.ActorIsAssignable {
 		// Create search function for reviewer selection using login-based API
