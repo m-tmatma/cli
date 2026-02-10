@@ -406,7 +406,6 @@ func createRun(opts *CreateOptions) error {
 	}
 	var reviewerSearchFunc func(string) prompter.MultiSelectSearchResult
 	if issueFeatures.ActorIsAssignable {
-		// Create search function for reviewer selection using login-based API
 		reviewerSearchFunc = func(query string) prompter.MultiSelectSearchResult {
 			candidates, moreResults, err := api.SuggestedReviewerActorsForRepo(client, ctx.PRRefs.BaseRepo(), query)
 			if err != nil {
