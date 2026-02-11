@@ -118,10 +118,13 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	}
 
 	var userReviewers []string
+	var botReviewers []string
 	var teamReviewers []string
 	for _, r := range tb.Reviewers {
 		if strings.ContainsRune(r, '/') {
 			teamReviewers = append(teamReviewers, r)
+		} else if r == api.CopilotReviewerLogin {
+			botReviewers = append(botReviewers, r)
 		} else {
 			userReviewers = append(userReviewers, r)
 		}
@@ -131,6 +134,9 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	// RequestReviewsByLogin mutation. Otherwise, resolve to IDs for GHES compatibility.
 	if tb.ActorReviewers {
 		params["userReviewerLogins"] = userReviewers
+		if len(botReviewers) > 0 {
+			params["botReviewerLogins"] = botReviewers
+		}
 		params["teamReviewerSlugs"] = teamReviewers
 	} else {
 		userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
