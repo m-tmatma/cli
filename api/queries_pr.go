@@ -618,11 +618,12 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 
 	// Request reviewers using either login-based (github.com) or ID-based (GHES) mutation
 	userLogins, hasUserLogins := params["userReviewerLogins"].([]string)
+	botLogins, _ := params["botReviewerLogins"].([]string)
 	teamSlugs, hasTeamSlugs := params["teamReviewerSlugs"].([]string)
 
 	if hasUserLogins || hasTeamSlugs {
 		// Use login-based mutation (RequestReviewsByLogin) for github.com
-		err := RequestReviewsByLogin(client, repo, pr.ID, userLogins, nil, teamSlugs, true)
+		err := RequestReviewsByLogin(client, repo, pr.ID, userLogins, botLogins, teamSlugs, true)
 		if err != nil {
 			return pr, err
 		}
