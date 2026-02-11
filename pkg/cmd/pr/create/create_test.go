@@ -909,7 +909,7 @@ func Test_createRun(t *testing.T) {
 				opts.Assignees = []string{"monalisa"}
 				opts.Labels = []string{"bug", "todo"}
 				opts.Projects = []string{"roadmap"}
-				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Reviewers = []string{"hubot", "monalisa", "OWNER/core", "OWNER/robots"}
 				opts.Milestone = "big one.oh"
 				return func() {}
 			},
@@ -1648,7 +1648,7 @@ func Test_createRun_GHES(t *testing.T) {
 				opts.HeadBranch = "feature"
 				opts.Assignees = []string{"monalisa"}
 				opts.Labels = []string{"bug", "todo"}
-				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Reviewers = []string{"hubot", "monalisa", "OWNER/core", "OWNER/robots"}
 				opts.Milestone = "big one.oh"
 				opts.DryRun = true
 				return func() {}
@@ -1709,7 +1709,7 @@ func Test_createRun_GHES(t *testing.T) {
 				`base:	trunk`,
 				`head:	feature`,
 				`labels:	bug, todo`,
-				`reviewers:	hubot, monalisa, /core, /robots`,
+				`reviewers:	hubot, monalisa, OWNER/core, OWNER/robots`,
 				`assignees:	monalisa`,
 				`milestones:	big one.oh`,
 				`maintainerCanModify:	false`,
@@ -1731,7 +1731,7 @@ func Test_createRun_GHES(t *testing.T) {
 				opts.HeadBranch = "feature"
 				opts.Assignees = []string{"monalisa"}
 				opts.Labels = []string{"bug", "todo"}
-				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Reviewers = []string{"hubot", "monalisa", "OWNER/core", "OWNER/robots"}
 				opts.Milestone = "big one.oh"
 				opts.DryRun = true
 				return func() {}
@@ -1792,7 +1792,7 @@ func Test_createRun_GHES(t *testing.T) {
 				`Base: trunk`,
 				`Head: feature`,
 				`Labels: bug, todo`,
-				`Reviewers: hubot, monalisa, /core, /robots`,
+				`Reviewers: hubot, monalisa, OWNER/core, OWNER/robots`,
 				`Assignees: monalisa`,
 				`Milestones: big one.oh`,
 				`MaintainerCanModify: false`,
