@@ -764,8 +764,8 @@ func RemovePullRequestReviews(client *Client, repo ghrepo.Interface, prNumber in
 // RequestReviewsByLogin sets requested reviewers on a pull request using the GraphQL mutation.
 // This mutation replaces existing reviewers with the provided set unless union is true.
 // Only available on github.com, not GHES.
-// Bot logins should include the [bot] suffix (e.g., "copilot-pull-request-reviewer[bot]").
-// Team slugs should be in the format "org/team-slug".
+// Bot logins should be passed without the [bot] suffix; it is appended automatically.
+// Team slugs must be in the format "org/team-slug".
 // When union is false (replace mode), passing empty slices will remove all reviewers.
 func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, userLogins, botLogins, teamSlugs []string, union bool) error {
 	// In union mode (additive), nothing to do if all lists are empty.

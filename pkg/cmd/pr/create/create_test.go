@@ -987,7 +987,7 @@ func Test_createRun(t *testing.T) {
 				`, func(inputs map[string]interface{}) {
 						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
 						assert.Equal(t, []interface{}{"hubot", "monalisa"}, inputs["userLogins"])
-						assert.Equal(t, []interface{}{"/core", "/robots"}, inputs["teamSlugs"])
+						assert.Equal(t, []interface{}{"OWNER/core", "OWNER/robots"}, inputs["teamSlugs"])
 						assert.Equal(t, true, inputs["union"])
 					}))
 			},

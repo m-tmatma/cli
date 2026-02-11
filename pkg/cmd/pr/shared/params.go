@@ -122,6 +122,10 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	var teamReviewers []string
 	for _, r := range tb.Reviewers {
 		if strings.ContainsRune(r, '/') {
+			// Normalize /slug shorthand to org/slug using the repo owner
+			if strings.HasPrefix(r, "/") {
+				r = baseRepo.RepoOwner() + r
+			}
 			teamReviewers = append(teamReviewers, r)
 		} else if r == api.CopilotReviewerLogin {
 			botReviewers = append(botReviewers, r)
