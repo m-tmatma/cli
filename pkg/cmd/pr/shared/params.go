@@ -131,17 +131,7 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	// RequestReviewsByLogin mutation. Otherwise, resolve to IDs for GHES compatibility.
 	if tb.ActorReviewers {
 		params["userReviewerLogins"] = userReviewers
-		// Extract team slugs from org/slug format
-		teamSlugs := make([]string, len(teamReviewers))
-		for i, t := range teamReviewers {
-			parts := strings.SplitN(t, "/", 2)
-			if len(parts) == 2 {
-				teamSlugs[i] = parts[1]
-			} else {
-				teamSlugs[i] = t
-			}
-		}
-		params["teamReviewerSlugs"] = teamSlugs
+		params["teamReviewerSlugs"] = teamReviewers
 	} else {
 		userReviewerIDs, err := tb.MetadataResult.MembersToIDs(userReviewers)
 		if err != nil {
