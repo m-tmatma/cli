@@ -1128,7 +1128,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	forkableRefs, requiresFork := refs.(forkableRefs)
 	if requiresFork {
 		opts.IO.StartProgressIndicator()
-		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", false)
+		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", true)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
