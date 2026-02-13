@@ -185,7 +185,10 @@ func (r ReviewRequests) DisplayNames() []string {
 }
 
 // ReviewerCandidate represents a potential reviewer for a pull request.
-// This can be a User, Bot, or Team.
+// This can be a User, Bot, or Team. It mirrors AssignableActor but adds
+// team support (teams can review but not be assigned) and drops the ID method.
+// ReviewerUser and ReviewerBot are thin wrappers around AssignableUser and
+// AssignableBot that satisfy this interface.
 type ReviewerCandidate interface {
 	DisplayName() string
 	Login() string
