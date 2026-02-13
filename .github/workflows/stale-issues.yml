@@ -15,7 +15,7 @@ jobs:
           start-date: "2025-07-10T00:00:00Z"  # Skip for issues created before this date
           days-before-issue-stale: 30
           only-issue-labels: 
-            "needs-triage,needs-user-input"   # Only issues with all of these labels can be marked as stale
+            "needs-triage,more-info-needed"   # Only issues with all of these labels can be marked as stale
           exempt-issue-labels: "keep"         # Issues marked with this label should not be marked as stale
           stale-issue-label: "stale"          # Mark stale issues with this label
           stale-issue-message: |

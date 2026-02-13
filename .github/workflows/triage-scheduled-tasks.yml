@@ -1,0 +1,13 @@
+name: Triage Scheduled Tasks
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: '5 * * * *'   # Hourly — no-response close
+
+jobs:
+  no-response:
+    uses: desktop/gh-cli-and-desktop-shared-workflows/.github/workflows/triage-no-response-close.yml@main
+    permissions:
+      issues: write
