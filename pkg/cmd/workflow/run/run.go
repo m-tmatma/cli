@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
 	"sort"
 	"strings"
@@ -319,7 +320,7 @@ func runRun(opts *RunOptions) error {
 		returnRunDetailsSupported = features.DispatchRunDetails
 	}
 
-	path := fmt.Sprintf("repos/%s/actions/workflows/%d/dispatches", ghrepo.FullName(repo), workflow.ID)
+	path := fmt.Sprintf("repos/%s/%s/actions/workflows/%d/dispatches", url.PathEscape(repo.RepoOwner()), url.PathEscape(repo.RepoName()), workflow.ID)
 
 	requestBody := map[string]interface{}{
 		"ref":    ref,
