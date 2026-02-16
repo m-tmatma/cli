@@ -360,23 +360,22 @@ func runRun(opts *RunOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		out := opts.IO.Out
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(out, "%s Created workflow_dispatch event for %s at %s\n",
+		fmt.Fprintf(opts.IO.Out, "%s Created workflow_dispatch event for %s at %s\n",
 			cs.SuccessIcon(), cs.Cyan(workflow.Base()), cs.Bold(ref))
 
 		if response.HtmlURL != "" {
-			fmt.Fprintln(out, response.HtmlURL)
+			fmt.Fprintln(opts.IO.Out, response.HtmlURL)
 		}
 
-		fmt.Fprintln(out)
+		fmt.Fprintln(opts.IO.Out)
 
 		if response.WorkflowRunID != 0 {
-			fmt.Fprintf(out, "To see the created workflow run, try: %s\n",
+			fmt.Fprintf(opts.IO.Out, "To see the created workflow run, try: %s\n",
 				cs.Boldf("gh run view %d", response.WorkflowRunID))
 		}
 
-		fmt.Fprintf(out, "To see runs for this workflow, try: %s\n",
+		fmt.Fprintf(opts.IO.Out, "To see runs for this workflow, try: %s\n",
 			cs.Boldf("gh run list --workflow=%q", workflow.Base()))
 	} else {
 		if response.HtmlURL != "" {
