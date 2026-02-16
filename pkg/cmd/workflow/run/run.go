@@ -10,9 +10,11 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -25,6 +27,7 @@ type RunOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Detector   fd.Detector
 	Prompter   iprompter
 
 	Selector  string
@@ -64,6 +67,8 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			- Interactively
 			- Via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
 			- As JSON, via standard input
+
+			When running non-interactively, the created workflow run URL will be returned if available.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
@@ -260,6 +265,11 @@ func runRun(opts *RunOptions) error {
 		return err
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(c, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, repo.RepoHost())
+	}
+
 	ref := opts.Ref
 
 	if ref == "" {
@@ -303,20 +313,48 @@ func runRun(opts *RunOptions) error {
 		}
 	}
 
-	path := fmt.Sprintf("repos/%s/actions/workflows/%d/dispatches",
-		ghrepo.FullName(repo), workflow.ID)
+	var returnRunDetailsSupported bool
+	if features, err := opts.Detector.ActionsFeatures(); err == nil {
+		// If there's an error detecting features, we assume the feature is not supported.
+		returnRunDetailsSupported = features.DispatchRunDetails
+	}
 
-	requestByte, err := json.Marshal(map[string]interface{}{
+	path := fmt.Sprintf("repos/%s/actions/workflows/%d/dispatches", ghrepo.FullName(repo), workflow.ID)
+
+	requestBody := map[string]interface{}{
 		"ref":    ref,
 		"inputs": providedInputs,
-	})
+	}
+
+	if returnRunDetailsSupported {
+		requestBody["return_run_details"] = true
+	}
+
+	requestByte, err := json.Marshal(requestBody)
 	if err != nil {
 		return fmt.Errorf("failed to serialize workflow inputs: %w", err)
 	}
 
 	body := bytes.NewReader(requestByte)
 
-	err = client.REST(repo.RepoHost(), "POST", path, body, nil)
+	var response struct {
+		WorkflowRunID int64  `json:"workflow_run_id"`
+		RunURL        string `json:"run_url"`
+		HtmlURL       string `json:"html_url"`
+	}
+
+	// Note that the workflow dispatch endpoint used to return 204 No Content
+	// (with no body, obviously). Now it's possible for the endpoint to also
+	// return 200 OK with created run details. So, we have to handle both cases
+	// because old GHE versions still return 204. Even on github.com, we
+	// may still get 204 for any reason.
+	//
+	// Our REST client library is smart enough to ignore JSON unmarshal when it
+	// receives 204, so we're safe here anyway.
+	//
+	// As a related note, the new REST API version (which will come with breaking
+	// changes) will probably default to return 200 + run details.
+	err = client.REST(repo.RepoHost(), "POST", path, body, &response)
 	if err != nil {
 		return fmt.Errorf("could not create workflow dispatch event: %w", err)
 	}
@@ -327,10 +365,23 @@ func runRun(opts *RunOptions) error {
 		fmt.Fprintf(out, "%s Created workflow_dispatch event for %s at %s\n",
 			cs.SuccessIcon(), cs.Cyan(workflow.Base()), cs.Bold(ref))
 
+		if response.HtmlURL != "" {
+			fmt.Fprintln(out, response.HtmlURL)
+		}
+
 		fmt.Fprintln(out)
+
+		if response.WorkflowRunID != 0 {
+			fmt.Fprintf(out, "To see the created workflow run, try: %s\n",
+				cs.Boldf("gh run view %d", response.WorkflowRunID))
+		}
 
 		fmt.Fprintf(out, "To see runs for this workflow, try: %s\n",
 			cs.Boldf("gh run list --workflow=%q", workflow.Base()))
+	} else {
+		if response.HtmlURL != "" {
+			fmt.Fprintln(opts.IO.Out, response.HtmlURL)
+		}
 	}
 
 	return nil
