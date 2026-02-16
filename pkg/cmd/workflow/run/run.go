@@ -327,6 +327,10 @@ func runRun(opts *RunOptions) error {
 		"inputs": providedInputs,
 	}
 
+	// TODO workflowDispatchRunDetailsCleanup
+	// We will have to always set the `return_run_details` field to true, unless
+	// we opt into the the new REST API version, which will probably return the
+	// details by default.
 	if returnRunDetailsSupported {
 		requestBody["return_run_details"] = true
 	}
