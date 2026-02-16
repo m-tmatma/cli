@@ -732,7 +732,7 @@ func TestActionsFeatures(t *testing.T) {
 			},
 		},
 		{
-			name:     "GHE 3.21, workflow dispatch run details not supported",
+			name:     "GHE 3.21, workflow dispatch run details supported",
 			hostname: "git.my.org",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
