@@ -69,7 +69,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			- Via %[1]s-f/--raw-field%[1]s or %[1]s-F/--field%[1]s flags
 			- As JSON, via standard input
 
-			When running non-interactively, the created workflow run URL will be returned if available.
+			The created workflow run URL will be returned if available.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Have gh prompt you for what workflow you'd like to run and interactively collect inputs
