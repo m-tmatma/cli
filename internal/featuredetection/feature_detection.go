@@ -104,8 +104,8 @@ type ActionsFeatures struct {
 	// field in workflow dispatches that, when set to true, will return the details
 	// of the created workflow run in the response (with status code 200).
 	//
-	// On older API versions (e.g. GHES 3.20 or earlier), this new field is now
-	// supported, and setting it will cause error.
+	// On older API versions (e.g. GHES 3.20 or earlier), this new field is not
+	// supported and setting it will cause an error.
 	DispatchRunDetails bool
 }
 
