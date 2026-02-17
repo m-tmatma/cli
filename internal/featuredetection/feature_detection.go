@@ -425,28 +425,30 @@ func (d *detector) ActionsFeatures() (ActionsFeatures, error) {
 	// going to be ignored/removed. So, once we are migrating to the new API version we should double check the status
 	// of the API.
 
-	var dispatchRunDetailsSupported bool
-
 	if !ghauth.IsEnterprise(d.host) {
-		dispatchRunDetailsSupported = true
-	} else {
-		minSupportedVersion, err := version.NewVersion(enterpriseWorkflowDispatchRunDetailsSupport)
-		if err != nil {
-			return ActionsFeatures{}, err
-		}
+		return ActionsFeatures{
+			DispatchRunDetails: true,
+		}, nil
+	}
 
-		hostVersion, err := resolveEnterpriseVersion(d.httpClient, d.host)
-		if err != nil {
-			return ActionsFeatures{}, err
-		}
+	minSupportedVersion, err := version.NewVersion(enterpriseWorkflowDispatchRunDetailsSupport)
+	if err != nil {
+		return ActionsFeatures{}, err
+	}
 
-		if hostVersion.GreaterThanOrEqual(minSupportedVersion) {
-			dispatchRunDetailsSupported = true
-		}
+	hostVersion, err := resolveEnterpriseVersion(d.httpClient, d.host)
+	if err != nil {
+		return ActionsFeatures{}, err
+	}
+
+	if hostVersion.GreaterThanOrEqual(minSupportedVersion) {
+		return ActionsFeatures{
+			DispatchRunDetails: true,
+		}, nil
 	}
 
 	return ActionsFeatures{
-		DispatchRunDetails: dispatchRunDetailsSupported,
+		DispatchRunDetails: false,
 	}, nil
 }
 
