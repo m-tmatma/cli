@@ -314,10 +314,9 @@ func runRun(opts *RunOptions) error {
 		}
 	}
 
-	var returnRunDetailsSupported bool
-	if features, err := opts.Detector.ActionsFeatures(); err == nil {
-		// If there's an error detecting features, we assume the feature is not supported.
-		returnRunDetailsSupported = features.DispatchRunDetails
+	features, err := opts.Detector.ActionsFeatures()
+	if err != nil {
+		return err
 	}
 
 	path := fmt.Sprintf("repos/%s/%s/actions/workflows/%d/dispatches", url.PathEscape(repo.RepoOwner()), url.PathEscape(repo.RepoName()), workflow.ID)
@@ -331,7 +330,7 @@ func runRun(opts *RunOptions) error {
 	// We will have to always set the `return_run_details` field to true, unless
 	// we opt into the the new REST API version, which will probably return the
 	// details by default.
-	if returnRunDetailsSupported {
+	if features.DispatchRunDetails {
 		requestBody["return_run_details"] = true
 	}
 
