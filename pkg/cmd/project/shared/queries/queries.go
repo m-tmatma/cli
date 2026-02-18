@@ -172,7 +172,7 @@ type projectQueryBase struct {
 	Fields ProjectFields `graphql:"fields(first: $firstFields, after: $afterFields)"`
 }
 
-type projectQueryWithItemsQuery struct {
+type projectQueryWithQueryableItems struct {
 	projectQueryBase
 	Items struct {
 		PageInfo   PageInfo
@@ -181,7 +181,7 @@ type projectQueryWithItemsQuery struct {
 	} `graphql:"items(first: $firstItems, after: $afterItems, query: $query)"`
 }
 
-type projectQueryWithoutItemsQuery struct {
+type projectQueryWithoutQueryableItems struct {
 	projectQueryBase
 	Items struct {
 		PageInfo   PageInfo
@@ -208,7 +208,7 @@ func newProjectFromQueryBase(source projectQueryBase) *Project {
 	return project
 }
 
-func newProjectFromQueryWithItemsQuery(source projectQueryWithItemsQuery) *Project {
+func newProjectFromQueryWithItemsQuery(source projectQueryWithQueryableItems) *Project {
 	project := newProjectFromQueryBase(source.projectQueryBase)
 	project.Items.PageInfo = source.Items.PageInfo
 	project.Items.TotalCount = source.Items.TotalCount
@@ -216,7 +216,7 @@ func newProjectFromQueryWithItemsQuery(source projectQueryWithItemsQuery) *Proje
 	return project
 }
 
-func newProjectFromQueryWithoutItemsQuery(source projectQueryWithoutItemsQuery) *Project {
+func newProjectFromQueryWithoutItemsQuery(source projectQueryWithoutQueryableItems) *Project {
 	project := newProjectFromQueryBase(source.projectQueryBase)
 	project.Items.PageInfo = source.Items.PageInfo
 	project.Items.TotalCount = source.Items.TotalCount
@@ -1039,16 +1039,16 @@ type viewerLoginOrgs struct {
 }
 
 type ownerWithLogin struct {
-	Project projectQueryWithoutItemsQuery `graphql:"projectV2(number: $number)"`
+	Project projectQueryWithoutQueryableItems `graphql:"projectV2(number: $number)"`
 	Login   string
 }
 
 type ownerWithProjectWithItemQuery struct {
-	Project projectQueryWithItemsQuery `graphql:"projectV2(number: $number)"`
+	Project projectQueryWithQueryableItems `graphql:"projectV2(number: $number)"`
 }
 
 type ownerWithProjectWithoutItemQuery struct {
-	Project projectQueryWithoutItemsQuery `graphql:"projectV2(number: $number)"`
+	Project projectQueryWithoutQueryableItems `graphql:"projectV2(number: $number)"`
 }
 
 // userOwner is used to query the project of a user.
@@ -1214,7 +1214,7 @@ type userProjects struct {
 		Projects struct {
 			TotalCount int
 			PageInfo   PageInfo
-			Nodes      []projectQueryWithoutItemsQuery
+			Nodes      []projectQueryWithoutQueryableItems
 		} `graphql:"projectsV2(first: $first, after: $after)"`
 		Login string
 	} `graphql:"user(login: $login)"`
@@ -1226,7 +1226,7 @@ type orgProjects struct {
 		Projects struct {
 			TotalCount int
 			PageInfo   PageInfo
-			Nodes      []projectQueryWithoutItemsQuery
+			Nodes      []projectQueryWithoutQueryableItems
 		} `graphql:"projectsV2(first: $first, after: $after)"`
 		Login string
 	} `graphql:"organization(login: $login)"`
@@ -1238,7 +1238,7 @@ type viewerProjects struct {
 		Projects struct {
 			TotalCount int
 			PageInfo   PageInfo
-			Nodes      []projectQueryWithoutItemsQuery
+			Nodes      []projectQueryWithoutQueryableItems
 		} `graphql:"projectsV2(first: $first, after: $after)"`
 		Login string
 	} `graphql:"viewer"`
