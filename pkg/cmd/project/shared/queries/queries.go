@@ -617,24 +617,24 @@ func (c *Client) ProjectItems(o *Owner, number int32, limit int, queryStr string
 	case UserOwner:
 		variables["login"] = githubv4.String(o.Login)
 		if queryStr == "" {
-			query = &userOwnerWithItemsNoQuery{} // must be a pointer to work with graphql queries
+			query = &userOwnerWithItemsNoQuery{}
 		} else {
-			query = &userOwnerWithItems{} // must be a pointer to work with graphql queries
+			query = &userOwnerWithItems{}
 		}
 		queryName = "UserProjectWithItems"
 	case OrgOwner:
 		variables["login"] = githubv4.String(o.Login)
 		if queryStr == "" {
-			query = &orgOwnerWithItemsNoQuery{} // must be a pointer to work with graphql queries
+			query = &orgOwnerWithItemsNoQuery{}
 		} else {
-			query = &orgOwnerWithItems{} // must be a pointer to work with graphql queries
+			query = &orgOwnerWithItems{}
 		}
 		queryName = "OrgProjectWithItems"
 	case ViewerOwner:
 		if queryStr == "" {
-			query = &viewerOwnerWithItemsNoQuery{} // must be a pointer to work with graphql queries
+			query = &viewerOwnerWithItemsNoQuery{}
 		} else {
-			query = &viewerOwnerWithItems{} // must be a pointer to work with graphql queries
+			query = &viewerOwnerWithItems{}
 		}
 		queryName = "ViewerProjectWithItems"
 	}
@@ -990,14 +990,14 @@ func (c *Client) ProjectFields(o *Owner, number int32, limit int) (*Project, err
 	switch o.Type {
 	case UserOwner:
 		variables["login"] = githubv4.String(o.Login)
-		query = &userOwnerWithFields{} // must be a pointer to work with graphql queries
+		query = &userOwnerWithFields{}
 		queryName = "UserProjectWithFields"
 	case OrgOwner:
 		variables["login"] = githubv4.String(o.Login)
-		query = &orgOwnerWithFields{} // must be a pointer to work with graphql queries
+		query = &orgOwnerWithFields{}
 		queryName = "OrgProjectWithFields"
 	case ViewerOwner:
-		query = &viewerOwnerWithFields{} // must be a pointer to work with graphql queries
+		query = &viewerOwnerWithFields{}
 		queryName = "ViewerProjectWithFields"
 	}
 	err := c.doQueryWithProgressIndicator(queryName, query, variables)
