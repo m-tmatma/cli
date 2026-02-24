@@ -75,8 +75,8 @@ if [ "$1" = "--check" ]; then
 
     echo "License generation verified for all platforms."
 elif [ $# -eq 2 ]; then
-    generate_licenses "$1" "$2" "internal/licenses/embed"
-    echo "Licenses written to internal/licenses/embed/"
+    generate_licenses "$1" "$2" "internal/licenses/embed/${1}-${2}"
+    echo "Licenses written to internal/licenses/embed/${1}-${2}"
 else
     echo "Usage: $0 <GOOS> <GOARCH>"
     echo "       $0 --check"
