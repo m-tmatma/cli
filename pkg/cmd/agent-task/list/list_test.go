@@ -99,6 +99,7 @@ func Test_listRun(t *testing.T) {
 		capiStubs      func(*testing.T, *capi.CapiClientMock)
 		limit          int
 		web            bool
+		jsonFields     []string
 		wantOut        string
 		wantErr        error
 		wantStderr     string
@@ -286,6 +287,33 @@ func Test_listRun(t *testing.T) {
 			wantStderr:     "Opening https://github.com/copilot/agents in your browser.\n",
 			wantBrowserURL: "https://github.com/copilot/agents",
 		},
+		{
+			name: "json output",
+			tty:  false,
+			capiStubs: func(t *testing.T, m *capi.CapiClientMock) {
+				m.ListLatestSessionsForViewerFunc = func(ctx context.Context, limit int) ([]*capi.Session, error) {
+					return []*capi.Session{
+						{
+							ID:            "abc-123",
+							Name:          "s1",
+							State:         "completed",
+							CreatedAt:     sampleDate,
+							LastUpdatedAt: sampleDate,
+							ResourceType:  "pull",
+							PullRequest: &api.PullRequest{
+								Number: 101,
+								URL:    "https://github.com/OWNER/REPO/pull/101",
+								Repository: &api.PRRepository{
+									NameWithOwner: "OWNER/REPO",
+								},
+							},
+						},
+					}, nil
+				}
+			},
+			jsonFields: []string{"id", "name", "status", "repository", "pullRequestNumber", "pullRequestUrl"},
+			wantOut:    "[{\"id\":\"abc-123\",\"name\":\"s1\",\"pullRequestNumber\":101,\"pullRequestUrl\":\"https://github.com/OWNER/REPO/pull/101\",\"repository\":\"OWNER/REPO\",\"status\":\"completed\"}]\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -314,6 +342,12 @@ func Test_listRun(t *testing.T) {
 					}
 					return capiClientMock, nil
 				},
+			}
+
+			if tt.jsonFields != nil {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields(tt.jsonFields)
+				opts.Exporter = exporter
 			}
 
 			err := listRun(opts)
