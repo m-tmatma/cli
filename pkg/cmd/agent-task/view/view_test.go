@@ -1242,7 +1242,7 @@ func Test_viewRun(t *testing.T) {
 					}, nil
 				}
 			},
-			wantOut: "{\"id\":\"some-session-id\",\"name\":\"Fix login bug\",\"pullRequestNumber\":42,\"pullRequestUrl\":\"https://github.com/OWNER/REPO/pull/42\",\"repository\":\"OWNER/REPO\",\"status\":\"completed\"}\n",
+			wantOut:    "{\"id\":\"some-session-id\",\"name\":\"Fix login bug\",\"pullRequestNumber\":42,\"pullRequestUrl\":\"https://github.com/OWNER/REPO/pull/42\",\"repository\":\"OWNER/REPO\",\"status\":\"completed\"}\n",
 			jsonFields: []string{"id", "name", "status", "repository", "pullRequestNumber", "pullRequestUrl"},
 		},
 	}
