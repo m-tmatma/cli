@@ -23,8 +23,9 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "github.com",
 			hostname: "github.com",
 			wantFeatures: IssueFeatures{
-				StateReason:       true,
-				ActorIsAssignable: true,
+				StateReason:          true,
+				StateReasonDuplicate: true,
+				ActorIsAssignable:    true,
 			},
 			wantErr: false,
 		},
@@ -32,8 +33,9 @@ func TestIssueFeatures(t *testing.T) {
 			name:     "ghec data residency (ghe.com)",
 			hostname: "stampname.ghe.com",
 			wantFeatures: IssueFeatures{
-				StateReason:       true,
-				ActorIsAssignable: true,
+				StateReason:          true,
+				StateReasonDuplicate: true,
+				ActorIsAssignable:    true,
 			},
 			wantErr: false,
 		},
@@ -44,13 +46,14 @@ func TestIssueFeatures(t *testing.T) {
 				`query Issue_fields\b`: `{"data": {}}`,
 			},
 			wantFeatures: IssueFeatures{
-				StateReason:       false,
-				ActorIsAssignable: false,
+				StateReason:          false,
+				StateReasonDuplicate: false,
+				ActorIsAssignable:    false,
 			},
 			wantErr: false,
 		},
 		{
-			name:     "GHE has state reason field",
+			name:     "GHE has state reason field without duplicate enum",
 			hostname: "git.my.org",
 			queryResponse: map[string]string{
 				`query Issue_fields\b`: heredoc.Doc(`
@@ -58,9 +61,41 @@ func TestIssueFeatures(t *testing.T) {
 						{"name": "stateReason"}
 					] } } }
 				`),
+				`query IssueClosedStateReason_enumValues\b`: heredoc.Doc(`
+					{ "data": { "IssueClosedStateReason": { "enumValues": [
+						{"name": "COMPLETED"},
+						{"name": "NOT_PLANNED"}
+					] } } }
+				`),
 			},
 			wantFeatures: IssueFeatures{
-				StateReason: true,
+				StateReason:          true,
+				StateReasonDuplicate: false,
+				ActorIsAssignable:    false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has duplicate state reason enum value",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Issue_fields\b`: heredoc.Doc(`
+					{ "data": { "Issue": { "fields": [
+						{"name": "stateReason"}
+					] } } }
+				`),
+				`query IssueClosedStateReason_enumValues\b`: heredoc.Doc(`
+					{ "data": { "IssueClosedStateReason": { "enumValues": [
+						{"name": "COMPLETED"},
+						{"name": "NOT_PLANNED"},
+						{"name": "DUPLICATE"}
+					] } } }
+				`),
+			},
+			wantFeatures: IssueFeatures{
+				StateReason:          true,
+				StateReasonDuplicate: true,
+				ActorIsAssignable:    false,
 			},
 			wantErr: false,
 		},
