@@ -90,7 +90,7 @@ func listRun(opts *ListOptions) error {
 
 	opts.IO.StopProgressIndicator()
 
-	if len(sessions) == 0 {
+	if len(sessions) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no agent tasks found")
 	}
 

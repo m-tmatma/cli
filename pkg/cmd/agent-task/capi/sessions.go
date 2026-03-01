@@ -106,12 +106,16 @@ type SessionError struct {
 var SessionFields = []string{
 	"id",
 	"name",
-	"status",
+	"state",
 	"repository",
+	"user",
 	"createdAt",
 	"updatedAt",
+	"completedAt",
 	"pullRequestNumber",
 	"pullRequestUrl",
+	"pullRequestTitle",
+	"pullRequestState",
 }
 
 // ExportData implements the exportable interface for JSON output.
@@ -123,7 +127,7 @@ func (s *Session) ExportData(fields []string) map[string]interface{} {
 			data[f] = s.ID
 		case "name":
 			data[f] = s.Name
-		case "status":
+		case "state":
 			data[f] = s.State
 		case "repository":
 			if s.PullRequest != nil && s.PullRequest.Repository != nil {
@@ -131,10 +135,22 @@ func (s *Session) ExportData(fields []string) map[string]interface{} {
 			} else {
 				data[f] = nil
 			}
+		case "user":
+			if s.User != nil {
+				data[f] = s.User.Login
+			} else {
+				data[f] = nil
+			}
 		case "createdAt":
 			data[f] = s.CreatedAt
 		case "updatedAt":
 			data[f] = s.LastUpdatedAt
+		case "completedAt":
+			if s.CompletedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.CompletedAt
+			}
 		case "pullRequestNumber":
 			if s.PullRequest != nil {
 				data[f] = s.PullRequest.Number
@@ -144,6 +160,18 @@ func (s *Session) ExportData(fields []string) map[string]interface{} {
 		case "pullRequestUrl":
 			if s.PullRequest != nil {
 				data[f] = s.PullRequest.URL
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestTitle":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.Title
+			} else {
+				data[f] = nil
+			}
+		case "pullRequestState":
+			if s.PullRequest != nil {
+				data[f] = s.PullRequest.State
 			} else {
 				data[f] = nil
 			}
