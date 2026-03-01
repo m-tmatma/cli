@@ -142,9 +142,17 @@ func (s *Session) ExportData(fields []string) map[string]interface{} {
 				data[f] = nil
 			}
 		case "createdAt":
-			data[f] = s.CreatedAt
+			if s.CreatedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.CreatedAt
+			}
 		case "updatedAt":
-			data[f] = s.LastUpdatedAt
+			if s.LastUpdatedAt.IsZero() {
+				data[f] = nil
+			} else {
+				data[f] = s.LastUpdatedAt
+			}
 		case "completedAt":
 			if s.CompletedAt.IsZero() {
 				data[f] = nil
