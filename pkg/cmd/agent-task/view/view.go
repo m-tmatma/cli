@@ -288,12 +288,12 @@ func viewRun(opts *ViewOptions) error {
 		opts.IO.StopProgressIndicator()
 	}
 
-	if opts.Log {
-		return printLogs(opts, capiClient, session.ID)
-	}
-
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, session)
+	}
+
+	if opts.Log {
+		return printLogs(opts, capiClient, session.ID)
 	}
 
 	printSession(opts, session)
