@@ -152,21 +152,22 @@ func developRun(opts *DevelopOptions) error {
 		return err
 	}
 
-	opts.IO.StartProgressIndicator()
+	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Fetching issue #%d", opts.IssueNumber))
+	defer opts.IO.StopProgressIndicator()
+
 	issue, err := shared.FindIssueOrPR(httpClient, baseRepo, opts.IssueNumber, []string{"id", "number"})
-	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	opts.IO.StartProgressIndicator()
+	opts.IO.StartProgressIndicatorWithLabel("Checking linked branch support")
 	err = api.CheckLinkedBranchFeature(apiClient, baseRepo.RepoHost())
-	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
+	opts.IO.StopProgressIndicator()
 
 	if opts.List {
 		return developRunList(opts, apiClient, baseRepo, issue)
@@ -184,12 +185,14 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 		}
 	}
 
+	opts.IO.StartProgressIndicatorWithLabel("Preparing linked branch")
+	defer opts.IO.StopProgressIndicator()
+
 	branchName := ""
 	reusedExisting := false
 	if opts.Name != "" {
-		opts.IO.StartProgressIndicator()
+		opts.IO.StartProgressIndicatorWithLabel("Checking existing linked branches")
 		branches, err := api.ListLinkedBranches(apiClient, issueRepo, issue.Number)
-		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
@@ -201,9 +204,8 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	branchID := ""
 	baseValidated := false
 	if opts.BaseBranch != "" {
-		opts.IO.StartProgressIndicator()
+		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Validating base branch %q", opts.BaseBranch))
 		foundRepoID, foundBranchID, err := api.FindRepoBranchID(apiClient, branchRepo, opts.BaseBranch)
-		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
@@ -214,9 +216,8 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 
 	if branchName == "" {
 		if !baseValidated {
-			opts.IO.StartProgressIndicator()
+			opts.IO.StartProgressIndicatorWithLabel("Resolving base branch")
 			foundRepoID, foundBranchID, err := api.FindRepoBranchID(apiClient, branchRepo, opts.BaseBranch)
-			opts.IO.StopProgressIndicator()
 			if err != nil {
 				return err
 			}
@@ -224,9 +225,8 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 			branchID = foundBranchID
 		}
 
-		opts.IO.StartProgressIndicator()
+		opts.IO.StartProgressIndicatorWithLabel("Creating linked branch")
 		createdBranchName, err := api.CreateLinkedBranch(apiClient, branchRepo.RepoHost(), repoID, issue.ID, branchID, opts.Name)
-		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
@@ -236,6 +236,8 @@ func developRunCreate(opts *DevelopOptions, apiClient *api.Client, issueRepo ghr
 	if branchName == "" {
 		return fmt.Errorf("failed to create linked branch: API returned empty branch name")
 	}
+
+	opts.IO.StopProgressIndicator()
 
 	if reusedExisting && opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.ErrOut, "Using existing linked branch %q\n", branchName)
@@ -283,12 +285,14 @@ func linkedBranchRepoFromURL(branchURL string) (ghrepo.Interface, error) {
 }
 
 func developRunList(opts *DevelopOptions, apiClient *api.Client, issueRepo ghrepo.Interface, issue *api.Issue) error {
-	opts.IO.StartProgressIndicator()
+	opts.IO.StartProgressIndicatorWithLabel("Fetching linked branches")
+	defer opts.IO.StopProgressIndicator()
+
 	branches, err := api.ListLinkedBranches(apiClient, issueRepo, issue.Number)
-	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
+	opts.IO.StopProgressIndicator()
 
 	if len(branches) == 0 {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no linked branches found for %s#%d", ghrepo.FullName(issueRepo), issue.Number))
