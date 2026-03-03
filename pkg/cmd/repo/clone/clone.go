@@ -61,8 +61,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			the remote after the owner of the parent repository.
 
 			If the repository is a fork, its parent repository will be set as the default remote repository.
-
-			To skip adding the upstream remote entirely, use %[1]s--no-upstream%[1]s.
+			To skip this behavior, use %[1]s--no-upstream%[1]s.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Clone a repository from a specific org
