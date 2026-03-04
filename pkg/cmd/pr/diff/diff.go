@@ -303,8 +303,7 @@ func changedFilesNames(w io.Writer, r io.Reader) error {
 	// `"`` + hello-\360\237\230\200-world"
 	//
 	// Where I'm using the `` to indicate a string to avoid confusion with the " character.
-	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\s(["]?)b/(.*)`)
-	matches := pattern.FindAllStringSubmatch(string(diff), -1)
+	matches := diffHeaderRegexp.FindAllStringSubmatch(string(diff), -1)
 
 	for _, val := range matches {
 		name := strings.TrimSpace(val[1] + val[2])
@@ -369,7 +368,7 @@ func isPrint(r rune) bool {
 	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
 }
 
-var diffHeaderRegexp = regexp.MustCompile(`diff\s--git.*\s(["]?)b/(.*)`)
+var diffHeaderRegexp = regexp.MustCompile(`(?:^|\n)diff\s--git.*\s(["]?)b/(.*)`)
 
 // filterDiff reads a unified diff and returns a new reader with file entries
 // matching any of the exclude patterns removed.
@@ -405,7 +404,7 @@ func splitDiffSections(diff string) []string {
 			break
 		}
 		sections = append(sections, diff[:idx+1]) // include the trailing \n
-		diff = diff[idx+1:]                        // next section starts at "diff --git"
+		diff = diff[idx+1:]                       // next section starts at "diff --git"
 	}
 	return sections
 }
