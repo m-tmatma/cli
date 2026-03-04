@@ -23,12 +23,10 @@ type Detector interface {
 }
 
 type IssueFeatures struct {
-	StateReason       bool
 	ActorIsAssignable bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	StateReason:       true,
 	ActorIsAssignable: true,
 }
 
@@ -137,32 +135,9 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 		return allIssueFeatures, nil
 	}
 
-	features := IssueFeatures{
-		StateReason:       false,
+	return IssueFeatures{
 		ActorIsAssignable: false, // replaceActorsForAssignable GraphQL mutation unavailable on GHES
-	}
-
-	var featureDetection struct {
-		Issue struct {
-			Fields []struct {
-				Name string
-			} `graphql:"fields(includeDeprecated: true)"`
-		} `graphql:"Issue: __type(name: \"Issue\")"`
-	}
-
-	gql := api.NewClientFromHTTP(d.httpClient)
-	err := gql.Query(d.host, "Issue_fields", &featureDetection, nil)
-	if err != nil {
-		return features, err
-	}
-
-	for _, field := range featureDetection.Issue.Fields {
-		if field.Name == "stateReason" {
-			features.StateReason = true
-		}
-	}
-
-	return features, nil
+	}, nil
 }
 
 func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
