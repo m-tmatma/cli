@@ -196,12 +196,6 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, 
 				return fmt.Errorf("closing as duplicate is not supported on %s", repo.RepoHost())
 			}
 			reason = ""
-		} else if reason == "duplicate" && !features.StateReasonDuplicate {
-			if duplicateIssueID != "" {
-				return fmt.Errorf("closing as duplicate is not supported on %s", repo.RepoHost())
-			}
-			// If DUPLICATE is not supported silently close issue without setting StateReason.
-			reason = ""
 		}
 	}
 
