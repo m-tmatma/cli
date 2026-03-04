@@ -151,6 +151,11 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 				Name string
 			} `graphql:"fields(includeDeprecated: true)"`
 		} `graphql:"Issue: __type(name: \"Issue\")"`
+		IssueClosedStateReason struct {
+			EnumValues []struct {
+				Name string
+			} `graphql:"enumValues(includeDeprecated: true)"`
+		} `graphql:"IssueClosedStateReason: __type(name: \"IssueClosedStateReason\")"`
 	}
 
 	gql := api.NewClientFromHTTP(d.httpClient)
@@ -165,27 +170,12 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 		}
 	}
 
-	if !features.StateReason {
-		return features, nil
-	}
-
-	var issueClosedStateReasonFeatureDetection struct {
-		IssueClosedStateReason struct {
-			EnumValues []struct {
-				Name string
-			} `graphql:"enumValues(includeDeprecated: true)"`
-		} `graphql:"IssueClosedStateReason: __type(name: \"IssueClosedStateReason\")"`
-	}
-
-	err = gql.Query(d.host, "IssueClosedStateReason_enumValues", &issueClosedStateReasonFeatureDetection, nil)
-	if err != nil {
-		return features, err
-	}
-
-	for _, enumValue := range issueClosedStateReasonFeatureDetection.IssueClosedStateReason.EnumValues {
-		if enumValue.Name == "DUPLICATE" {
-			features.StateReasonDuplicate = true
-			break
+	if features.StateReason {
+		for _, enumValue := range featureDetection.IssueClosedStateReason.EnumValues {
+			if enumValue.Name == "DUPLICATE" {
+				features.StateReasonDuplicate = true
+				break
+			}
 		}
 	}
 

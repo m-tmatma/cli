@@ -59,10 +59,7 @@ func TestIssueFeatures(t *testing.T) {
 				`query Issue_fields\b`: heredoc.Doc(`
 					{ "data": { "Issue": { "fields": [
 						{"name": "stateReason"}
-					] } } }
-				`),
-				`query IssueClosedStateReason_enumValues\b`: heredoc.Doc(`
-					{ "data": { "IssueClosedStateReason": { "enumValues": [
+					] }, "IssueClosedStateReason": { "enumValues": [
 						{"name": "COMPLETED"},
 						{"name": "NOT_PLANNED"}
 					] } } }
@@ -82,10 +79,7 @@ func TestIssueFeatures(t *testing.T) {
 				`query Issue_fields\b`: heredoc.Doc(`
 					{ "data": { "Issue": { "fields": [
 						{"name": "stateReason"}
-					] } } }
-				`),
-				`query IssueClosedStateReason_enumValues\b`: heredoc.Doc(`
-					{ "data": { "IssueClosedStateReason": { "enumValues": [
+					] }, "IssueClosedStateReason": { "enumValues": [
 						{"name": "COMPLETED"},
 						{"name": "NOT_PLANNED"},
 						{"name": "DUPLICATE"}
