@@ -130,8 +130,10 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 		}
 	}
 
+	// TODO requestReviewsByLoginCleanup
 	// When ActorReviewers is true (github.com), pass logins directly for use with
-	// RequestReviewsByLogin mutation. Otherwise, resolve to IDs for GHES compatibility.
+	// RequestReviewsByLogin mutation. The ID-based else branch can be removed once
+	// GHES supports requestReviewsByLogin.
 	if tb.ActorReviewers {
 		params["userReviewerLogins"] = userReviewers
 		if len(botReviewers) > 0 {
