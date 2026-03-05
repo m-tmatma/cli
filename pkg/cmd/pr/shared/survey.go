@@ -183,7 +183,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	// Retrieve and process data for survey prompts based on the extra fields selected.
 	// When search-based reviewer selection is available, skip the expensive assignable-users
 	// and teams fetch since reviewers are found dynamically via the search function.
-	useReviewerSearch := reviewerSearchFunc != nil
+	useReviewerSearch := state.ActorReviewers && reviewerSearchFunc != nil
 	metadataInput := api.RepoMetadataInput{
 		Reviewers:      isChosen("Reviewers") && !useReviewerSearch,
 		TeamReviewers:  isChosen("Reviewers") && !useReviewerSearch,
