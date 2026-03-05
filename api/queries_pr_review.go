@@ -557,7 +557,9 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query string) ([]ReviewerCandidate, int, error) {
 	type responseData struct {
 		Repository struct {
-			// Check for Copilot availability by looking at any open PR's suggested reviewers
+			// HACK: There's no repo-level API to check Copilot reviewer eligibility,
+			// so we piggyback on an open PR's suggestedReviewerActors to detect
+			// whether Copilot is available as a reviewer for this repository.
 			PullRequests struct {
 				Nodes []struct {
 					SuggestedActors struct {
