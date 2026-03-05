@@ -523,7 +523,9 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}
 
-	// Request reviewers using either login-based (github.com) or ID-based (GHES) mutation
+	// TODO requestReviewsByLoginCleanup
+	// Request reviewers using either login-based (github.com) or ID-based (GHES) mutation.
+	// The ID-based path can be removed once GHES supports requestReviewsByLogin.
 	userLogins, hasUserLogins := params["userReviewerLogins"].([]string)
 	botLogins, hasBotLogins := params["botReviewerLogins"].([]string)
 	teamSlugs, hasTeamSlugs := params["teamReviewerSlugs"].([]string)
