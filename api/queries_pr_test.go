@@ -390,6 +390,7 @@ func mockReviewerResponseForRepoWithCopilot(collabs, teams, totalCollabs, totalT
 
 	return fmt.Sprintf(`{
 		"data": {
+			"viewer": {"login": "testuser"},
 			"repository": {
 				%s,
 				"collaborators": {"nodes": [%s]},
@@ -499,6 +500,36 @@ func TestSuggestedReviewerActorsForRepo(t *testing.T) {
 			expectedCount:  5,
 			expectedLogins: []string{"c1", "c2", "c3", "OWNER/team1", "OWNER/team2"},
 			expectedMore:   10,
+		},
+		{
+			name: "viewer excluded from collaborators",
+			httpStubs: func(reg *httpmock.Registry) {
+				// c1 matches the viewer login "testuser" won't be in this fixture,
+				// but we can craft a response where the viewer login matches a collaborator.
+				reg.Register(
+					httpmock.GraphQL(`query SuggestedReviewerActorsForRepo\b`),
+					httpmock.StringResponse(`{
+						"data": {
+							"viewer": {"login": "c2"},
+							"repository": {
+								"pullRequests": {"nodes": []},
+								"collaborators": {"nodes": [
+									{"login": "c1", "name": "C1"},
+									{"login": "c2", "name": "C2"},
+									{"login": "c3", "name": "C3"}
+								]},
+								"collaboratorsTotalCount": {"totalCount": 3}
+							},
+							"organization": {
+								"teams": {"nodes": []},
+								"teamsTotalCount": {"totalCount": 0}
+							}
+						}
+					}`))
+			},
+			expectedCount:  2,
+			expectedLogins: []string{"c1", "c3"},
+			expectedMore:   3,
 		},
 	}
 

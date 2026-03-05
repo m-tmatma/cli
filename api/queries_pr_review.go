@@ -556,6 +556,9 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 // Returns the candidates, a MoreResults count, and an error.
 func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query string) ([]ReviewerCandidate, int, error) {
 	type responseData struct {
+		Viewer struct {
+			Login string
+		}
 		Repository struct {
 			// HACK: There's no repo-level API to check Copilot reviewer eligibility,
 			// so we piggyback on an open PR's suggestedReviewerActors to detect
@@ -610,8 +613,13 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 		return nil, 0, err
 	}
 
-	// Build candidates using cascading quota logic
+	// Build candidates using cascading quota logic.
+	// Pre-seed seen with the current user to exclude them from results
+	// since you cannot review your own PR.
 	seen := make(map[string]bool)
+	if result.Viewer.Login != "" {
+		seen[result.Viewer.Login] = true
+	}
 	var candidates []ReviewerCandidate
 	const baseQuota = 5
 
