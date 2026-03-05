@@ -160,7 +160,7 @@ func mockReviewerResponse(suggestions, collabs, teams, totalCollabs, totalTeams 
 
 	return fmt.Sprintf(`{
 		"data": {
-			"node": {"suggestedReviewerActors": {"nodes": [%s]}},
+			"node": {"author": {"login": "testauthor"}, "suggestedReviewerActors": {"nodes": [%s]}},
 			"repository": {
 				"collaborators": {"nodes": [%s]},
 				"collaboratorsTotalCount": {"totalCount": %d}
@@ -235,7 +235,7 @@ func TestSuggestedReviewerActors(t *testing.T) {
 					httpmock.GraphQL(`query SuggestedReviewerActors\b`),
 					httpmock.StringResponse(`{
 						"data": {
-							"node": {"suggestedReviewerActors": {"nodes": [
+							"node": {"author": {"login": "testauthor"}, "suggestedReviewerActors": {"nodes": [
 								{"isAuthor": true, "reviewer": {"__typename": "User", "login": "author", "name": "Author"}},
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}},
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s2", "name": "S2"}}
@@ -256,6 +256,34 @@ func TestSuggestedReviewerActors(t *testing.T) {
 			expectedMore:   8,
 		},
 		{
+			name: "author excluded from collaborators",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query SuggestedReviewerActors\b`),
+					httpmock.StringResponse(`{
+						"data": {
+							"node": {"author": {"login": "theauthor"}, "suggestedReviewerActors": {"nodes": [
+								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
+							]}},
+							"repository": {
+								"collaborators": {"nodes": [
+									{"login": "theauthor", "name": "The Author"},
+									{"login": "c1", "name": "C1"}
+								]},
+								"collaboratorsTotalCount": {"totalCount": 5}
+							},
+							"organization": {
+								"teams": {"nodes": []},
+								"teamsTotalCount": {"totalCount": 0}
+							}
+						}
+					}`))
+			},
+			expectedCount:  2,
+			expectedLogins: []string{"s1", "c1"},
+			expectedMore:   5,
+		},
+		{
 			name: "deduplication across sources",
 			httpStubs: func(reg *httpmock.Registry) {
 				// Custom response with duplicate user
@@ -263,7 +291,7 @@ func TestSuggestedReviewerActors(t *testing.T) {
 					httpmock.GraphQL(`query SuggestedReviewerActors\b`),
 					httpmock.StringResponse(`{
 						"data": {
-							"node": {"suggestedReviewerActors": {"nodes": [
+							"node": {"author": {"login": "testauthor"}, "suggestedReviewerActors": {"nodes": [
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "shareduser", "name": "Shared"}}
 							]}},
 							"repository": {
@@ -291,7 +319,7 @@ func TestSuggestedReviewerActors(t *testing.T) {
 					httpmock.GraphQL(`query SuggestedReviewerActors\b`),
 					httpmock.StringResponse(`{
 						"data": {
-							"node": {"suggestedReviewerActors": {"nodes": [
+							"node": {"author": {"login": "testauthor"}, "suggestedReviewerActors": {"nodes": [
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
 							]}},
 							"repository": {
@@ -314,7 +342,7 @@ func TestSuggestedReviewerActors(t *testing.T) {
 					httpmock.GraphQL(`query SuggestedReviewerActors\b`),
 					httpmock.StringResponse(`{
 						"data": {
-							"node": {"suggestedReviewerActors": {"nodes": [
+							"node": {"author": {"login": "testauthor"}, "suggestedReviewerActors": {"nodes": [
 								{"isAuthor": false, "reviewer": {"__typename": "Bot", "login": "copilot-pull-request-reviewer"}},
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
 							]}},

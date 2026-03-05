@@ -413,6 +413,9 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 	type responseData struct {
 		Node struct {
 			PullRequest struct {
+				Author struct {
+					Login string
+				}
 				SuggestedActors struct {
 					Nodes []struct {
 						IsAuthor    bool
@@ -472,7 +475,11 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 	// Build candidates using cascading quota logic:
 	// Each source has a base quota of 5, plus any unfilled quota from previous sources.
 	// This ensures we show up to 15 total candidates, filling gaps when earlier sources have fewer.
+	// Pre-seed seen with the PR author since you cannot review your own PR.
 	seen := make(map[string]bool)
+	if authorLogin := result.Node.PullRequest.Author.Login; authorLogin != "" {
+		seen[authorLogin] = true
+	}
 	var candidates []ReviewerCandidate
 	const baseQuota = 5
 
