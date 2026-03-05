@@ -105,13 +105,13 @@ func TestNewCmdEdit(t *testing.T) {
 			},
 		},
 		{
-			name: "squash merge commit message without enable-squash-merge",
-			args: "--squash-merge-commit-message default",
+			name:    "squash merge commit message without enable-squash-merge",
+			args:    "--squash-merge-commit-message default",
 			wantErr: "--squash-merge-commit-message requires --enable-squash-merge",
 		},
 		{
-			name: "squash merge commit message with invalid value",
-			args: "--enable-squash-merge --squash-merge-commit-message blah",
+			name:    "squash merge commit message with invalid value",
+			args:    "--enable-squash-merge --squash-merge-commit-message blah",
 			wantErr: `invalid value for --squash-merge-commit-message: "blah". Valid values are: default, pr-title, pr-title-commits, pr-title-description`,
 		},
 	}
