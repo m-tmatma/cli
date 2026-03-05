@@ -680,9 +680,12 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		return nil, err
 	}
 
+	copilotReplacer := shared.NewCopilotReviewerReplacer()
+	reviewers := copilotReplacer.ReplaceSlice(opts.Reviewers)
+
 	state := &shared.IssueMetadataState{
 		Type:          shared.PRMetadata,
-		Reviewers:     opts.Reviewers,
+		Reviewers:     reviewers,
 		Assignees:     assignees,
 		Labels:        opts.Labels,
 		ProjectTitles: opts.Projects,
