@@ -271,6 +271,9 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 			}
 			values.Reviewers = selectedReviewers
 		} else if len(reviewers) > 0 {
+			// TODO requestReviewsByLoginCleanup
+			// The static MultiSelect path can be removed once GHES supports
+			// requestReviewsByLogin and search-based selection is always used.
 			selected, err := p.MultiSelect("Reviewers", state.Reviewers, reviewers)
 			if err != nil {
 				return err
