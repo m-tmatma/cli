@@ -563,21 +563,29 @@ func TestDisplayName(t *testing.T) {
 	}
 }
 
-func TestCopilotDisplayName(t *testing.T) {
+func TestActorDisplayName(t *testing.T) {
 	tests := []struct {
-		login string
-		want  string
+		name     string
+		typeName string
+		login    string
+		actName  string
+		want     string
 	}{
-		{login: "copilot-pull-request-reviewer", want: "Copilot (AI)"},
-		{login: "copilot-swe-agent", want: "Copilot (AI)"},
-		{login: "octocat", want: "octocat"},
-		{login: "", want: ""},
+		{name: "copilot reviewer", typeName: "Bot", login: "copilot-pull-request-reviewer", want: "Copilot (AI)"},
+		{name: "copilot assignee", typeName: "Bot", login: "copilot-swe-agent", want: "Copilot (AI)"},
+		{name: "copilot without typename", typeName: "", login: "copilot-pull-request-reviewer", want: "Copilot (AI)"},
+		{name: "copilot actor name login", typeName: "", login: "Copilot", want: "Copilot (AI)"},
+		{name: "regular bot", typeName: "Bot", login: "dependabot", want: "dependabot"},
+		{name: "user with name", typeName: "User", login: "octocat", actName: "Mona Lisa", want: "octocat (Mona Lisa)"},
+		{name: "user without name", typeName: "User", login: "octocat", want: "octocat"},
+		{name: "unknown type with name", typeName: "", login: "octocat", actName: "Mona Lisa", want: "octocat (Mona Lisa)"},
+		{name: "empty login", typeName: "", login: "", want: ""},
 	}
 	for _, tt := range tests {
-		t.Run(tt.login, func(t *testing.T) {
-			got := copilotDisplayName(tt.login)
+		t.Run(tt.name, func(t *testing.T) {
+			got := actorDisplayName(tt.typeName, tt.login, tt.actName)
 			if got != tt.want {
-				t.Errorf("copilotDisplayName(%q) = %q, want %q", tt.login, got, tt.want)
+				t.Errorf("actorDisplayName(%q, %q, %q) = %q, want %q", tt.typeName, tt.login, tt.actName, got, tt.want)
 			}
 		})
 	}
