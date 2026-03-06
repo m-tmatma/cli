@@ -66,18 +66,18 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			the flag to exclude multiple patterns.
 		`, "`"),
 		Example: heredoc.Doc(`
-		# See diff for current branch
-		$ gh pr diff
+			# See diff for current branch
+			$ gh pr diff
 
-		# See diff for a specific PR
-		$ gh pr diff 123
+			# See diff for a specific PR
+			$ gh pr diff 123
 
-		# Exclude files from diff output
-		$ gh pr diff --exclude '*.yml' --exclude 'generated/*'
+			# Exclude files from diff output
+			$ gh pr diff --exclude '*.yml' --exclude 'generated/*'
 
-		# Exclude matching files by name
-		$ gh pr diff --name-only --exclude '*.generated.*'
-	`),
+			# Exclude matching files by name
+			$ gh pr diff --name-only --exclude '*.generated.*'
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
