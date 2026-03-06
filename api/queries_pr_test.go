@@ -162,16 +162,14 @@ func mockReviewerResponse(suggestions, collabs, teams, totalCollabs, totalTeams 
 		"data": {
 			"node": {"author": {"login": "testauthor"}, "suggestedReviewerActors": {"nodes": [%s]}},
 			"repository": {
+				"owner": {"__typename": "Organization", "teams": {"nodes": [%s]}, "teamsTotalCount": {"totalCount": %d}},
 				"collaborators": {"nodes": [%s]},
 				"collaboratorsTotalCount": {"totalCount": %d}
-			},
-			"organization": {
-				"teams": {"nodes": [%s]},
-				"teamsTotalCount": {"totalCount": %d}
 			}
 		}
-	}`, strings.Join(suggestionNodes, ","), strings.Join(collabNodes, ","), totalCollabs,
-		strings.Join(teamNodes, ","), totalTeams)
+	}`, strings.Join(suggestionNodes, ","),
+		strings.Join(teamNodes, ","), totalTeams,
+		strings.Join(collabNodes, ","), totalCollabs)
 }
 
 func TestSuggestedReviewerActors(t *testing.T) {
@@ -241,12 +239,9 @@ func TestSuggestedReviewerActors(t *testing.T) {
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s2", "name": "S2"}}
 							]}},
 							"repository": {
+								"owner": {"__typename": "Organization", "teams": {"nodes": [{"slug": "team1"}]}, "teamsTotalCount": {"totalCount": 3}},
 								"collaborators": {"nodes": [{"login": "c1", "name": "C1"}]},
 								"collaboratorsTotalCount": {"totalCount": 5}
-							},
-							"organization": {
-								"teams": {"nodes": [{"slug": "team1"}]},
-								"teamsTotalCount": {"totalCount": 3}
 							}
 						}
 					}`))
@@ -271,10 +266,6 @@ func TestSuggestedReviewerActors(t *testing.T) {
 									{"login": "c1", "name": "C1"}
 								]},
 								"collaboratorsTotalCount": {"totalCount": 5}
-							},
-							"organization": {
-								"teams": {"nodes": []},
-								"teamsTotalCount": {"totalCount": 0}
 							}
 						}
 					}`))
@@ -295,15 +286,12 @@ func TestSuggestedReviewerActors(t *testing.T) {
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "shareduser", "name": "Shared"}}
 							]}},
 							"repository": {
+								"owner": {"__typename": "Organization", "teams": {"nodes": [{"slug": "team1"}]}, "teamsTotalCount": {"totalCount": 5}},
 								"collaborators": {"nodes": [
 									{"login": "shareduser", "name": "Shared"},
 									{"login": "c1", "name": "C1"}
 								]},
 								"collaboratorsTotalCount": {"totalCount": 10}
-							},
-							"organization": {
-								"teams": {"nodes": [{"slug": "team1"}]},
-								"teamsTotalCount": {"totalCount": 5}
 							}
 						}
 					}`))
@@ -323,12 +311,11 @@ func TestSuggestedReviewerActors(t *testing.T) {
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
 							]}},
 							"repository": {
+								"owner": {"__typename": "User"},
 								"collaborators": {"nodes": [{"login": "c1", "name": "C1"}]},
 								"collaboratorsTotalCount": {"totalCount": 3}
-							},
-							"organization": null
-						},
-						"errors": [{"message": "Could not resolve to an Organization with the login of 'OWNER'."}]
+							}
+						}
 					}`))
 			},
 			expectedCount:  2,
@@ -347,12 +334,9 @@ func TestSuggestedReviewerActors(t *testing.T) {
 								{"isAuthor": false, "reviewer": {"__typename": "User", "login": "s1", "name": "S1"}}
 							]}},
 							"repository": {
+								"owner": {"__typename": "Organization", "teams": {"nodes": []}, "teamsTotalCount": {"totalCount": 0}},
 								"collaborators": {"nodes": []},
 								"collaboratorsTotalCount": {"totalCount": 5}
-							},
-							"organization": {
-								"teams": {"nodes": []},
-								"teamsTotalCount": {"totalCount": 0}
 							}
 						}
 					}`))
@@ -421,16 +405,14 @@ func mockReviewerResponseForRepoWithCopilot(collabs, teams, totalCollabs, totalT
 			"viewer": {"login": "testuser"},
 			"repository": {
 				%s,
+				"owner": {"__typename": "Organization", "teams": {"nodes": [%s]}, "teamsTotalCount": {"totalCount": %d}},
 				"collaborators": {"nodes": [%s]},
 				"collaboratorsTotalCount": {"totalCount": %d}
-			},
-			"organization": {
-				"teams": {"nodes": [%s]},
-				"teamsTotalCount": {"totalCount": %d}
 			}
 		}
-	}`, pullRequestsJSON, strings.Join(collabNodes, ","), totalCollabs,
-		strings.Join(teamNodes, ","), totalTeams)
+	}`, pullRequestsJSON,
+		strings.Join(teamNodes, ","), totalTeams,
+		strings.Join(collabNodes, ","), totalCollabs)
 }
 
 func TestSuggestedReviewerActorsForRepo(t *testing.T) {
@@ -484,12 +466,11 @@ func TestSuggestedReviewerActorsForRepo(t *testing.T) {
 						"data": {
 							"repository": {
 								"pullRequests": {"nodes": []},
+								"owner": {"__typename": "User"},
 								"collaborators": {"nodes": [{"login": "c1", "name": "C1"}]},
 								"collaboratorsTotalCount": {"totalCount": 3}
-							},
-							"organization": null
-						},
-						"errors": [{"message": "Could not resolve to an Organization with the login of 'OWNER'."}]
+							}
+						}
 					}`))
 			},
 			expectedCount:  1,
@@ -541,16 +522,13 @@ func TestSuggestedReviewerActorsForRepo(t *testing.T) {
 							"viewer": {"login": "c2"},
 							"repository": {
 								"pullRequests": {"nodes": []},
+								"owner": {"__typename": "Organization", "teams": {"nodes": []}, "teamsTotalCount": {"totalCount": 0}},
 								"collaborators": {"nodes": [
 									{"login": "c1", "name": "C1"},
 									{"login": "c2", "name": "C2"},
 									{"login": "c3", "name": "C3"}
 								]},
 								"collaboratorsTotalCount": {"totalCount": 3}
-							},
-							"organization": {
-								"teams": {"nodes": []},
-								"teamsTotalCount": {"totalCount": 0}
 							}
 						}
 					}`))

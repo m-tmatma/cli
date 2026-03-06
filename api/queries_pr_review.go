@@ -407,8 +407,8 @@ func RequestReviewsByLogin(client *Client, repo ghrepo.Interface, prID string, u
 // Returns the candidates, a MoreResults count, and an error.
 func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string, query string) ([]ReviewerCandidate, int, error) {
 	// Fetch 10 from each source to allow cascading quota to fill from available results.
-	// Use a single query that includes organization.teams - if the owner is not an org,
-	// we'll get a "Could not resolve to an Organization" error which we handle gracefully.
+	// Organization teams are fetched via repository.owner inline fragment, which
+	// gracefully returns empty data for personal (User-owned) repos.
 	// We also fetch unfiltered total counts via aliases for the "X more" display.
 	type responseData struct {
 		Node struct {
@@ -435,6 +435,19 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 			} `graphql:"... on PullRequest"`
 		} `graphql:"node(id: $id)"`
 		Repository struct {
+			Owner struct {
+				TypeName     string `graphql:"__typename"`
+				Organization struct {
+					Teams struct {
+						Nodes []struct {
+							Slug string
+						}
+					} `graphql:"teams(first: 10, query: $query)"`
+					TeamsTotalCount struct {
+						TotalCount int
+					} `graphql:"teamsTotalCount: teams(first: 0)"`
+				} `graphql:"... on Organization"`
+			}
 			Collaborators struct {
 				Nodes []struct {
 					Login string
@@ -445,16 +458,6 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 				TotalCount int
 			} `graphql:"collaboratorsTotalCount: collaborators(first: 0)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
-		Organization struct {
-			Teams struct {
-				Nodes []struct {
-					Slug string
-				}
-			} `graphql:"teams(first: 10, query: $query)"`
-			TeamsTotalCount struct {
-				TotalCount int
-			} `graphql:"teamsTotalCount: teams(first: 0)"`
-		} `graphql:"organization(login: $owner)"`
 	}
 
 	variables := map[string]interface{}{
@@ -466,9 +469,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 
 	var result responseData
 	err := client.Query(repo.RepoHost(), "SuggestedReviewerActors", &result, variables)
-	// Handle the case where the owner is not an organization - the query still returns
-	// partial data (repository, node), so we can continue processing.
-	if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -531,7 +532,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 	teamsQuota := baseQuota + (collaboratorsQuota - collaboratorsAdded)
 	teamsAdded := 0
 	ownerName := repo.RepoOwner()
-	for _, t := range result.Organization.Teams.Nodes {
+	for _, t := range result.Repository.Owner.Organization.Teams.Nodes {
 		if teamsAdded >= teamsQuota {
 			break
 		}
@@ -547,7 +548,7 @@ func SuggestedReviewerActors(client *Client, repo ghrepo.Interface, prID string,
 	}
 
 	// MoreResults uses unfiltered total counts (teams will be 0 for personal repos)
-	moreResults := result.Repository.CollaboratorsTotalCount.TotalCount + result.Organization.TeamsTotalCount.TotalCount
+	moreResults := result.Repository.CollaboratorsTotalCount.TotalCount + result.Repository.Owner.Organization.TeamsTotalCount.TotalCount
 
 	return candidates, moreResults, nil
 }
@@ -584,6 +585,19 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 					} `graphql:"suggestedReviewerActors(first: 10)"`
 				}
 			} `graphql:"pullRequests(first: 1, states: [OPEN])"`
+			Owner struct {
+				TypeName     string `graphql:"__typename"`
+				Organization struct {
+					Teams struct {
+						Nodes []struct {
+							Slug string
+						}
+					} `graphql:"teams(first: 10, query: $query)"`
+					TeamsTotalCount struct {
+						TotalCount int
+					} `graphql:"teamsTotalCount: teams(first: 0)"`
+				} `graphql:"... on Organization"`
+			}
 			Collaborators struct {
 				Nodes []struct {
 					Login string
@@ -594,16 +608,6 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 				TotalCount int
 			} `graphql:"collaboratorsTotalCount: collaborators(first: 0)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
-		Organization struct {
-			Teams struct {
-				Nodes []struct {
-					Slug string
-				}
-			} `graphql:"teams(first: 10, query: $query)"`
-			TeamsTotalCount struct {
-				TotalCount int
-			} `graphql:"teamsTotalCount: teams(first: 0)"`
-		} `graphql:"organization(login: $owner)"`
 	}
 
 	variables := map[string]interface{}{
@@ -614,9 +618,7 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 
 	var result responseData
 	err := client.Query(repo.RepoHost(), "SuggestedReviewerActorsForRepo", &result, variables)
-	// Handle the case where the owner is not an organization - the query still returns
-	// partial data (repository), so we can continue processing.
-	if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
+	if err != nil {
 		return nil, 0, err
 	}
 
@@ -661,7 +663,7 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 	teamsQuota := baseQuota + (baseQuota - collaboratorsAdded)
 	teamsAdded := 0
 	ownerName := repo.RepoOwner()
-	for _, t := range result.Organization.Teams.Nodes {
+	for _, t := range result.Repository.Owner.Organization.Teams.Nodes {
 		if teamsAdded >= teamsQuota {
 			break
 		}
@@ -677,7 +679,7 @@ func SuggestedReviewerActorsForRepo(client *Client, repo ghrepo.Interface, query
 	}
 
 	// MoreResults uses unfiltered total counts (teams will be 0 for personal repos)
-	moreResults := result.Repository.CollaboratorsTotalCount.TotalCount + result.Organization.TeamsTotalCount.TotalCount
+	moreResults := result.Repository.CollaboratorsTotalCount.TotalCount + result.Repository.Owner.Organization.TeamsTotalCount.TotalCount
 
 	return candidates, moreResults, nil
 }
