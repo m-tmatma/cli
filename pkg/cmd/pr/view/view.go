@@ -351,7 +351,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	for _, review := range pr.Reviews.Nodes {
 		if review.Author.Login != pr.Author.Login {
-			name := review.Author.Login
+			name := review.AuthorLogin()
 			if name == "" {
 				name = ghostName
 			}
@@ -364,7 +364,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.LoginOrSlug()
+		name := reviewRequest.RequestedReviewer.DisplayName()
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
 			State: requestedReviewState,

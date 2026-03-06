@@ -52,7 +52,7 @@ func (prr PullRequestReview) Identifier() string {
 }
 
 func (prr PullRequestReview) AuthorLogin() string {
-	return prr.Author.Login
+	return copilotDisplayName(prr.Author.Login)
 }
 
 func (prr PullRequestReview) Association() string {
@@ -158,8 +158,9 @@ func (r RequestedReviewer) DisplayName() string {
 	if r.TypeName == teamTypeName {
 		return fmt.Sprintf("%s/%s", r.Organization.Login, r.Slug)
 	}
-	if r.TypeName == botTypeName && r.Login == CopilotReviewerLogin {
-		return "Copilot (AI)"
+	displayName := copilotDisplayName(r.Login)
+	if displayName != r.Login {
+		return displayName
 	}
 	if r.Name != "" {
 		return fmt.Sprintf("%s (%s)", r.Login, r.Name)
@@ -221,10 +222,7 @@ func NewReviewerBot(login string) ReviewerBot {
 }
 
 func (b ReviewerBot) DisplayName() string {
-	if b.login == CopilotReviewerLogin {
-		return fmt.Sprintf("%s (AI)", CopilotActorName)
-	}
-	return b.Login()
+	return copilotDisplayName(b.login)
 }
 
 func (r ReviewerBot) sealedReviewerCandidate() {}

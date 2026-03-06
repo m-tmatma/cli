@@ -1087,6 +1087,16 @@ const CopilotAssigneeLogin = "copilot-swe-agent"
 const CopilotReviewerLogin = "copilot-pull-request-reviewer"
 const CopilotActorName = "Copilot"
 
+// copilotDisplayName returns "Copilot (AI)" if the login is a known Copilot bot login,
+// otherwise returns the login unchanged. Use this to translate raw bot logins into
+// user-friendly display names in command output.
+func copilotDisplayName(login string) string {
+	if login == CopilotReviewerLogin || login == CopilotAssigneeLogin {
+		return fmt.Sprintf("%s (AI)", CopilotActorName)
+	}
+	return login
+}
+
 type AssignableActor interface {
 	DisplayName() string
 	ID() string
@@ -1145,10 +1155,7 @@ func NewAssignableBot(id, login string) AssignableBot {
 }
 
 func (b AssignableBot) DisplayName() string {
-	if b.login == CopilotAssigneeLogin {
-		return fmt.Sprintf("%s (AI)", CopilotActorName)
-	}
-	return b.Login()
+	return copilotDisplayName(b.login)
 }
 
 func (b AssignableBot) ID() string {

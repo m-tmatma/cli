@@ -563,6 +563,26 @@ func TestDisplayName(t *testing.T) {
 	}
 }
 
+func TestCopilotDisplayName(t *testing.T) {
+	tests := []struct {
+		login string
+		want  string
+	}{
+		{login: "copilot-pull-request-reviewer", want: "Copilot (AI)"},
+		{login: "copilot-swe-agent", want: "Copilot (AI)"},
+		{login: "octocat", want: "octocat"},
+		{login: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.login, func(t *testing.T) {
+			got := copilotDisplayName(tt.login)
+			if got != tt.want {
+				t.Errorf("copilotDisplayName(%q) = %q, want %q", tt.login, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRepoExists(t *testing.T) {
 	tests := []struct {
 		name       string
