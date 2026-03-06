@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
+	"path"
 	"regexp"
 	"strings"
 	"unicode"
@@ -60,7 +60,24 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			is selected.
 
 			With %[1]s--web%[1]s flag, open the pull request diff in a web browser instead.
+
+			Use %[1]s--exclude%[1]s to filter out files matching a glob pattern. The pattern
+			uses forward slashes as path separators on all platforms. You can repeat
+			the flag to exclude multiple patterns.
 		`, "`"),
+		Example: heredoc.Doc(`
+		# See diff for current branch
+		$ gh pr diff
+
+		# See diff for a specific PR
+		$ gh pr diff 123
+
+		# Exclude files from diff output
+		$ gh pr diff --exclude '*.yml' --exclude 'generated/*'
+
+		# Exclude matching files by name
+		$ gh pr diff --name-only --exclude '*.generated.*'
+	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
@@ -368,11 +385,11 @@ func isPrint(r rune) bool {
 	return r == '\n' || r == '\r' || r == '\t' || unicode.IsPrint(r)
 }
 
-var diffHeaderRegexp = regexp.MustCompile(`(?:^|\n)diff\s--git.*\s(["]?)b/(.*)`)
+var diffHeaderRegexp = regexp.MustCompile(`(?:^|\n)diff\s--git.*\s("?)b/(.*)`)
 
 // filterDiff reads a unified diff and returns a new reader with file entries
 // matching any of the exclude patterns removed.
-func filterDiff(r io.Reader, patterns []string) (io.Reader, error) {
+func filterDiff(r io.Reader, excludePatterns []string) (io.Reader, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -381,7 +398,7 @@ func filterDiff(r io.Reader, patterns []string) (io.Reader, error) {
 	var result bytes.Buffer
 	for _, section := range splitDiffSections(string(data)) {
 		name := extractFileName([]byte(section))
-		if name != "" && matchesAny(name, patterns) {
+		if name != "" && matchesAny(name, excludePatterns) {
 			continue
 		}
 		result.WriteString(section)
@@ -394,17 +411,19 @@ func filterDiff(r io.Reader, patterns []string) (io.Reader, error) {
 // not including) the next "diff --git" line.
 func splitDiffSections(diff string) []string {
 	marker := "\ndiff --git "
-	var sections []string
-	for {
-		idx := strings.Index(diff, marker)
-		if idx == -1 {
-			if len(diff) > 0 {
-				sections = append(sections, diff)
+	parts := strings.Split(diff, marker)
+	if len(parts) == 1 {
+		return []string{diff}
+	}
+	sections := make([]string, 0, len(parts))
+	for i, p := range parts {
+		if i == 0 {
+			if len(p) > 0 {
+				sections = append(sections, p+"\n")
 			}
-			break
+		} else {
+			sections = append(sections, "diff --git "+p)
 		}
-		sections = append(sections, diff[:idx+1]) // include the trailing \n
-		diff = diff[idx+1:]                       // next section starts at "diff --git"
 	}
 	return sections
 }
@@ -417,13 +436,13 @@ func extractFileName(section []byte) string {
 	return strings.TrimSpace(string(m[1]) + string(m[2]))
 }
 
-func matchesAny(name string, patterns []string) bool {
-	for _, p := range patterns {
-		if matched, _ := filepath.Match(p, name); matched {
+func matchesAny(name string, excludePatterns []string) bool {
+	for _, p := range excludePatterns {
+		if matched, _ := path.Match(p, name); matched {
 			return true
 		}
 		// Also match against the basename so "*.yml" matches "dir/file.yml"
-		if matched, _ := filepath.Match(p, filepath.Base(name)); matched {
+		if matched, _ := path.Match(p, path.Base(name)); matched {
 			return true
 		}
 	}
