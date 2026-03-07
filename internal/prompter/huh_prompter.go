@@ -83,7 +83,94 @@ func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []st
 }
 
 func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
-	return multiSelectWithSearch(p, prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
+	selectedValues := make([]string, len(defaultValues))
+	copy(selectedValues, defaultValues)
+
+	optionKeyLabels := make(map[string]string)
+	for _, k := range selectedValues {
+		optionKeyLabels[k] = k
+	}
+
+	buildOptions := func(query string) []huh.Option[string] {
+		result := searchFunc(query)
+		if result.Err != nil {
+			return nil
+		}
+		for i, k := range result.Keys {
+			optionKeyLabels[k] = result.Labels[i]
+		}
+
+		var formOptions []huh.Option[string]
+		seen := make(map[string]bool)
+
+		// 1. Currently selected values (persisted across searches).
+		for _, k := range selectedValues {
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			l := optionKeyLabels[k]
+			if l == "" {
+				l = k
+			}
+			formOptions = append(formOptions, huh.NewOption(l, k))
+		}
+
+		// 2. Search results.
+		for i, k := range result.Keys {
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			l := result.Labels[i]
+			if l == "" {
+				l = k
+			}
+			formOptions = append(formOptions, huh.NewOption(l, k))
+		}
+
+		// 3. Persistent options.
+		for _, k := range persistentValues {
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			l := optionKeyLabels[k]
+			if l == "" {
+				l = k
+			}
+			formOptions = append(formOptions, huh.NewOption(l, k))
+		}
+
+		if len(formOptions) == 0 {
+			formOptions = append(formOptions, huh.NewOption("No results", ""))
+		}
+
+		return formOptions
+	}
+
+	var searchQuery string
+
+	err := p.newForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title(searchPrompt).
+				Value(&searchQuery),
+			huh.NewMultiSelect[string]().
+				Title(prompt).
+				Options(buildOptions("")...).
+				OptionsFunc(func() []huh.Option[string] {
+					return buildOptions(searchQuery)
+				}, &searchQuery).
+				Value(&selectedValues).
+				Limit(0),
+		),
+	).Run()
+	if err != nil {
+		return nil, err
+	}
+
+	return selectedValues, nil
 }
 
 func (p *huhPrompter) Input(prompt, defaultValue string) (string, error) {
