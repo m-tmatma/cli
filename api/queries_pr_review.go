@@ -143,6 +143,7 @@ type RequestedReviewer struct {
 
 const teamTypeName = "Team"
 const botTypeName = "Bot"
+const userTypeName = "User"
 
 func (r RequestedReviewer) LoginOrSlug() string {
 	if r.TypeName == teamTypeName {

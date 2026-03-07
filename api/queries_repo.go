@@ -1135,7 +1135,7 @@ func NewAssignableUser(id, login, name string) AssignableUser {
 
 // DisplayName returns a user-friendly name via actorDisplayName.
 func (u AssignableUser) DisplayName() string {
-	return actorDisplayName("User", u.login, u.name)
+	return actorDisplayName(userTypeName, u.login, u.name)
 }
 
 func (u AssignableUser) ID() string {
@@ -1165,7 +1165,7 @@ func NewAssignableBot(id, login string) AssignableBot {
 }
 
 func (b AssignableBot) DisplayName() string {
-	return actorDisplayName("Bot", b.login, "")
+	return actorDisplayName(botTypeName, b.login, "")
 }
 
 func (b AssignableBot) ID() string {

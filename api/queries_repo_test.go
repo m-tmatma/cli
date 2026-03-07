@@ -583,10 +583,7 @@ func TestActorDisplayName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := actorDisplayName(tt.typeName, tt.login, tt.actName)
-			if got != tt.want {
-				t.Errorf("actorDisplayName(%q, %q, %q) = %q, want %q", tt.typeName, tt.login, tt.actName, got, tt.want)
-			}
+			require.Equal(t, tt.want, actorDisplayName(tt.typeName, tt.login, tt.actName))
 		})
 	}
 }
