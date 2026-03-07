@@ -53,6 +53,15 @@ type Prompter interface {
 }
 
 func New(editorCmd string, io *iostreams.IOStreams) Prompter {
+	if io.ExperimentalPrompterEnabled() {
+		return &huhPrompter{
+			stdin:     io.In,
+			stdout:    io.Out,
+			stderr:    io.ErrOut,
+			editorCmd: editorCmd,
+		}
+	}
+
 	if io.AccessiblePrompterEnabled() {
 		return &accessiblePrompter{
 			stdin:     io.In,
