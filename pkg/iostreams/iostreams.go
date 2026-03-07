@@ -79,8 +79,8 @@ type IOStreams struct {
 	pagerCommand string
 	pagerProcess *os.Process
 
-	neverPrompt                bool
-	accessiblePrompterEnabled  bool
+	neverPrompt                 bool
+	accessiblePrompterEnabled   bool
 	experimentalPrompterEnabled bool
 
 	TempFileOverride *os.File
