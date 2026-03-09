@@ -397,7 +397,7 @@ func filterDiff(r io.Reader, excludePatterns []string) (io.Reader, error) {
 
 	var result bytes.Buffer
 	for _, section := range splitDiffSections(string(data)) {
-		name := extractFileName([]byte(section))
+		name := extractFileName(section)
 		if name != "" && matchesAny(name, excludePatterns) {
 			continue
 		}
@@ -428,12 +428,12 @@ func splitDiffSections(diff string) []string {
 	return sections
 }
 
-func extractFileName(section []byte) string {
-	m := diffHeaderRegexp.FindSubmatch(section)
+func extractFileName(section string) string {
+	m := diffHeaderRegexp.FindStringSubmatch(section)
 	if m == nil {
 		return ""
 	}
-	return strings.TrimSpace(string(m[1]) + string(m[2]))
+	return strings.TrimSpace(m[1] + m[2])
 }
 
 func matchesAny(name string, excludePatterns []string) bool {
