@@ -314,8 +314,9 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
-// IssueRepoInfo fetches only the repository fields needed for issue creation,
-// avoiding fields like defaultBranchRef that require additional token permissions.
+// IssueRepoInfo fetches only the repository fields needed for issue operations such as
+// issue creation and transfer, avoiding fields like defaultBranchRef that require additional
+// token permissions.
 func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	query IssueRepositoryInfo($owner: String!, $name: String!) {
@@ -338,6 +339,8 @@ func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
 		return nil, err
 	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
 	if result.Repository == nil {
 		return nil, GraphQLError{
 			GraphQLError: &ghAPI.GraphQLError{
