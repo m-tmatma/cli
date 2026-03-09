@@ -21,6 +21,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -214,7 +215,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Upon success, the URL of the created pull request will be printed.
 
 			When the current branch isn't fully pushed to a git remote, a prompt will ask where
-			to push the branch and offer an option to fork the base repository. Use %[1]s--head%[1]s to
+			to push the branch and offer an option to fork the base repository. Any fork created this
+			way will only have the default branch of the upstream repository. Use %[1]s--head%[1]s to
 			explicitly skip any forking or pushing behavior.
 
 			%[1]s--head%[1]s supports %[1]s<user>:<branch>%[1]s syntax to select a head repo owned by %[1]s<user>%[1]s.
@@ -397,9 +399,36 @@ func createRun(opts *CreateOptions) error {
 
 	client := ctx.Client
 
+	// Detect ActorIsAssignable feature to determine if we can use search-based
+	// reviewer selection (github.com) or need to use legacy ID-based selection (GHES)
+	issueFeatures, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+	var reviewerSearchFunc func(string) prompter.MultiSelectSearchResult
+	if issueFeatures.ActorIsAssignable {
+		reviewerSearchFunc = func(query string) prompter.MultiSelectSearchResult {
+			candidates, moreResults, err := api.SuggestedReviewerActorsForRepo(client, ctx.PRRefs.BaseRepo(), query)
+			if err != nil {
+				return prompter.MultiSelectSearchResult{Err: err}
+			}
+			keys := make([]string, len(candidates))
+			labels := make([]string, len(candidates))
+			for i, c := range candidates {
+				keys[i] = c.Login()
+				labels[i] = c.DisplayName()
+			}
+			return prompter.MultiSelectSearchResult{Keys: keys, Labels: labels, MoreResults: moreResults}
+		}
+	}
+
 	state, err := NewIssueState(*ctx, *opts)
 	if err != nil {
 		return err
+	}
+
+	if issueFeatures.ActorIsAssignable {
+		state.ActorReviewers = true
 	}
 
 	var openURL string
@@ -568,7 +597,7 @@ func createRun(opts *CreateOptions) error {
 				Repo:      ctx.PRRefs.BaseRepo(),
 				State:     state,
 			}
-			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state, projectsV1Support)
+			err = shared.MetadataSurvey(opts.Prompter, opts.IO, ctx.PRRefs.BaseRepo(), fetcher, state, projectsV1Support, reviewerSearchFunc)
 			if err != nil {
 				return err
 			}
@@ -652,9 +681,12 @@ func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadata
 		return nil, err
 	}
 
+	copilotReplacer := shared.NewCopilotReviewerReplacer()
+	reviewers := copilotReplacer.ReplaceSlice(opts.Reviewers)
+
 	state := &shared.IssueMetadataState{
 		Type:          shared.PRMetadata,
-		Reviewers:     opts.Reviewers,
+		Reviewers:     reviewers,
 		Assignees:     assignees,
 		Labels:        opts.Labels,
 		ProjectTitles: opts.Projects,
@@ -1128,7 +1160,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	forkableRefs, requiresFork := refs.(forkableRefs)
 	if requiresFork {
 		opts.IO.StartProgressIndicator()
-		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", false)
+		forkedRepo, err := api.ForkRepo(ctx.Client, forkableRefs.BaseRepo(), "", "", true)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
