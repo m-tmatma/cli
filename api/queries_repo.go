@@ -314,6 +314,44 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
+// IssueRepoInfo fetches only the repository fields needed for issue creation,
+// avoiding fields like defaultBranchRef that require additional token permissions.
+func IssueRepoInfo(client *Client, repo ghrepo.Interface) (*Repository, error) {
+	query := `
+	query IssueRepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
+			id
+			name
+			owner { login }
+			hasIssuesEnabled
+			viewerPermission
+		}
+	}`
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	if result.Repository == nil {
+		return nil, GraphQLError{
+			GraphQLError: &ghAPI.GraphQLError{
+				Errors: []ghAPI.GraphQLErrorItem{{
+					Type:    "NOT_FOUND",
+					Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+				}},
+			},
+		}
+	}
+
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
