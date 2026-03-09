@@ -411,7 +411,7 @@ func Test_createRun(t *testing.T) {
 			name: "editor",
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": {
 							"id": "REPOID",
@@ -440,7 +440,7 @@ func Test_createRun(t *testing.T) {
 			name: "editor and template",
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -516,7 +516,7 @@ func Test_createRun(t *testing.T) {
 			},
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": {
 							"id": "REPOID",
@@ -589,7 +589,7 @@ func Test_createRun(t *testing.T) {
 			},
 			httpStubs: func(r *httpmock.Registry) {
 				r.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 					httpmock.StringResponse(`
 						{ "data": { "repository": {
 							"id": "REPOID",
@@ -721,7 +721,7 @@ func TestIssueCreate(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -754,7 +754,7 @@ func TestIssueCreate_recover(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -838,7 +838,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -901,7 +901,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -947,7 +947,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.StubIssueRepoInfoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
 		httpmock.StringResponse(`
@@ -1057,7 +1057,7 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"id": "REPOID",
@@ -1084,7 +1084,7 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 		`),
 	)
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
@@ -1127,7 +1127,7 @@ func TestIssueCreate_AtCopilotAssignee(t *testing.T) {
 	defer http.Verify(t)
 
 	http.Register(
-		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.GraphQL(`query IssueRepositoryInfo\b`),
 		httpmock.StringResponse(`
 		{ "data": { "repository": {
 			"id": "REPOID",
@@ -1168,7 +1168,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
-	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.StubIssueRepoInfoResponse("OWNER", "REPO")
 	http.Register(
 		httpmock.GraphQL(`query RepositoryProjectList\b`),
 		httpmock.StringResponse(`
@@ -1261,7 +1261,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 
 			reg := &httpmock.Registry{}
-			reg.StubRepoInfoResponse("OWNER", "REPO", "main")
+			reg.StubIssueRepoInfoResponse("OWNER", "REPO")
 			reg.Register(
 				// ( is required to avoid matching projectsV2
 				httpmock.GraphQL(`projects\(`),
@@ -1298,7 +1298,7 @@ func TestProjectsV1Deprecation(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 
 			reg := &httpmock.Registry{}
-			reg.StubRepoInfoResponse("OWNER", "REPO", "main")
+			reg.StubIssueRepoInfoResponse("OWNER", "REPO")
 			// ( is required to avoid matching projectsV2
 			reg.Exclude(t, httpmock.GraphQL(`projects\(`))
 
