@@ -114,6 +114,11 @@ func TestNewCmdEdit(t *testing.T) {
 			args:    "--enable-squash-merge --squash-merge-commit-message blah",
 			wantErr: `invalid value for --squash-merge-commit-message: "blah". Valid values are: default, pr-title, pr-title-commits, pr-title-description`,
 		},
+		{
+			name:    "squash merge commit message with enable-squash-merge=false",
+			args:    "--enable-squash-merge=false --squash-merge-commit-message default",
+			wantErr: "--squash-merge-commit-message cannot be used when --enable-squash-merge=false",
+		},
 	}
 
 	for _, tt := range tests {
@@ -970,6 +975,15 @@ func Test_transformSquashMergeOpts(t *testing.T) {
 			assert.Equal(t, tt.wantMessage, *edits.SquashMergeCommitMessage)
 		})
 	}
+}
+
+func Test_transformSquashMergeOpts_unknownInput(t *testing.T) {
+	edits := &EditRepositoryInput{
+		squashMergeCommitMsg: sp("unknown-value"),
+	}
+	transformSquashMergeOpts(edits)
+	assert.Nil(t, edits.SquashMergeCommitTitle)
+	assert.Nil(t, edits.SquashMergeCommitMessage)
 }
 
 func Test_validateSquashMergeCommitMsg(t *testing.T) {

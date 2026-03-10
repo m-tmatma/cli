@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -47,11 +48,13 @@ const (
 	optionIssues            = "Issues"
 	optionMergeOptions      = "Merge Options"
 	optionProjects          = "Projects"
-	optionDiscussions       = "Discussions"
 	optionTemplateRepo      = "Template Repository"
 	optionTopics            = "Topics"
 	optionVisibility        = "Visibility"
 	optionWikis             = "Wikis"
+
+	// TODO: GitHub Enterprise Server does not support has_discussions yet
+	// optionDiscussions = "Discussions"
 )
 
 type EditOptions struct {
@@ -132,11 +135,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			When the %[1]s--enable-squash-merge%[1]s flag is used, %[1]s--squash-merge-commit-message%[1]s
 			can be used to change the default squash merge commit message behavior:
 
-			- %[1]sdefault%[1]s: uses commit title and message for 1 commit, or pull request title and list of commits for 2 or more
-			- %[1]spr-title%[1]s: uses pull request title
-			- %[1]spr-title-commits%[1]s: uses pull request title and list of commits
-			- %[1]spr-title-description%[1]s: uses pull request title and description
-		`, "`"),
+			- %[1]s%[2]s%[1]s: uses commit title and message for 1 commit, or pull request title and list of commits for 2 or more
+			- %[1]s%[3]s%[1]s: uses pull request title
+			- %[1]s%[4]s%[1]s: uses pull request title and list of commits
+			- %[1]s%[5]s%[1]s: uses pull request title and description
+		`, "`", squashMsgDefault, squashMsgPRTitle, squashMsgPRTitleCommits, squashMsgPRTitleDescription),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			# Enable issues and wiki
@@ -179,11 +182,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			}
 
 			if opts.Edits.squashMergeCommitMsg != nil {
-				if err := validateSquashMergeCommitMsg(*opts.Edits.squashMergeCommitMsg); err != nil {
-					return err
-				}
 				if opts.Edits.EnableSquashMerge == nil {
 					return cmdutil.FlagErrorf("--squash-merge-commit-message requires --enable-squash-merge")
+				}
+				if !*opts.Edits.EnableSquashMerge {
+					return cmdutil.FlagErrorf("--squash-merge-commit-message cannot be used when --enable-squash-merge=false")
+				}
+				if err := validateSquashMergeCommitMsg(*opts.Edits.squashMergeCommitMsg); err != nil {
+					return err
 				}
 				transformSquashMergeOpts(&opts.Edits)
 			}
@@ -502,12 +508,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			if enableSquashMerge {
-				squashMsgOptions := []string{
-					squashMsgDefault,
-					squashMsgPRTitle,
-					squashMsgPRTitleCommits,
-					squashMsgPRTitleDescription,
-				}
+				squashMsgOptions := validSquashMsgValues
 				idx, err := p.Select(
 					"Default squash merge commit message",
 					squashMsgDefault,
@@ -684,10 +685,8 @@ func transformSecurityAndAnalysisOpts(opts *EditOptions) *SecurityAndAnalysisInp
 var validSquashMsgValues = []string{squashMsgDefault, squashMsgPRTitle, squashMsgPRTitleCommits, squashMsgPRTitleDescription}
 
 func validateSquashMergeCommitMsg(value string) error {
-	for _, v := range validSquashMsgValues {
-		if value == v {
-			return nil
-		}
+	if slices.Contains(validSquashMsgValues, value) {
+		return nil
 	}
 	return cmdutil.FlagErrorf("invalid value for --squash-merge-commit-message: %q. Valid values are: %s", value, strings.Join(validSquashMsgValues, ", "))
 }
@@ -712,6 +711,8 @@ func transformSquashMergeOpts(edits *EditRepositoryInput) {
 	case squashMsgPRTitleDescription:
 		title = "PR_TITLE"
 		message = "PR_BODY"
+	default:
+		return
 	}
 	edits.SquashMergeCommitTitle = &title
 	edits.SquashMergeCommitMessage = &message
