@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"charm.land/huh/v2"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/surveyext"

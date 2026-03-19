@@ -1,119 +1,151 @@
 package prompter
 
 import (
+	"io"
 	"testing"
+	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Test helpers adapted from huh's own test suite (huh_test.go).
+// --- Interaction helpers ---
+// A set of helpers for simulating user input in huh form tests.
+// Each helper (tab(), toggle(), typeKeys(), etc.) produces raw terminal
+// bytes that are piped into form.Run() via io.Pipe, driving the real
+// bubbletea event loop.
 
-func batchUpdate(m huh.Model, cmd tea.Cmd) huh.Model {
-	if cmd == nil {
-		return m
+type interactionStep struct {
+	bytes []byte
+	delay time.Duration // pause before sending (lets the event loop settle)
+}
+
+type interaction struct {
+	steps []interactionStep
+}
+
+func newInteraction(steps ...interactionStep) interaction {
+	return interaction{steps: steps}
+}
+
+func (ix interaction) run(t *testing.T, w *io.PipeWriter) {
+	t.Helper()
+	for _, s := range ix.steps {
+		time.Sleep(s.delay)
+		_, err := w.Write(s.bytes)
+		require.NoError(t, err)
 	}
-	msg := cmd()
-	m, cmd = m.Update(msg)
-	if cmd == nil {
-		return m
-	}
-	msg = cmd()
-	m, _ = m.Update(msg)
-	return m
 }
 
-func codeKeypress(r rune) tea.KeyPressMsg {
-	return tea.KeyPressMsg(tea.Key{Code: r})
+// Step helpers — each returns a single interactionStep.
+//
+// These send raw terminal escape sequences that bubbletea's input parser
+// understands. Common ANSI escape codes:
+//
+//	\t        = Tab
+//	\x1b[Z   = Shift+Tab (reverse tab)
+//	\r       = Enter (carriage return)
+//	\x1b[A   = Arrow Up
+//	\x1b[B   = Arrow Down
+//	\x1b[C   = Arrow Right
+//	\x1b[D   = Arrow Left
+//	\x01     = Ctrl+A (line start)
+//	\x0b     = Ctrl+K (kill to end of line)
+
+func tab() interactionStep {
+	return interactionStep{bytes: []byte("\t")}
 }
 
-func keypress(r rune) tea.KeyPressMsg {
-	return tea.KeyPressMsg(tea.Key{
-		Text:        string(r),
-		Code:        r,
-		ShiftedCode: r,
-	})
+func shiftTab() interactionStep {
+	return interactionStep{bytes: []byte("\x1b[Z")}
 }
 
-func typeText(m huh.Model, s string) huh.Model {
-	for _, r := range s {
-		m, _ = m.Update(keypress(r))
-	}
-	return m
+func enter() interactionStep {
+	return interactionStep{bytes: []byte("\r")}
 }
 
-func viewStripped(m huh.Model) string {
-	return ansi.Strip(m.View())
+func toggle() interactionStep {
+	return interactionStep{bytes: []byte("x")}
 }
 
-func shiftTabKeypress() tea.KeyPressMsg {
-	return tea.KeyPressMsg(tea.Key{Code: tea.KeyTab, Mod: tea.ModShift})
+func down() interactionStep {
+	return interactionStep{bytes: []byte("\x1b[B")}
 }
+
+func left() interactionStep {
+	return interactionStep{bytes: []byte("\x1b[D")}
+}
+
+func right() interactionStep {
+	return interactionStep{bytes: []byte("\x1b[C")}
+}
+
+func typeKeys(s string) interactionStep {
+	return interactionStep{bytes: []byte(s)}
+}
+
+func pressY() interactionStep {
+	return interactionStep{bytes: []byte("y")}
+}
+
+func pressN() interactionStep {
+	return interactionStep{bytes: []byte("n")}
+}
+
+func clearLine() interactionStep {
+	return interactionStep{bytes: []byte{0x01, 0x0b}}
+}
+
+// waitForOptions adds extra delay to let OptionsFunc load before continuing.
+func waitForOptions() interactionStep {
+	return interactionStep{bytes: nil, delay: 50 * time.Millisecond}
+}
+
+// --- Test harness ---
 
 func newTestHuhPrompter() *huhPrompter {
 	return &huhPrompter{}
 }
 
-// doAllUpdates processes all batched commands from the form, including async
-// OptionsFunc evaluations. Adapted from huh's own test suite. Uses iterative
-// rounds with a depth limit to prevent infinite loops from cascading binding updates.
-func doAllUpdates(f *huh.Form, cmd tea.Cmd) {
-	for range 3 {
-		if cmd == nil {
-			return
-		}
-		cmds := expandBatch(cmd)
-		var next []tea.Cmd
-		for _, c := range cmds {
-			if c == nil {
-				continue
-			}
-			_, result := f.Update(c())
-			if result != nil {
-				next = append(next, result)
-			}
-		}
-		if len(next) == 0 {
-			return
-		}
-		cmd = tea.Batch(next...)
+// runForm runs a huh form with the given interaction, returning any error.
+// The form runs in a goroutine using bubbletea's real event loop via io.Pipe.
+func runForm(t *testing.T, f *huh.Form, ix interaction) {
+	t.Helper()
+	r, w := io.Pipe()
+	f.WithInput(r).WithOutput(io.Discard)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- f.Run() }()
+
+	ix.run(t, w)
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("form.Run() did not complete in time")
 	}
 }
 
-// expandBatch flattens nested tea.BatchMsg into a flat slice of commands.
-func expandBatch(cmd tea.Cmd) []tea.Cmd {
-	if cmd == nil {
-		return nil
-	}
-	msg := cmd()
-	if batch, ok := msg.(tea.BatchMsg); ok {
-		var all []tea.Cmd
-		for _, sub := range batch {
-			all = append(all, expandBatch(sub)...)
-		}
-		return all
-	}
-	return []tea.Cmd{func() tea.Msg { return msg }}
-}
+// --- Tests ---
 
 func TestHuhPrompterInput(t *testing.T) {
 	tests := []struct {
 		name         string
 		defaultValue string
-		input        string
+		ix           interaction
 		wantResult   string
 	}{
 		{
 			name:       "basic input",
-			input:      "hello",
+			ix:         newInteraction(typeKeys("hello"), enter()),
 			wantResult: "hello",
 		},
 		{
 			name:         "default value returned when no input",
 			defaultValue: "default",
+			ix:           newInteraction(enter()),
 			wantResult:   "default",
 		},
 	}
@@ -122,14 +154,7 @@ func TestHuhPrompterInput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newTestHuhPrompter()
 			f, result := p.buildInputForm("Name:", tt.defaultValue)
-			f.Update(f.Init())
-
-			var m huh.Model = f
-			if tt.input != "" {
-				m = typeText(m, tt.input)
-			}
-			batchUpdate(m.Update(codeKeypress(tea.KeyEnter)))
-
+			runForm(t, f, tt.ix)
 			require.Equal(t, tt.wantResult, *result)
 		})
 	}
@@ -140,36 +165,39 @@ func TestHuhPrompterSelect(t *testing.T) {
 		name         string
 		options      []string
 		defaultValue string
-		keys         []tea.KeyPressMsg // keypresses before Enter
+		ix           interaction
 		wantIndex    int
 	}{
 		{
 			name:      "selects first option by default",
 			options:   []string{"a", "b", "c"},
+			ix:        newInteraction(enter()),
 			wantIndex: 0,
 		},
 		{
 			name:         "respects default value",
 			options:      []string{"a", "b", "c"},
 			defaultValue: "b",
+			ix:           newInteraction(enter()),
 			wantIndex:    1,
 		},
 		{
 			name:         "invalid default selects first",
 			options:      []string{"a", "b", "c"},
 			defaultValue: "z",
+			ix:           newInteraction(enter()),
 			wantIndex:    0,
 		},
 		{
 			name:      "navigate down one",
 			options:   []string{"a", "b", "c"},
-			keys:      []tea.KeyPressMsg{keypress('j')},
+			ix:        newInteraction(down(), enter()),
 			wantIndex: 1,
 		},
 		{
 			name:      "navigate down two",
 			options:   []string{"a", "b", "c"},
-			keys:      []tea.KeyPressMsg{keypress('j'), keypress('j')},
+			ix:        newInteraction(down(), down(), enter()),
 			wantIndex: 2,
 		},
 	}
@@ -178,14 +206,7 @@ func TestHuhPrompterSelect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newTestHuhPrompter()
 			f, result := p.buildSelectForm("Pick:", tt.defaultValue, tt.options)
-			f.Update(f.Init())
-
-			var m huh.Model = f
-			for _, k := range tt.keys {
-				m = batchUpdate(m.Update(k))
-			}
-			batchUpdate(m.Update(codeKeypress(tea.KeyEnter)))
-
+			runForm(t, f, tt.ix)
 			require.Equal(t, tt.wantIndex, *result)
 		})
 	}
@@ -196,41 +217,45 @@ func TestHuhPrompterMultiSelect(t *testing.T) {
 		name       string
 		options    []string
 		defaults   []string
-		keys       []tea.KeyPressMsg
+		ix         interaction
 		wantResult []int
 	}{
 		{
 			name:       "no defaults and no toggles returns empty",
 			options:    []string{"a", "b", "c"},
+			ix:         newInteraction(enter()),
 			wantResult: []int{},
 		},
 		{
 			name:       "defaults are pre-selected",
 			options:    []string{"a", "b", "c"},
 			defaults:   []string{"a", "c"},
+			ix:         newInteraction(enter()),
 			wantResult: []int{0, 2},
 		},
 		{
-			name:    "toggle first option",
-			options: []string{"a", "b", "c"},
-			keys:    []tea.KeyPressMsg{keypress('x')},
+			name:       "toggle first option",
+			options:    []string{"a", "b", "c"},
+			ix:         newInteraction(toggle(), enter()),
 			wantResult: []int{0},
 		},
 		{
 			name:    "toggle multiple options",
 			options: []string{"a", "b", "c"},
-			keys: []tea.KeyPressMsg{
-				keypress('x'),          // toggle a
-				keypress('j'),          // move to b
-				keypress('j'),          // move to c
-				keypress('x'),          // toggle c
-			},
+			ix: newInteraction(
+				toggle(), // toggle a
+				down(),   // move to b
+				down(),   // move to c
+				toggle(), // toggle c
+				enter(),
+			),
 			wantResult: []int{0, 2},
 		},
 		{
-			name:     "invalid defaults are excluded",
-			options:  []string{"a", "b"},
-			defaults: []string{"z"},
+			name:       "invalid defaults are excluded",
+			options:    []string{"a", "b"},
+			defaults:   []string{"z"},
+			ix:         newInteraction(enter()),
 			wantResult: []int{},
 		},
 	}
@@ -239,14 +264,7 @@ func TestHuhPrompterMultiSelect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newTestHuhPrompter()
 			f, result := p.buildMultiSelectForm("Pick:", tt.defaults, tt.options)
-			f.Update(f.Init())
-
-			var m huh.Model = f
-			for _, k := range tt.keys {
-				m = batchUpdate(m.Update(k))
-			}
-			batchUpdate(m.Update(codeKeypress(tea.KeyEnter)))
-
+			runForm(t, f, tt.ix)
 			require.Equal(t, tt.wantResult, *result)
 		})
 	}
@@ -256,41 +274,40 @@ func TestHuhPrompterConfirm(t *testing.T) {
 	tests := []struct {
 		name         string
 		defaultValue bool
-		keys         []tea.KeyPressMsg
+		ix           interaction
 		wantResult   bool
 	}{
 		{
-			name:         "default false submitted as-is",
-			defaultValue: false,
-			wantResult:   false,
+			name:       "default false submitted as-is",
+			ix:         newInteraction(enter()),
+			wantResult: false,
 		},
 		{
 			name:         "default true submitted as-is",
 			defaultValue: true,
+			ix:           newInteraction(enter()),
 			wantResult:   true,
 		},
 		{
-			name:         "toggle from false to true with left arrow",
-			defaultValue: false,
-			keys:         []tea.KeyPressMsg{codeKeypress(tea.KeyLeft)},
-			wantResult:   true,
+			name:       "toggle from false to true with left arrow",
+			ix:         newInteraction(left(), enter()),
+			wantResult: true,
 		},
 		{
 			name:         "toggle from true to false with right arrow",
 			defaultValue: true,
-			keys:         []tea.KeyPressMsg{codeKeypress(tea.KeyRight)},
+			ix:           newInteraction(right(), enter()),
 			wantResult:   false,
 		},
 		{
-			name:         "accept with y key",
-			defaultValue: false,
-			keys:         []tea.KeyPressMsg{keypress('y')},
-			wantResult:   true,
+			name:       "accept with y key",
+			ix:         newInteraction(pressY(), enter()),
+			wantResult: true,
 		},
 		{
 			name:         "reject with n key",
 			defaultValue: true,
-			keys:         []tea.KeyPressMsg{keypress('n')},
+			ix:           newInteraction(pressN(), enter()),
 			wantResult:   false,
 		},
 	}
@@ -299,14 +316,7 @@ func TestHuhPrompterConfirm(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newTestHuhPrompter()
 			f, result := p.buildConfirmForm("Sure?", tt.defaultValue)
-			f.Update(f.Init())
-
-			var m huh.Model = f
-			for _, k := range tt.keys {
-				m = batchUpdate(m.Update(k))
-			}
-			batchUpdate(m.Update(codeKeypress(tea.KeyEnter)))
-
+			runForm(t, f, tt.ix)
 			require.Equal(t, tt.wantResult, *result)
 		})
 	}
@@ -315,16 +325,17 @@ func TestHuhPrompterConfirm(t *testing.T) {
 func TestHuhPrompterPassword(t *testing.T) {
 	tests := []struct {
 		name       string
-		input      string
+		ix         interaction
 		wantResult string
 	}{
 		{
 			name:       "basic password",
-			input:      "s3cret",
+			ix:         newInteraction(typeKeys("s3cret"), enter()),
 			wantResult: "s3cret",
 		},
 		{
 			name:       "empty password",
+			ix:         newInteraction(enter()),
 			wantResult: "",
 		},
 	}
@@ -333,14 +344,7 @@ func TestHuhPrompterPassword(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newTestHuhPrompter()
 			f, result := p.buildPasswordForm("Password:")
-			f.Update(f.Init())
-
-			var m huh.Model = f
-			if tt.input != "" {
-				m = typeText(m, tt.input)
-			}
-			batchUpdate(m.Update(codeKeypress(tea.KeyEnter)))
-
+			runForm(t, f, tt.ix)
 			require.Equal(t, tt.wantResult, *result)
 		})
 	}
@@ -350,18 +354,19 @@ func TestHuhPrompterMarkdownEditor(t *testing.T) {
 	tests := []struct {
 		name         string
 		blankAllowed bool
-		keys         []tea.KeyPressMsg
+		ix           interaction
 		wantResult   string
 	}{
 		{
 			name:         "selects launch by default",
 			blankAllowed: true,
+			ix:           newInteraction(enter()),
 			wantResult:   "launch",
 		},
 		{
 			name:         "navigate to skip",
 			blankAllowed: true,
-			keys:         []tea.KeyPressMsg{keypress('j')},
+			ix:           newInteraction(down(), enter()),
 			wantResult:   "skip",
 		},
 	}
@@ -370,14 +375,7 @@ func TestHuhPrompterMarkdownEditor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			p := newTestHuhPrompter()
 			f, result := p.buildMarkdownEditorForm("Body:", tt.blankAllowed)
-			f.Update(f.Init())
-
-			var m huh.Model = f
-			for _, k := range tt.keys {
-				m = batchUpdate(m.Update(k))
-			}
-			batchUpdate(m.Update(codeKeypress(tea.KeyEnter)))
-
+			runForm(t, f, tt.ix)
 			require.Equal(t, tt.wantResult, *result)
 		})
 	}
@@ -401,46 +399,47 @@ func TestHuhPrompterMultiSelectWithSearch(t *testing.T) {
 		name       string
 		defaults   []string
 		persistent []string
-		keys       []tea.KeyPressMsg
+		ix         interaction
 		wantResult []string
 	}{
 		{
-			name: "defaults are pre-selected and returned on immediate submit",
-			defaults: []string{"result-a"},
-			keys: []tea.KeyPressMsg{
-				// Tab past the search input to the multi-select, then submit.
-				codeKeypress(tea.KeyTab),
-				codeKeypress(tea.KeyEnter),
-			},
+			name:       "defaults are pre-selected and returned on immediate submit",
+			defaults:   []string{"result-a"},
+			ix:         newInteraction(tab(), enter()),
 			wantResult: []string{"result-a"},
 		},
 		{
-			name: "toggle an option from search results",
-			keys: []tea.KeyPressMsg{
-				codeKeypress(tea.KeyTab),   // advance to multi-select
-				keypress('x'),             // toggle first option (result-a)
-				codeKeypress(tea.KeyEnter), // submit
-			},
+			name:       "toggle an option from search results",
+			ix:         newInteraction(tab(), waitForOptions(), toggle(), enter()),
 			wantResult: []string{"result-a"},
 		},
 		{
 			name: "toggle multiple options",
-			keys: []tea.KeyPressMsg{
-				codeKeypress(tea.KeyTab),   // advance to multi-select
-				keypress('x'),             // toggle result-a
-				keypress('j'),             // move to result-b
-				keypress('x'),             // toggle result-b
-				codeKeypress(tea.KeyEnter), // submit
-			},
+			ix: newInteraction(
+				tab(), waitForOptions(),
+				toggle(), // toggle result-a
+				down(),   // move to result-b
+				toggle(), // toggle result-b
+				enter(),
+			),
 			wantResult: []string{"result-a", "result-b"},
 		},
 		{
-			name: "no selection returns empty",
-			keys: []tea.KeyPressMsg{
-				codeKeypress(tea.KeyTab),
-				codeKeypress(tea.KeyEnter),
-			},
+			name:       "no selection returns empty",
+			ix:         newInteraction(tab(), enter()),
 			wantResult: []string{},
+		},
+		{
+			name:       "persistent options are shown and selectable",
+			persistent: []string{"persistent-1"},
+			ix: newInteraction(
+				tab(), waitForOptions(),
+				down(),   // skip result-a
+				down(),   // skip result-b
+				toggle(), // toggle persistent-1
+				enter(),
+			),
+			wantResult: []string{"persistent-1"},
 		},
 	}
 
@@ -450,22 +449,14 @@ func TestHuhPrompterMultiSelectWithSearch(t *testing.T) {
 			f, result := p.buildMultiSelectWithSearchForm(
 				"Select", "Search", tt.defaults, tt.persistent, staticSearchFunc,
 			)
-			doAllUpdates(f, f.Init())
-
-			for _, k := range tt.keys {
-				_, cmd := f.Update(k)
-				doAllUpdates(f, cmd)
-			}
-
+			runForm(t, f, tt.ix)
 			assert.Equal(t, tt.wantResult, *result)
 		})
 	}
 }
 
 func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
-	callCount := 0
 	staticSearchFunc := func(query string) MultiSelectSearchResult {
-		callCount++
 		if query == "" {
 			return MultiSelectSearchResult{
 				Keys:   []string{"result-a", "result-b"},
@@ -483,26 +474,110 @@ func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
 		f, result := p.buildMultiSelectWithSearchForm(
 			"Select", "Search", nil, nil, staticSearchFunc,
 		)
-		doAllUpdates(f, f.Init())
-
-		steps := []tea.KeyPressMsg{
-			// Tab to multi-select, toggle result-a.
-			codeKeypress(tea.KeyTab),
-			keypress('x'),
-			// Shift+Tab back to search input, type "foo".
-			shiftTabKeypress(),
-			keypress('f'), keypress('o'), keypress('o'),
-			// Tab back to multi-select — result-a should still be selected.
-			codeKeypress(tea.KeyTab),
-			// Submit.
-			codeKeypress(tea.KeyEnter),
-		}
-
-		for _, k := range steps {
-			_, cmd := f.Update(k)
-			doAllUpdates(f, cmd)
-		}
-
+		runForm(t, f, newInteraction(
+			tab(), waitForOptions(),
+			toggle(),        // toggle result-a
+			shiftTab(),      // back to search input
+			typeKeys("foo"), // change query
+			tab(), waitForOptions(),
+			enter(), // submit — result-a should persist
+		))
 		assert.Equal(t, []string{"result-a"}, *result)
 	})
+	t.Run("empty search results shows no-results placeholder", func(t *testing.T) {
+		emptySearchFunc := func(query string) MultiSelectSearchResult {
+			return MultiSelectSearchResult{}
+		}
+		p := newTestHuhPrompter()
+		f, result := p.buildMultiSelectWithSearchForm(
+			"Select", "Search", nil, nil, emptySearchFunc,
+		)
+		// With no results, the "No results" placeholder is shown but nothing
+		// is selected, so submitting returns empty.
+		runForm(t, f, newInteraction(tab(), waitForOptions(), toggle(), enter()))
+		assert.Equal(t, []string{""}, *result)
+	})
+}
+
+func TestHuhPrompterAuthToken(t *testing.T) {
+	tests := []struct {
+		name       string
+		ix         interaction
+		wantResult string
+	}{
+		{
+			name:       "accepts token input",
+			ix:         newInteraction(typeKeys("ghp_abc123"), enter()),
+			wantResult: "ghp_abc123",
+		},
+		{
+			name:       "rejects blank then accepts valid input",
+			ix:         newInteraction(enter(), typeKeys("ghp_valid"), enter()),
+			wantResult: "ghp_valid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newTestHuhPrompter()
+			f, result := p.buildAuthTokenForm()
+			runForm(t, f, tt.ix)
+			require.Equal(t, tt.wantResult, *result)
+		})
+	}
+}
+
+func TestHuhPrompterConfirmDeletion(t *testing.T) {
+	tests := []struct {
+		name          string
+		requiredValue string
+		ix            interaction
+	}{
+		{
+			name:          "accepts matching input",
+			requiredValue: "my-repo",
+			ix:            newInteraction(typeKeys("my-repo"), enter()),
+		},
+		{
+			name:          "rejects wrong input then accepts correct input",
+			requiredValue: "my-repo",
+			ix:            newInteraction(typeKeys("wrong"), enter(), clearLine(), typeKeys("my-repo"), enter()),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newTestHuhPrompter()
+			f := p.buildConfirmDeletionForm(tt.requiredValue)
+			runForm(t, f, tt.ix)
+		})
+	}
+}
+
+func TestHuhPrompterInputHostname(t *testing.T) {
+	tests := []struct {
+		name       string
+		ix         interaction
+		wantResult string
+	}{
+		{
+			name:       "accepts valid hostname",
+			ix:         newInteraction(typeKeys("github.example.com"), enter()),
+			wantResult: "github.example.com",
+		},
+		{
+			name:       "rejects blank then accepts valid hostname",
+			ix:         newInteraction(enter(), typeKeys("github.example.com"), enter()),
+			wantResult: "github.example.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newTestHuhPrompter()
+			f, result := p.buildInputHostnameForm()
+			runForm(t, f, tt.ix)
+			require.Equal(t, tt.wantResult, *result)
+		})
+	}
 }
