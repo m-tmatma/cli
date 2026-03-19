@@ -24,7 +24,7 @@ func (p *huhPrompter) newForm(groups ...*huh.Group) *huh.Form {
 		WithOutput(p.stdout)
 }
 
-func (p *huhPrompter) Select(prompt, defaultValue string, options []string) (int, error) {
+func (p *huhPrompter) buildSelectForm(prompt, defaultValue string, options []string) (*huh.Form, *int) {
 	var result int
 
 	if !slices.Contains(options, defaultValue) {
@@ -39,19 +39,24 @@ func (p *huhPrompter) Select(prompt, defaultValue string, options []string) (int
 		formOptions[i] = huh.NewOption(o, i)
 	}
 
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewSelect[int]().
 				Title(prompt).
 				Value(&result).
 				Options(formOptions...),
 		),
-	).Run()
-
-	return result, err
+	)
+	return form, &result
 }
 
-func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
+func (p *huhPrompter) Select(prompt, defaultValue string, options []string) (int, error) {
+	form, result := p.buildSelectForm(prompt, defaultValue, options)
+	err := form.Run()
+	return *result, err
+}
+
+func (p *huhPrompter) buildMultiSelectForm(prompt string, defaults []string, options []string) (*huh.Form, *[]int) {
 	var result []int
 
 	defaults = slices.DeleteFunc(defaults, func(s string) bool {
@@ -66,7 +71,7 @@ func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []st
 		formOptions[i] = huh.NewOption(o, i)
 	}
 
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[int]().
 				Title(prompt).
@@ -74,12 +79,17 @@ func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []st
 				Limit(len(options)).
 				Options(formOptions...),
 		),
-	).Run()
+	)
+	return form, &result
+}
 
+func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
+	form, result := p.buildMultiSelectForm(prompt, defaults, options)
+	err := form.Run()
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return *result, nil
 }
 
 // searchOptionsBinding is used as the OptionsFunc binding for MultiSelectWithSearch.
@@ -91,7 +101,7 @@ type searchOptionsBinding struct {
 	Selected *[]string
 }
 
-func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
+func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) (*huh.Form, *[]string) {
 	selectedValues := make([]string, len(defaultValues))
 	copy(selectedValues, defaultValues)
 
@@ -103,13 +113,15 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 	// Cache searchFunc results locally keyed by query string.
 	// This avoids redundant calls when the OptionsFunc binding hash changes
 	// due to selection changes (not query changes).
+	searchCacheValid := false
 	var cachedSearchQuery string
 	var cachedSearchResult MultiSelectSearchResult
 
 	buildOptions := func(query string) []huh.Option[string] {
-		if query != cachedSearchQuery || cachedSearchResult.Err != nil {
+		if !searchCacheValid || query != cachedSearchQuery {
 			cachedSearchResult = searchFunc(query)
 			cachedSearchQuery = query
+			searchCacheValid = true
 		}
 		result := cachedSearchResult
 
@@ -175,7 +187,7 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 		Selected: &selectedValues,
 	}
 
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title(searchPrompt).
@@ -189,67 +201,83 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 				Value(&selectedValues).
 				Limit(0),
 		),
-	).Run()
+	)
+	return form, &selectedValues
+}
+
+func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
+	form, result := p.buildMultiSelectWithSearchForm(prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
+	err := form.Run()
 	if err != nil {
 		return nil, err
 	}
-
-	return selectedValues, nil
+	return *result, nil
 }
 
-func (p *huhPrompter) Input(prompt, defaultValue string) (string, error) {
+func (p *huhPrompter) buildInputForm(prompt, defaultValue string) (*huh.Form, *string) {
 	result := defaultValue
-
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title(prompt).
 				Value(&result),
 		),
-	).Run()
-
-	return result, err
+	)
+	return form, &result
 }
 
-func (p *huhPrompter) Password(prompt string) (string, error) {
-	var result string
+func (p *huhPrompter) Input(prompt, defaultValue string) (string, error) {
+	form, result := p.buildInputForm(prompt, defaultValue)
+	err := form.Run()
+	return *result, err
+}
 
-	err := p.newForm(
+func (p *huhPrompter) buildPasswordForm(prompt string) (*huh.Form, *string) {
+	var result string
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				EchoMode(huh.EchoModePassword).
 				Title(prompt).
 				Value(&result),
 		),
-	).Run()
+	)
+	return form, &result
+}
 
+func (p *huhPrompter) Password(prompt string) (string, error) {
+	form, result := p.buildPasswordForm(prompt)
+	err := form.Run()
 	if err != nil {
 		return "", err
 	}
-	return result, nil
+	return *result, nil
 }
 
-func (p *huhPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
+func (p *huhPrompter) buildConfirmForm(prompt string, defaultValue bool) (*huh.Form, *bool) {
 	result := defaultValue
-
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title(prompt).
 				Value(&result),
 		),
-	).Run()
+	)
+	return form, &result
+}
 
+func (p *huhPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
+	form, result := p.buildConfirmForm(prompt, defaultValue)
+	err := form.Run()
 	if err != nil {
 		return false, err
 	}
-	return result, nil
+	return *result, nil
 }
 
-func (p *huhPrompter) AuthToken() (string, error) {
+func (p *huhPrompter) buildAuthTokenForm() (*huh.Form, *string) {
 	var result string
-
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				EchoMode(huh.EchoModePassword).
@@ -262,12 +290,17 @@ func (p *huhPrompter) AuthToken() (string, error) {
 				}).
 				Value(&result),
 		),
-	).Run()
-
-	return result, err
+	)
+	return form, &result
 }
 
-func (p *huhPrompter) ConfirmDeletion(requiredValue string) error {
+func (p *huhPrompter) AuthToken() (string, error) {
+	form, result := p.buildAuthTokenForm()
+	err := form.Run()
+	return *result, err
+}
+
+func (p *huhPrompter) buildConfirmDeletionForm(requiredValue string) *huh.Form {
 	return p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -279,28 +312,36 @@ func (p *huhPrompter) ConfirmDeletion(requiredValue string) error {
 					return nil
 				}),
 		),
-	).Run()
+	)
 }
 
-func (p *huhPrompter) InputHostname() (string, error) {
-	var result string
+func (p *huhPrompter) ConfirmDeletion(requiredValue string) error {
+	return p.buildConfirmDeletionForm(requiredValue).Run()
+}
 
-	err := p.newForm(
+func (p *huhPrompter) buildInputHostnameForm() (*huh.Form, *string) {
+	var result string
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Hostname:").
 				Validate(ghinstance.HostnameValidator).
 				Value(&result),
 		),
-	).Run()
+	)
+	return form, &result
+}
 
+func (p *huhPrompter) InputHostname() (string, error) {
+	form, result := p.buildInputHostnameForm()
+	err := form.Run()
 	if err != nil {
 		return "", err
 	}
-	return result, nil
+	return *result, nil
 }
 
-func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
+func (p *huhPrompter) buildMarkdownEditorForm(prompt string, blankAllowed bool) (*huh.Form, *string) {
 	var result string
 	skipOption := "skip"
 	launchOption := "launch"
@@ -311,20 +352,25 @@ func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed b
 		options = append(options, huh.NewOption("Skip", skipOption))
 	}
 
-	err := p.newForm(
+	form := p.newForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title(prompt).
 				Options(options...).
 				Value(&result),
 		),
-	).Run()
+	)
+	return form, &result
+}
 
+func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
+	form, result := p.buildMarkdownEditorForm(prompt, blankAllowed)
+	err := form.Run()
 	if err != nil {
 		return "", err
 	}
 
-	if result == skipOption {
+	if *result == "skip" {
 		return "", nil
 	}
 
