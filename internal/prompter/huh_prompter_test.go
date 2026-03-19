@@ -113,7 +113,7 @@ func newTestHuhPrompter() *huhPrompter {
 func runForm(t *testing.T, f *huh.Form, ix interaction) {
 	t.Helper()
 	r, w := io.Pipe()
-	f.WithInput(r).WithOutput(io.Discard)
+	f.WithInput(r).WithOutput(io.Discard).WithWidth(80)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- f.Run() }()

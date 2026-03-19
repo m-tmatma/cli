@@ -227,6 +227,7 @@ func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string
 		huh.NewGroup(
 			huh.NewInput().
 				Title(searchPrompt).
+				Placeholder("Type to search, Ctrl+U to clear").
 				Accessor(queryAccessor),
 			huh.NewMultiSelect[string]().
 				Title(prompt).
