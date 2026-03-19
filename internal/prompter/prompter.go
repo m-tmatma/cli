@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/charmbracelet/huh"
+	"charm.land/huh/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/surveyext"
@@ -89,7 +89,7 @@ type accessiblePrompter struct {
 
 func (p *accessiblePrompter) newForm(groups ...*huh.Group) *huh.Form {
 	return huh.NewForm(groups...).
-		WithTheme(huh.ThemeBase16()).
+		WithTheme(huh.ThemeFunc(huh.ThemeBase16)).
 		WithAccessible(true).
 		WithInput(p.stdin).
 		WithOutput(p.stdout)

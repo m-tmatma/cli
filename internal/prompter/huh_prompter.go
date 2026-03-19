@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/charmbracelet/huh"
+	"charm.land/huh/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	ghPrompter "github.com/cli/go-gh/v2/pkg/prompter"
@@ -19,7 +19,7 @@ type huhPrompter struct {
 
 func (p *huhPrompter) newForm(groups ...*huh.Group) *huh.Form {
 	return huh.NewForm(groups...).
-		WithTheme(huh.ThemeBase16()).
+		WithTheme(huh.ThemeFunc(huh.ThemeBase16)).
 		WithInput(p.stdin).
 		WithOutput(p.stdout)
 }
@@ -82,6 +82,15 @@ func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []st
 	return result, nil
 }
 
+// searchOptionsBinding is used as the OptionsFunc binding for MultiSelectWithSearch.
+// By including both the search query and selected values, the binding hash changes
+// whenever either changes. This prevents huh's internal Eval cache from serving
+// stale option sets that would overwrite the user's current selections.
+type searchOptionsBinding struct {
+	Query    *string
+	Selected *[]string
+}
+
 func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	selectedValues := make([]string, len(defaultValues))
 	copy(selectedValues, defaultValues)
@@ -91,8 +100,19 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 		optionKeyLabels[k] = k
 	}
 
+	// Cache searchFunc results locally keyed by query string.
+	// This avoids redundant calls when the OptionsFunc binding hash changes
+	// due to selection changes (not query changes).
+	var cachedSearchQuery string
+	var cachedSearchResult MultiSelectSearchResult
+
 	buildOptions := func(query string) []huh.Option[string] {
-		result := searchFunc(query)
+		if query != cachedSearchQuery || cachedSearchResult.Err != nil {
+			cachedSearchResult = searchFunc(query)
+			cachedSearchQuery = query
+		}
+		result := cachedSearchResult
+
 		if result.Err != nil {
 			return nil
 		}
@@ -113,7 +133,7 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 			if l == "" {
 				l = k
 			}
-			formOptions = append(formOptions, huh.NewOption(l, k))
+			formOptions = append(formOptions, huh.NewOption(l, k).Selected(true))
 		}
 
 		// 2. Search results.
@@ -150,6 +170,10 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 	}
 
 	var searchQuery string
+	binding := &searchOptionsBinding{
+		Query:    &searchQuery,
+		Selected: &selectedValues,
+	}
 
 	err := p.newForm(
 		huh.NewGroup(
@@ -161,7 +185,7 @@ func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, default
 				Options(buildOptions("")...).
 				OptionsFunc(func() []huh.Option[string] {
 					return buildOptions(searchQuery)
-				}, &searchQuery).
+				}, binding).
 				Value(&selectedValues).
 				Limit(0),
 		),
