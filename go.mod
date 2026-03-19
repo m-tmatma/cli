@@ -3,7 +3,10 @@ module github.com/cli/cli/v2
 go 1.26.1
 
 require (
+	charm.land/bubbles/v2 v2.0.0
+	charm.land/bubbletea/v2 v2.0.2
 	charm.land/huh/v2 v2.0.3
+	charm.land/lipgloss/v2 v2.0.2
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2
@@ -61,9 +64,6 @@ require (
 )
 
 require (
-	charm.land/bubbles/v2 v2.0.0 // indirect
-	charm.land/bubbletea/v2 v2.0.2 // indirect
-	charm.land/lipgloss/v2 v2.0.2 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
