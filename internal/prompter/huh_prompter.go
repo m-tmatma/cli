@@ -3,6 +3,7 @@ package prompter
 import (
 	"fmt"
 	"slices"
+	"sync"
 
 	"charm.land/huh/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -101,12 +102,35 @@ type searchOptionsBinding struct {
 	Selected *[]string
 }
 
-func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) (*huh.Form, *[]string) {
-	selectedValues := make([]string, len(defaultValues))
-	copy(selectedValues, defaultValues)
+// syncAccessor is a thread-safe huh.Accessor implementation.
+// huh calls OptionsFunc from a goroutine while the main event loop
+// writes field values via Set(). This accessor synchronizes both
+// paths through the same mutex.
+type syncAccessor[T any] struct {
+	mu    *sync.Mutex
+	value T
+}
+
+func (a *syncAccessor[T]) Get() T {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.value
+}
+
+func (a *syncAccessor[T]) Set(value T) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.value = value
+}
+
+func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) (*huh.Form, *syncAccessor[[]string]) {
+	var mu sync.Mutex
+
+	queryAccessor := &syncAccessor[string]{mu: &mu}
+	selectAccessor := &syncAccessor[[]string]{mu: &mu, value: slices.Clone(defaultValues)}
 
 	optionKeyLabels := make(map[string]string)
-	for _, k := range selectedValues {
+	for _, k := range defaultValues {
 		optionKeyLabels[k] = k
 	}
 
@@ -117,12 +141,25 @@ func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string
 	var cachedSearchQuery string
 	var cachedSearchResult MultiSelectSearchResult
 
-	buildOptions := func(query string) []huh.Option[string] {
-		if !searchCacheValid || query != cachedSearchQuery {
-			cachedSearchResult = searchFunc(query)
+	buildOptions := func() []huh.Option[string] {
+		mu.Lock()
+		query := queryAccessor.value
+		needsFetch := !searchCacheValid || query != cachedSearchQuery
+		mu.Unlock()
+
+		if needsFetch {
+			result := searchFunc(query)
+			mu.Lock()
+			cachedSearchResult = result
 			cachedSearchQuery = query
 			searchCacheValid = true
+			mu.Unlock()
 		}
+
+		mu.Lock()
+		defer mu.Unlock()
+
+		selectedValues := selectAccessor.value
 		result := cachedSearchResult
 
 		if result.Err != nil {
@@ -181,37 +218,36 @@ func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string
 		return formOptions
 	}
 
-	var searchQuery string
 	binding := &searchOptionsBinding{
-		Query:    &searchQuery,
-		Selected: &selectedValues,
+		Query:    &queryAccessor.value,
+		Selected: &selectAccessor.value,
 	}
 
 	form := p.newForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title(searchPrompt).
-				Value(&searchQuery),
+				Accessor(queryAccessor),
 			huh.NewMultiSelect[string]().
 				Title(prompt).
-				Options(buildOptions("")...).
+				Options(buildOptions()...).
 				OptionsFunc(func() []huh.Option[string] {
-					return buildOptions(searchQuery)
+					return buildOptions()
 				}, binding).
-				Value(&selectedValues).
+				Accessor(selectAccessor).
 				Limit(0),
 		),
 	)
-	return form, &selectedValues
+	return form, selectAccessor
 }
 
 func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
-	form, result := p.buildMultiSelectWithSearchForm(prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
+	form, accessor := p.buildMultiSelectWithSearchForm(prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
 	err := form.Run()
 	if err != nil {
 		return nil, err
 	}
-	return *result, nil
+	return accessor.Get(), nil
 }
 
 func (p *huhPrompter) buildInputForm(prompt, defaultValue string) (*huh.Form, *string) {

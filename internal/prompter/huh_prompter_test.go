@@ -450,7 +450,7 @@ func TestHuhPrompterMultiSelectWithSearch(t *testing.T) {
 				"Select", "Search", tt.defaults, tt.persistent, staticSearchFunc,
 			)
 			runForm(t, f, tt.ix)
-			assert.Equal(t, tt.wantResult, *result)
+			assert.Equal(t, tt.wantResult, result.Get())
 		})
 	}
 }
@@ -482,7 +482,7 @@ func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
 			tab(), waitForOptions(),
 			enter(), // submit — result-a should persist
 		))
-		assert.Equal(t, []string{"result-a"}, *result)
+		assert.Equal(t, []string{"result-a"}, result.Get())
 	})
 	t.Run("empty search results shows no-results placeholder", func(t *testing.T) {
 		emptySearchFunc := func(query string) MultiSelectSearchResult {
@@ -495,7 +495,7 @@ func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
 		// With no results, the "No results" placeholder is shown but nothing
 		// is selected, so submitting returns empty.
 		runForm(t, f, newInteraction(tab(), waitForOptions(), toggle(), enter()))
-		assert.Equal(t, []string{""}, *result)
+		assert.Equal(t, []string{""}, result.Get())
 	})
 }
 
