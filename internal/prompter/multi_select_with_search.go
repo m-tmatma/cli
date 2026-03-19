@@ -253,7 +253,8 @@ func (m *multiSelectSearchField) updateSearch(msg tea.KeyPressMsg) (huh.Model, t
 			m.search.Blur()
 			return m, nil
 		}
-		// New query — search in background with spinner.
+		// New query — clear input and search in background with spinner.
+		m.search.SetValue("")
 		return m, m.startSearch(query)
 
 	case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"))):
