@@ -450,7 +450,7 @@ func TestHuhPrompterMultiSelectWithSearch(t *testing.T) {
 				"Select", "Search", tt.defaults, tt.persistent, staticSearchFunc,
 			)
 			runForm(t, f, tt.ix)
-			assert.Equal(t, tt.wantResult, result.Get())
+			assert.Equal(t, tt.wantResult, result.selectedKeys())
 		})
 	}
 }
@@ -482,7 +482,7 @@ func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
 			tab(), waitForOptions(),
 			enter(), // submit — result-a should persist
 		))
-		assert.Equal(t, []string{"result-a"}, result.Get())
+		assert.Equal(t, []string{"result-a"}, result.selectedKeys())
 	})
 	t.Run("empty search results shows no-results placeholder", func(t *testing.T) {
 		emptySearchFunc := func(query string) MultiSelectSearchResult {
@@ -492,10 +492,10 @@ func TestHuhPrompterMultiSelectWithSearchPersistence(t *testing.T) {
 		f, result := p.buildMultiSelectWithSearchForm(
 			"Select", "Search", nil, nil, emptySearchFunc,
 		)
-		// With no results, the "No results" placeholder is shown but nothing
-		// is selected, so submitting returns empty.
+		// With no results, the "No results" message is shown.
+		// Toggle does nothing, submitting returns empty.
 		runForm(t, f, newInteraction(tab(), waitForOptions(), toggle(), enter()))
-		assert.Equal(t, []string{""}, result.Get())
+		assert.Equal(t, []string{}, result.selectedKeys())
 	})
 }
 
@@ -580,4 +580,41 @@ func TestHuhPrompterInputHostname(t *testing.T) {
 			require.Equal(t, tt.wantResult, *result)
 		})
 	}
+}
+
+func TestHuhPrompterMultiSelectWithSearchBackspace(t *testing.T) {
+	// Simulate real API latency and non-overlapping results.
+	staticSearchFunc := func(query string) MultiSelectSearchResult {
+		time.Sleep(100 * time.Millisecond) // simulate API latency
+		if query == "" {
+			return MultiSelectSearchResult{
+				Keys:   []string{"alice", "bob"},
+				Labels: []string{"Alice", "Bob"},
+			}
+		}
+		return MultiSelectSearchResult{
+			Keys:   []string{"frank", "fiona"},
+			Labels: []string{"Frank", "Fiona"},
+		}
+	}
+
+	t.Run("selections persist after backspacing search query", func(t *testing.T) {
+		p := newTestHuhPrompter()
+		f, result := p.buildMultiSelectWithSearchForm(
+			"Select", "Search", nil, nil, staticSearchFunc,
+		)
+		longWait := interactionStep{delay: 300 * time.Millisecond}
+		runForm(t, f, newInteraction(
+			tab(), longWait,
+			toggle(),         // toggle alice
+			shiftTab(),       // back to search input
+			typeKeys("f"),    // type "f"
+			longWait,         // wait for API + OptionsFunc
+			typeKeys("\x7f"), // backspace to ""
+			longWait,         // wait for cache/API
+			tab(), longWait,
+			enter(),
+		))
+		assert.Equal(t, []string{"alice"}, result.selectedKeys())
+	})
 }
