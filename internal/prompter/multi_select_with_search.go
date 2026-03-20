@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 	"charm.land/lipgloss/v2"
@@ -23,17 +21,14 @@ type multiSelectSearchField struct {
 	// configuration
 	title       string
 	searchTitle string
-	placeholder string
 	searchFunc  func(string) MultiSelectSearchResult
 
 	// state
-	mode         msMode // which sub-component has focus
-	search       textinput.Model
-	cursor       int
-	viewport     viewport.Model
-	loading      bool
-	loadingStart time.Time
-	spinner      spinner.Model
+	mode    msMode // which sub-component has focus
+	search  textinput.Model
+	cursor  int
+	loading bool
+	spinner spinner.Model
 
 	// options and selections
 	options       []msOption
@@ -111,7 +106,6 @@ func newMultiSelectSearchField(
 // deliver the result via msSearchResultMsg.
 func (m *multiSelectSearchField) startSearch(query string) tea.Cmd {
 	m.loading = true
-	m.loadingStart = time.Now()
 	searchFunc := m.searchFunc
 	return tea.Batch(
 		func() tea.Msg {
