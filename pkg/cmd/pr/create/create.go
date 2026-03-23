@@ -429,6 +429,7 @@ func createRun(opts *CreateOptions) error {
 
 	if issueFeatures.ActorIsAssignable {
 		state.ActorReviewers = true
+		state.ActorAssignees = true
 	}
 
 	var openURL string

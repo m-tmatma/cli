@@ -142,6 +142,10 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 
 		e.Assignees.Value = assigneeSet.ToSlice()
 	}
+	// TODO replaceActorsByLoginCleanup
+	// When ActorAssignees is true (github.com), this should compute the final
+	// assignee logins and return them directly without resolving to IDs, for use
+	// with ReplaceActorsForAssignableByLogin.
 	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
 	return &a, err
 }
@@ -472,8 +476,9 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 		}
 		// However, if we have Add/Remove operations (non-interactive flow),
 		// we do need to fetch the assignees.
-		// TODO: KW noninteractive assignees need to migrate to directly use
-		// new logins input with ReplaceActorsForAssignable to prevent fetching.
+		// TODO replaceActorsByLoginCleanup
+		// When ActorAssignees is true, noninteractive assignees should use
+		// ReplaceActorsForAssignableByLogin to skip this fetch entirely.
 		if len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0 {
 			fetchAssignees = true
 		}
