@@ -602,44 +602,17 @@ func ReplaceActorsForAssignableByLogin(client *Client, repo ghrepo.Interface, as
 		actorLogins[i] = githubv4.String(l)
 	}
 
+	var mutation struct {
+		ReplaceActorsForAssignable struct {
+			TypeName string `graphql:"__typename"`
+		} `graphql:"replaceActorsForAssignable(input: $input)"`
+	}
+
 	variables := map[string]interface{}{
 		"input": ReplaceActorsForAssignableInput{
 			AssignableID: githubv4.ID(assignableID),
 			ActorLogins:  actorLogins,
 		},
-	}
-
-	return replaceActorsForAssignable(client, repo, variables)
-}
-
-// ReplaceActorsForAssignableByID calls the replaceActorsForAssignable mutation
-// using actor node IDs. Used for GHES and edit flows that resolve IDs from search results.
-func ReplaceActorsForAssignableByID(client *Client, repo ghrepo.Interface, assignableID string, actorIDs []string) error {
-	type ReplaceActorsForAssignableInput struct {
-		AssignableID githubv4.ID   `json:"assignableId"`
-		ActorIDs     []githubv4.ID `json:"actorIds"`
-	}
-
-	ids := make([]githubv4.ID, len(actorIDs))
-	for i, id := range actorIDs {
-		ids[i] = githubv4.ID(id)
-	}
-
-	variables := map[string]interface{}{
-		"input": ReplaceActorsForAssignableInput{
-			AssignableID: githubv4.ID(assignableID),
-			ActorIDs:     ids,
-		},
-	}
-
-	return replaceActorsForAssignable(client, repo, variables)
-}
-
-func replaceActorsForAssignable(client *Client, repo ghrepo.Interface, variables map[string]interface{}) error {
-	var mutation struct {
-		ReplaceActorsForAssignable struct {
-			TypeName string `graphql:"__typename"`
-		} `graphql:"replaceActorsForAssignable(input: $input)"`
 	}
 
 	return client.Mutate(repo.RepoHost(), "ReplaceActorsForAssignable", &mutation, variables)

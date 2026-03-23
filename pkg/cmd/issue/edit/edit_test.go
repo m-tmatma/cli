@@ -629,8 +629,9 @@ func Test_editRun(t *testing.T) {
 					require.Equal(t, []string{"hubot"}, eo.Assignees.Default)
 					require.Equal(t, []string{"hubot"}, eo.Assignees.DefaultLogins)
 
-					// Adding MonaLisa as PR assignee, should preserve hubot.
-					eo.Assignees.Value = []string{"hubot", "MonaLisa (Mona Display Name)"}
+					// Adding MonaLisa as issue assignee, should preserve hubot.
+					// MultiSelectWithSearch returns Keys (logins), not display names.
+					eo.Assignees.Value = []string{"hubot", "MonaLisa"}
 					return nil
 				},
 				FetchOptions:    prShared.FetchOptions,
@@ -644,10 +645,7 @@ func Test_editRun(t *testing.T) {
 					httpmock.GraphQLMutation(`
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
 						func(inputs map[string]interface{}) {
-							// Checking that despite the display name being returned
-							// from the EditFieldsSurvey, the login is still
-							// used in the mutation.
-							require.Subset(t, inputs["actorLogins"], []interface{}{"hubot", "MonaLisa (Mona Display Name)"})
+							require.Subset(t, inputs["actorLogins"], []interface{}{"hubot", "MonaLisa"})
 						}),
 				)
 			},

@@ -303,7 +303,7 @@ func editRun(opts *EditOptions) error {
 	// to legacy reviewer/assignee fetching.
 	// TODO actorIsAssignableCleanup
 	if issueFeatures.ActorIsAssignable {
-		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, pr.ID)
+		editable.AssigneeSearchFunc = shared.AssigneeSearchFunc(apiClient, repo, pr.ID)
 		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
 	}
 
@@ -344,50 +344,6 @@ func editRun(opts *EditOptions) error {
 	fmt.Fprintln(opts.IO.Out, pr.URL)
 
 	return nil
-}
-
-// assigneeSearchFunc is intended to be an arg for MultiSelectWithSearch
-// to return potential assignee actors.
-func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, assignableID string) func(string) prompter.MultiSelectSearchResult {
-	searchFunc := func(input string) prompter.MultiSelectSearchResult {
-		actors, availableAssigneesCount, err := api.SuggestedAssignableActors(
-			apiClient,
-			repo,
-			assignableID,
-			input)
-		if err != nil {
-			return prompter.MultiSelectSearchResult{
-				Keys:        nil,
-				Labels:      nil,
-				MoreResults: 0,
-				Err:         err,
-			}
-		}
-
-		logins := make([]string, 0, len(actors))
-		displayNames := make([]string, 0, len(actors))
-
-		for _, a := range actors {
-			if a.Login() != "" {
-				logins = append(logins, a.Login())
-			} else {
-				continue
-			}
-
-			if a.DisplayName() != "" {
-				displayNames = append(displayNames, a.DisplayName())
-			} else {
-				displayNames = append(displayNames, a.Login())
-			}
-		}
-		return prompter.MultiSelectSearchResult{
-			Keys:        logins,
-			Labels:      displayNames,
-			MoreResults: availableAssigneesCount,
-			Err:         nil,
-		}
-	}
-	return searchFunc
 }
 
 // reviewerSearchFunc is intended to be an arg for MultiSelectWithSearch

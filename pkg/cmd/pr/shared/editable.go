@@ -611,3 +611,35 @@ func milestoneSurvey(p EditPrompter, title string, opts []string) (result string
 	result = opts[selected]
 	return
 }
+
+// AssigneeSearchFunc returns a search function for MultiSelectWithSearch that
+// dynamically fetches assignable actors for the given assignable (Issue/PR) node ID.
+func AssigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, assignableID string) func(string) prompter.MultiSelectSearchResult {
+	return func(input string) prompter.MultiSelectSearchResult {
+		actors, availableAssigneesCount, err := api.SuggestedAssignableActors(
+			apiClient, repo, assignableID, input)
+		if err != nil {
+			return prompter.MultiSelectSearchResult{Err: err}
+		}
+
+		logins := make([]string, 0, len(actors))
+		displayNames := make([]string, 0, len(actors))
+
+		for _, a := range actors {
+			if a.Login() == "" {
+				continue
+			}
+			logins = append(logins, a.Login())
+			if a.DisplayName() != "" {
+				displayNames = append(displayNames, a.DisplayName())
+			} else {
+				displayNames = append(displayNames, a.Login())
+			}
+		}
+		return prompter.MultiSelectSearchResult{
+			Keys:        logins,
+			Labels:      displayNames,
+			MoreResults: availableAssigneesCount,
+		}
+	}
+}
