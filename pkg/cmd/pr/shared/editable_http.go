@@ -66,19 +66,14 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 			// other issue fields to ensure consistency with how legacy
 			// user assignees are handled.
 			// https://github.com/cli/cli/pull/10960#discussion_r2086725348
-			// TODO replaceActorsByLoginCleanup
-			// When ActorAssignees is true (github.com), this should pass logins directly
-			// to ReplaceActorsForAssignableByLogin instead of resolving IDs. The ID-based
-			// path can be removed once both interactive and non-interactive edit flows
-			// are migrated to use logins.
 			if options.Assignees.Edited && options.Assignees.ActorAssignees {
 				apiClient := api.NewClientFromHTTP(httpClient)
-				assigneeIds, err := options.AssigneeIds(apiClient, repo)
+				logins, err := options.AssigneeLogins(apiClient, repo)
 				if err != nil {
 					return err
 				}
 
-				err = api.ReplaceActorsForAssignableByID(apiClient, repo, id, *assigneeIds)
+				err = api.ReplaceActorsForAssignableByLogin(apiClient, repo, id, logins)
 				if err != nil {
 					return err
 				}

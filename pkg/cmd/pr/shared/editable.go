@@ -150,6 +150,49 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	return &a, err
 }
 
+// AssigneeLogins computes the final list of assignee logins from the current
+// defaults plus any Add/Remove operations. Unlike AssigneeIds, this does not
+// resolve logins to node IDs, and is used on github.com where the
+// ReplaceActorsForAssignable mutation accepts logins directly.
+func (e Editable) AssigneeLogins(client *api.Client, repo ghrepo.Interface) ([]string, error) {
+	if !e.Assignees.Edited {
+		return nil, nil
+	}
+
+	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
+		meReplacer := NewMeReplacer(client, repo.RepoHost())
+		copilotReplacer := NewCopilotReplacer(true)
+
+		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
+			replaced, err := meReplacer.ReplaceSlice(value)
+			if err != nil {
+				return nil, err
+			}
+			replaced = copilotReplacer.ReplaceSlice(replaced)
+			return replaced, nil
+		}
+
+		assigneeSet := set.NewStringSet()
+		assigneeSet.AddValues(e.Assignees.DefaultLogins)
+
+		add, err := replaceSpecialAssigneeNames(e.Assignees.Add)
+		if err != nil {
+			return nil, err
+		}
+		assigneeSet.AddValues(add)
+
+		remove, err := replaceSpecialAssigneeNames(e.Assignees.Remove)
+		if err != nil {
+			return nil, err
+		}
+		assigneeSet.RemoveValues(remove)
+
+		e.Assignees.Value = assigneeSet.ToSlice()
+	}
+
+	return e.Assignees.Value, nil
+}
+
 // ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.
 func (e Editable) ProjectIds() (*[]string, error) {
 	if !e.Projects.Edited {
@@ -474,12 +517,10 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable,
 		if len(editable.Assignees.Add) == 0 && len(editable.Assignees.Remove) == 0 && editable.AssigneeSearchFunc == nil {
 			fetchAssignees = true
 		}
-		// However, if we have Add/Remove operations (non-interactive flow),
-		// we do need to fetch the assignees.
-		// TODO replaceActorsByLoginCleanup
-		// When ActorAssignees is true, noninteractive assignees should use
-		// ReplaceActorsForAssignableByLogin to skip this fetch entirely.
-		if len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0 {
+		// For non-interactive Add/Remove operations, we only need to fetch assignees
+		// on GHES where ID resolution is required. On github.com (ActorAssignees),
+		// logins are passed directly to the mutation.
+		if (len(editable.Assignees.Add) > 0 || len(editable.Assignees.Remove) > 0) && !editable.Assignees.ActorAssignees {
 			fetchAssignees = true
 		}
 	}

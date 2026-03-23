@@ -528,17 +528,6 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "suggestedActors": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-							{ "login": "MonaLisa", "id": "MONAID", "__typename": "User" }
-						],
-						"pageInfo": { "hasNextPage": false, "endCursor": "Mg" }
-					} } } }
-					`))
-				reg.Register(
 					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
 					httpmock.StringResponse(`
 					{ "data": { "repository": { "milestones": {
@@ -618,6 +607,17 @@ func Test_editRun(t *testing.T) {
 				mockIssueGet(t, reg)
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "suggestedActors": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
+							{ "login": "monalisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateActorAssignees(t, reg)
 				mockIssueUpdateLabels(t, reg)
@@ -667,9 +667,9 @@ func Test_editRun(t *testing.T) {
 					{ "data": { "replaceActorsForAssignable": { "__typename": "" } } }`,
 						func(inputs map[string]interface{}) {
 							// Checking that despite the display name being returned
-							// from the EditFieldsSurvey, the ID is still
+							// from the EditFieldsSurvey, the login is still
 							// used in the mutation.
-							require.Subset(t, inputs["actorIds"], []string{"MONAID", "HUBOTID"})
+							require.Subset(t, inputs["actorLogins"], []interface{}{"hubot", "MonaLisa (Mona Display Name)"})
 						}),
 				)
 			},
@@ -839,18 +839,6 @@ func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
-	reg.Register(
-		httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "suggestedActors": {
-			"nodes": [
-				{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-				{ "login": "monalisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryLabelList\b`),
 		httpmock.StringResponse(`
