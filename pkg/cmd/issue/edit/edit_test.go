@@ -607,17 +607,6 @@ func Test_editRun(t *testing.T) {
 				mockIssueGet(t, reg)
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "suggestedActors": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-							{ "login": "monalisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateActorAssignees(t, reg)
 				mockIssueUpdateLabels(t, reg)
@@ -649,17 +638,6 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIsssueNumberGetWithAssignedActors(t, reg, 123)
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "suggestedActors": {
-						"nodes": [
-							{ "login": "hubot", "id": "HUBOTID", "__typename": "Bot" },
-							{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-						],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
 				mockIssueUpdate(t, reg)
 				reg.Register(
 					httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),

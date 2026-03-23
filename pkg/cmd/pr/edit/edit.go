@@ -303,7 +303,7 @@ func editRun(opts *EditOptions) error {
 	// to legacy reviewer/assignee fetching.
 	// TODO actorIsAssignableCleanup
 	if issueFeatures.ActorIsAssignable {
-		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, &editable, pr.ID)
+		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, repo, pr.ID)
 		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
 	}
 
@@ -348,7 +348,7 @@ func editRun(opts *EditOptions) error {
 
 // assigneeSearchFunc is intended to be an arg for MultiSelectWithSearch
 // to return potential assignee actors.
-func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *shared.Editable, assignableID string) func(string) prompter.MultiSelectSearchResult {
+func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, assignableID string) func(string) prompter.MultiSelectSearchResult {
 	searchFunc := func(input string) prompter.MultiSelectSearchResult {
 		actors, availableAssigneesCount, err := api.SuggestedAssignableActors(
 			apiClient,

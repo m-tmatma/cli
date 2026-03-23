@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -248,6 +249,13 @@ func editRun(opts *EditOptions) error {
 
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
+
+	// Wire up search function for assignees when ActorIsAssignable is available.
+	// Interactive mode only supports a single issue, so we use its ID for the search query.
+	if issueFeatures.ActorIsAssignable && opts.Interactive && len(issues) == 1 {
+		editable.AssigneeSearchFunc = assigneeSearchFunc(apiClient, baseRepo, issues[0].ID)
+	}
+
 	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
 	err = opts.FetchOptions(apiClient, baseRepo, &editable, opts.Detector.ProjectsV1())
 	opts.IO.StopProgressIndicator()
@@ -350,4 +358,37 @@ func editRun(opts *EditOptions) error {
 	}
 
 	return nil
+}
+
+func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, assignableID string) func(string) prompter.MultiSelectSearchResult {
+	return func(input string) prompter.MultiSelectSearchResult {
+		actors, availableAssigneesCount, err := api.SuggestedAssignableActors(
+			apiClient,
+			repo,
+			assignableID,
+			input)
+		if err != nil {
+			return prompter.MultiSelectSearchResult{Err: err}
+		}
+
+		logins := make([]string, 0, len(actors))
+		displayNames := make([]string, 0, len(actors))
+
+		for _, a := range actors {
+			if a.Login() == "" {
+				continue
+			}
+			logins = append(logins, a.Login())
+			if a.DisplayName() != "" {
+				displayNames = append(displayNames, a.DisplayName())
+			} else {
+				displayNames = append(displayNames, a.Login())
+			}
+		}
+		return prompter.MultiSelectSearchResult{
+			Keys:        logins,
+			Labels:      displayNames,
+			MoreResults: availableAssigneesCount,
+		}
+	}
 }

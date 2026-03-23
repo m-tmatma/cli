@@ -267,14 +267,16 @@ func (e Editable) MilestoneId() (*string, error) {
 // go routines. Fields that would be mutated will be copied.
 func (e *Editable) Clone() Editable {
 	return Editable{
-		Title:     e.Title.clone(),
-		Body:      e.Body.clone(),
-		Base:      e.Base.clone(),
-		Reviewers: e.Reviewers.clone(),
-		Assignees: e.Assignees.clone(),
-		Labels:    e.Labels.clone(),
-		Projects:  e.Projects.clone(),
-		Milestone: e.Milestone.clone(),
+		Title:              e.Title.clone(),
+		Body:               e.Body.clone(),
+		Base:               e.Base.clone(),
+		Reviewers:          e.Reviewers.clone(),
+		ReviewerSearchFunc: e.ReviewerSearchFunc,
+		Assignees:          e.Assignees.clone(),
+		AssigneeSearchFunc: e.AssigneeSearchFunc,
+		Labels:             e.Labels.clone(),
+		Projects:           e.Projects.clone(),
+		Milestone:          e.Milestone.clone(),
 		// Shallow copy since no mutation.
 		Metadata: e.Metadata,
 	}
