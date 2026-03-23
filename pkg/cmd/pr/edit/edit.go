@@ -348,9 +348,6 @@ func editRun(opts *EditOptions) error {
 
 // assigneeSearchFunc is intended to be an arg for MultiSelectWithSearch
 // to return potential assignee actors.
-// It also contains an important enclosure to update the editable's
-// assignable actors metadata for later ID resolution - this is required
-// while we continue to use IDs for mutating assignees with the GQL API.
 func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *shared.Editable, assignableID string) func(string) prompter.MultiSelectSearchResult {
 	searchFunc := func(input string) prompter.MultiSelectSearchResult {
 		actors, availableAssigneesCount, err := api.SuggestedAssignableActors(
@@ -382,10 +379,6 @@ func assigneeSearchFunc(apiClient *api.Client, repo ghrepo.Interface, editable *
 			} else {
 				displayNames = append(displayNames, a.Login())
 			}
-
-			// Update the assignable actors metadata in the editable struct
-			// so that updating the PR later can resolve the actor ID.
-			editable.Metadata.AssignableActors = append(editable.Metadata.AssignableActors, a)
 		}
 		return prompter.MultiSelectSearchResult{
 			Keys:        logins,

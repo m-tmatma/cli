@@ -142,10 +142,6 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 
 		e.Assignees.Value = assigneeSet.ToSlice()
 	}
-	// TODO replaceActorsByLoginCleanup
-	// When ActorAssignees is true (github.com), this should compute the final
-	// assignee logins and return them directly without resolving to IDs, for use
-	// with ReplaceActorsForAssignableByLogin.
 	a, err := e.Metadata.MembersToIDs(e.Assignees.Value)
 	return &a, err
 }
