@@ -12,6 +12,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/text"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -313,7 +314,11 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
-			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support, nil)
+			var assigneeSearchFunc func(string) prompter.MultiSelectSearchResult
+			if issueFeatures.ActorIsAssignable {
+				assigneeSearchFunc = prShared.RepoAssigneeSearchFunc(apiClient, baseRepo)
+			}
+			err = prShared.MetadataSurvey(opts.Prompter, opts.IO, baseRepo, fetcher, &tb, projectsV1Support, nil, assigneeSearchFunc)
 			if err != nil {
 				return
 			}

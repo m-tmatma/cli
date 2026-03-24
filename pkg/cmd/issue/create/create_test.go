@@ -495,10 +495,16 @@ func Test_createRun(t *testing.T) {
 					switch message {
 					case "What would you like to add?":
 						return prompter.IndexesFor(options, "Assignees")
-					case "Assignees":
-						return prompter.IndexesFor(options, "Copilot (AI)", "MonaLisa (Mona Display Name)")
 					default:
 						return nil, fmt.Errorf("unexpected multi-select prompt: %s", message)
+					}
+				}
+				pm.MultiSelectWithSearchFunc = func(message, searchPrompt string, defaults, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+					switch message {
+					case "Assignees":
+						return []string{"copilot-swe-agent", "MonaLisa"}, nil
+					default:
+						return nil, fmt.Errorf("unexpected multi-select-with-search prompt: %s", message)
 					}
 				}
 				pm.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
@@ -523,17 +529,6 @@ func Test_createRun(t *testing.T) {
 							"hasIssuesEnabled": true,
 							"viewerPermission": "WRITE"
 						} } }
-					`))
-				r.Register(
-					httpmock.GraphQL(`query RepositoryAssignableActors\b`),
-					httpmock.StringResponse(`
-						{ "data": { "repository": { "suggestedActors": {
-							"nodes": [
-								{ "login": "copilot-swe-agent", "id": "COPILOTID", "name": "Copilot (AI)", "__typename": "Bot" },
-								{ "login": "MonaLisa", "id": "MONAID", "name": "Mona Display Name", "__typename": "User" }
-							],
-							"pageInfo": { "hasNextPage": false }
-						} } } }
 					`))
 				r.Register(
 					httpmock.GraphQL(`mutation IssueCreate\b`),
