@@ -106,6 +106,30 @@ assert.Equal(t, "expected", actual)
 
 Interfaces use `moq`: `//go:generate moq -rm -out prompter_mock.go . Prompter`. Run `go generate ./...` after interface changes.
 
+### Table-Driven Tests
+
+Use table-driven tests for functions with multiple input/output scenarios. See `internal/agents/detect_test.go` or `pkg/cmd/issue/list/list_test.go` for examples:
+
+```go
+tests := []struct {
+    name      string
+    // inputs and expected outputs
+}{
+    {name: "descriptive case name", ...},
+}
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+        // arrange, act, assert
+    })
+}
+```
+
+## Code Style
+
+- Add godoc comments to all exported functions, types, and constants
+- Avoid unnecessary code comments — only comment when the *why* isn't obvious from the code
+- Do not comment just to restate what the code does
+
 ## Error Handling
 
 Error types in `pkg/cmdutil/errors.go`:
