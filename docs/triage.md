@@ -71,7 +71,7 @@ The pull request will be auto-assigned to an engineer on the team; that engineer
 
 The primary goal of triaging spam and abuse is to remove distracting and offensive content from our community.
 
-- **Spam issues:** Add the `invalid` label and close as "won't do".
+- **Spam issues:** Add the `invalid` label (auto-closes as "won't do").
 - **Spam comments:** Mark as spam using GitHub's built-in feature.
 - **Abusive content:** Defined by our [Code of Conduct](../.github/CODE-OF-CONDUCT.md). Remove the content. Repeat offenses or particularly offensive abuse should be reported and the user blocked.
 
