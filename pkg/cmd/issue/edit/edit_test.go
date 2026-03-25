@@ -395,7 +395,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
-				mockIssueUpdateActorAssignees(t, reg)
+				mockIssueUpdateApiActors(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
 			},
@@ -444,8 +444,8 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdate(t, reg)
-				mockIssueUpdateActorAssignees(t, reg)
-				mockIssueUpdateActorAssignees(t, reg)
+				mockIssueUpdateApiActors(t, reg)
+				mockIssueUpdateApiActors(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
@@ -608,7 +608,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
-				mockIssueUpdateActorAssignees(t, reg)
+				mockIssueUpdateApiActors(t, reg)
 				mockIssueUpdateLabels(t, reg)
 				mockProjectV2ItemUpdate(t, reg)
 			},
@@ -902,7 +902,7 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
-func mockIssueUpdateActorAssignees(t *testing.T, reg *httpmock.Registry) {
+func mockIssueUpdateApiActors(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation ReplaceActorsForAssignable\b`),
 		httpmock.GraphQLMutation(`

@@ -215,9 +215,9 @@ func editRun(opts *EditOptions) error {
 
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
-		// TODO actorIsAssignableCleanup
+		// TODO ApiActorsSupported
 		if issueFeatures.ActorIsAssignable {
-			editable.Assignees.ActorAssignees = true
+			editable.ApiActorsSupported = true
 			lookupFields = append(lookupFields, "assignedActors")
 		} else {
 			lookupFields = append(lookupFields, "assignees")
@@ -280,7 +280,8 @@ func editRun(opts *EditOptions) error {
 		editable.Body.Default = issue.Body
 		// We use Actors as the default assignees if Actors are assignable
 		// on this GitHub host.
-		if editable.Assignees.ActorAssignees {
+		// TODO ApiActorsSupported
+		if editable.ApiActorsSupported {
 			editable.Assignees.Default = issue.AssignedActors.DisplayNames()
 			editable.Assignees.DefaultLogins = issue.AssignedActors.Logins()
 		} else {

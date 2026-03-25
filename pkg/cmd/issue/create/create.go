@@ -188,14 +188,14 @@ func createRun(opts *CreateOptions) (err error) {
 	assigneeSet.AddValues(assignees)
 
 	tb := prShared.IssueMetadataState{
-		Type:           prShared.IssueMetadata,
-		ActorAssignees: issueFeatures.ActorIsAssignable,
-		Assignees:      assigneeSet.ToSlice(),
-		Labels:         opts.Labels,
-		ProjectTitles:  opts.Projects,
-		Milestones:     milestones,
-		Title:          opts.Title,
-		Body:           opts.Body,
+		Type:               prShared.IssueMetadata,
+		ApiActorsSupported: issueFeatures.ActorIsAssignable, // TODO ApiActorsSupported
+		Assignees:          assigneeSet.ToSlice(),
+		Labels:             opts.Labels,
+		ProjectTitles:      opts.Projects,
+		Milestones:         milestones,
+		Title:              opts.Title,
+		Body:               opts.Body,
 	}
 
 	if opts.RecoverFile != "" {

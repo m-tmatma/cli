@@ -181,19 +181,20 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}
 
 	// Retrieve and process data for survey prompts based on the extra fields selected.
-	// When search-based reviewer selection is available, skip the expensive assignable-users
-	// and teams fetch since reviewers are found dynamically via the search function.
-	useReviewerSearch := state.ActorReviewers && reviewerSearchFunc != nil
-	useAssigneeSearch := state.ActorAssignees && assigneeSearchFunc != nil
+	// When search-based selection is available, skip the expensive assignable-users
+	// and teams fetch since they are found dynamically via the search function.
+	// TODO ApiActorsSupported
+	useReviewerSearch := state.ApiActorsSupported && reviewerSearchFunc != nil
+	useAssigneeSearch := state.ApiActorsSupported && assigneeSearchFunc != nil
 	metadataInput := api.RepoMetadataInput{
-		Reviewers:      isChosen("Reviewers") && !useReviewerSearch,
-		TeamReviewers:  isChosen("Reviewers") && !useReviewerSearch,
-		Assignees:      isChosen("Assignees") && !useAssigneeSearch,
-		ActorAssignees: isChosen("Assignees") && !useAssigneeSearch && state.ActorAssignees,
-		Labels:         isChosen("Labels"),
-		ProjectsV1:     isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
-		ProjectsV2:     isChosen("Projects"),
-		Milestones:     isChosen("Milestone"),
+		Reviewers:          isChosen("Reviewers") && !useReviewerSearch,
+		TeamReviewers:      isChosen("Reviewers") && !useReviewerSearch,
+		Assignees:          isChosen("Assignees") && !useAssigneeSearch,
+		ApiActorsSupported: state.ApiActorsSupported && ((isChosen("Assignees") && !useAssigneeSearch) || (isChosen("Reviewers") && !useReviewerSearch)),
+		Labels:             isChosen("Labels"),
+		ProjectsV1:         isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
+		ProjectsV2:         isChosen("Projects"),
+		Milestones:         isChosen("Milestone"),
 	}
 	metadataResult, err := fetcher.RepoMetadataFetch(metadataInput)
 	if err != nil {
@@ -217,7 +218,8 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	var assignees []string
 	var assigneesDefault []string
 	if !useAssigneeSearch {
-		if state.ActorAssignees {
+		// TODO ApiActorsSupported
+		if state.ApiActorsSupported {
 			for _, u := range metadataResult.AssignableActors {
 				assignees = append(assignees, u.DisplayName())
 
@@ -305,7 +307,8 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 				return err
 			}
 			for _, i := range selected {
-				if state.ActorAssignees {
+				// TODO ApiActorsSupported
+				if state.ApiActorsSupported {
 					values.Assignees = append(values.Assignees, metadataResult.AssignableActors[i].Login())
 				} else {
 					values.Assignees = append(values.Assignees, metadataResult.AssignableUsers[i].Login())

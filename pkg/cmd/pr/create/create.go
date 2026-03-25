@@ -429,9 +429,9 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	// TODO ApiActorsSupported
 	if issueFeatures.ActorIsAssignable {
-		state.ActorReviewers = true
-		state.ActorAssignees = true
+		state.ApiActorsSupported = true
 	}
 
 	var openURL string

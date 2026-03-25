@@ -524,7 +524,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}
 
-	// Assign users using login-based mutation when ActorAssignees is true (github.com).
+	// Assign users using login-based mutation when ApiActorsSupported is true (github.com).
 	if assigneeLogins, ok := params["assigneeLogins"].([]string); ok && len(assigneeLogins) > 0 {
 		err := ReplaceActorsForAssignableByLogin(client, repo, pr.ID, assigneeLogins)
 		if err != nil {
