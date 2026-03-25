@@ -532,7 +532,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}
 
-	// TODO requestReviewsByLoginCleanup
+	// TODO ApiActorsSupported
 	// Request reviewers using either login-based (github.com) or ID-based (GHES) mutation.
 	// The ID-based path can be removed once GHES supports requestReviewsByLogin.
 	userLogins, hasUserLogins := params["userReviewerLogins"].([]string)

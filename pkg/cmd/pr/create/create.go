@@ -399,7 +399,7 @@ func createRun(opts *CreateOptions) error {
 
 	client := ctx.Client
 
-	// Detect ActorIsAssignable feature to determine if we can use search-based
+	// Detect ApiActorsSupported feature to determine if we can use search-based
 	// reviewer selection (github.com) or need to use legacy ID-based selection (GHES)
 	issueFeatures, err := opts.Detector.IssueFeatures()
 	if err != nil {
@@ -407,7 +407,7 @@ func createRun(opts *CreateOptions) error {
 	}
 	var reviewerSearchFunc func(string) prompter.MultiSelectSearchResult
 	var assigneeSearchFunc func(string) prompter.MultiSelectSearchResult
-	if issueFeatures.ActorIsAssignable {
+	if issueFeatures.ApiActorsSupported {
 		reviewerSearchFunc = func(query string) prompter.MultiSelectSearchResult {
 			candidates, moreResults, err := api.SuggestedReviewerActorsForRepo(client, ctx.PRRefs.BaseRepo(), query)
 			if err != nil {
@@ -430,7 +430,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	// TODO ApiActorsSupported
-	if issueFeatures.ActorIsAssignable {
+	if issueFeatures.ApiActorsSupported {
 		state.ApiActorsSupported = true
 	}
 

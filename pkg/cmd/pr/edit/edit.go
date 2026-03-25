@@ -270,8 +270,8 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
 		findOptions.Fields = append(findOptions.Fields, "assignedActors")
 	} else {
 		findOptions.Fields = append(findOptions.Fields, "assignees")
@@ -290,7 +290,7 @@ func editRun(opts *EditOptions) error {
 	editable.Reviewers.Default = pr.ReviewRequests.DisplayNames()
 	editable.Reviewers.DefaultLogins = pr.ReviewRequests.Logins()
 	// TODO ApiActorsSupported
-	if issueFeatures.ActorIsAssignable {
+	if issueFeatures.ApiActorsSupported {
 		editable.ApiActorsSupported = true
 		editable.Assignees.Default = pr.AssignedActors.DisplayNames()
 		editable.Assignees.DefaultLogins = pr.AssignedActors.Logins()
@@ -320,8 +320,8 @@ func editRun(opts *EditOptions) error {
 	// Wire up search functions for assignees and reviewers.
 	// When these aren't wired up, it triggers a downstream fallback
 	// to legacy reviewer/assignee fetching.
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
+	// TODO ApiActorsSupported
+	if issueFeatures.ApiActorsSupported {
 		editable.AssigneeSearchFunc = shared.AssigneeSearchFunc(apiClient, repo, pr.ID)
 		editable.ReviewerSearchFunc = reviewerSearchFunc(apiClient, repo, &editable, pr.ID)
 	}

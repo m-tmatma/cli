@@ -23,11 +23,17 @@ type Detector interface {
 }
 
 type IssueFeatures struct {
-	ActorIsAssignable bool
+	// TODO ApiActorsSupported
+	// ApiActorsSupported indicates the host supports actor-based APIs
+	// (replaceActorsForAssignable, requestReviewsByLogin, suggestedAssignableActors, etc.).
+	// True for github.com and ghe.com. False for GHES.
+	// Remove this flag once GHES supports these mutations, then collapse all
+	// // TODO ApiActorsSupported sites to the actor-only path.
+	ApiActorsSupported bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	ActorIsAssignable: true,
+	ApiActorsSupported: true,
 }
 
 type PullRequestFeatures struct {
@@ -136,7 +142,7 @@ func (d *detector) IssueFeatures() (IssueFeatures, error) {
 	}
 
 	return IssueFeatures{
-		ActorIsAssignable: false, // replaceActorsForAssignable GraphQL mutation unavailable on GHES
+		ApiActorsSupported: false, // TODO ApiActorsSupported — actor-based mutations unavailable on GHES
 	}, nil
 }
 

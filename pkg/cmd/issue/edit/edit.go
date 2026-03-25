@@ -216,7 +216,7 @@ func editRun(opts *EditOptions) error {
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if editable.Assignees.Edited {
 		// TODO ApiActorsSupported
-		if issueFeatures.ActorIsAssignable {
+		if issueFeatures.ApiActorsSupported {
 			editable.ApiActorsSupported = true
 			lookupFields = append(lookupFields, "assignedActors")
 		} else {
@@ -249,9 +249,9 @@ func editRun(opts *EditOptions) error {
 	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	// Wire up search function for assignees when ActorIsAssignable is available.
+	// Wire up search function for assignees when ApiActorsSupported is available.
 	// Interactive mode only supports a single issue, so we use its ID for the search query.
-	if issueFeatures.ActorIsAssignable && opts.Interactive && len(issues) == 1 {
+	if issueFeatures.ApiActorsSupported && opts.Interactive && len(issues) == 1 {
 		editable.AssigneeSearchFunc = prShared.AssigneeSearchFunc(apiClient, baseRepo, issues[0].ID)
 	}
 

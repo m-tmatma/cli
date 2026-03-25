@@ -935,7 +935,7 @@ func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
-func TestActorIsAssignable(t *testing.T) {
+func TestApiActorsSupported(t *testing.T) {
 	t.Run("when actors are assignable, query includes assignedActors", func(t *testing.T) {
 		ios, _, _, _ := iostreams.Test()
 
