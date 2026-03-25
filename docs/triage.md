@@ -40,7 +40,7 @@ The `needs-triage` label is automatically removed when end-state labels (`enhanc
 
 | Priority | Description |
 |----------|-------------|
-| `priority-1` | Affects a large population and inhibits work. **Escalate in Slack; may require a hotfix.** |
+| `priority-1` | Affects a large population and inhibits work. **Escalate internally via the appropriate incident channel; may require a hotfix.** |
 | `priority-2` | Affects more than a few users but does not prevent core functions |
 | `priority-3` | Affects a small number of users or is largely cosmetic |
 
