@@ -190,7 +190,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 		Reviewers:          isChosen("Reviewers") && !useReviewerSearch,
 		TeamReviewers:      isChosen("Reviewers") && !useReviewerSearch,
 		Assignees:          isChosen("Assignees") && !useAssigneeSearch,
-		ApiActorsSupported: state.ApiActorsSupported && ((isChosen("Assignees") && !useAssigneeSearch) || (isChosen("Reviewers") && !useReviewerSearch)),
+		ApiActorsSupported: state.ApiActorsSupported,
 		Labels:             isChosen("Labels"),
 		ProjectsV1:         isChosen("Projects") && projectsV1Support == gh.ProjectsV1Supported,
 		ProjectsV2:         isChosen("Projects"),
