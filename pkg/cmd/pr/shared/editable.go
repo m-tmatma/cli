@@ -95,22 +95,7 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	// If assignees came in from command line flags, we need to
 	// curate the final list of assignees from the default list.
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
-		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		copilotReplacer := NewCopilotReplacer(true)
-
-		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
-			replaced, err := meReplacer.ReplaceSlice(value)
-			if err != nil {
-				return nil, err
-			}
-
-			// Only suppported for actor assignees.
-			if e.Assignees.ActorAssignees {
-				replaced = copilotReplacer.ReplaceSlice(replaced)
-			}
-
-			return replaced, nil
-		}
+		replacer := NewSpecialAssigneeReplacer(client, repo.RepoHost(), e.Assignees.ActorAssignees, true)
 
 		assigneeSet := set.NewStringSet()
 
@@ -128,13 +113,13 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 			assigneeSet.AddValues(e.Assignees.Default)
 		}
 
-		add, err := replaceSpecialAssigneeNames(e.Assignees.Add)
+		add, err := replacer.ReplaceSlice(e.Assignees.Add)
 		if err != nil {
 			return nil, err
 		}
 		assigneeSet.AddValues(add)
 
-		remove, err := replaceSpecialAssigneeNames(e.Assignees.Remove)
+		remove, err := replacer.ReplaceSlice(e.Assignees.Remove)
 		if err != nil {
 			return nil, err
 		}
@@ -156,28 +141,18 @@ func (e Editable) AssigneeLogins(client *api.Client, repo ghrepo.Interface) ([]s
 	}
 
 	if len(e.Assignees.Add) != 0 || len(e.Assignees.Remove) != 0 {
-		meReplacer := NewMeReplacer(client, repo.RepoHost())
-		copilotReplacer := NewCopilotReplacer(true)
-
-		replaceSpecialAssigneeNames := func(value []string) ([]string, error) {
-			replaced, err := meReplacer.ReplaceSlice(value)
-			if err != nil {
-				return nil, err
-			}
-			replaced = copilotReplacer.ReplaceSlice(replaced)
-			return replaced, nil
-		}
+		replacer := NewSpecialAssigneeReplacer(client, repo.RepoHost(), true, true)
 
 		assigneeSet := set.NewStringSet()
 		assigneeSet.AddValues(e.Assignees.DefaultLogins)
 
-		add, err := replaceSpecialAssigneeNames(e.Assignees.Add)
+		add, err := replacer.ReplaceSlice(e.Assignees.Add)
 		if err != nil {
 			return nil, err
 		}
 		assigneeSet.AddValues(add)
 
-		remove, err := replaceSpecialAssigneeNames(e.Assignees.Remove)
+		remove, err := replacer.ReplaceSlice(e.Assignees.Remove)
 		if err != nil {
 			return nil, err
 		}
@@ -187,6 +162,37 @@ func (e Editable) AssigneeLogins(client *api.Client, repo ghrepo.Interface) ([]s
 	}
 
 	return e.Assignees.Value, nil
+}
+
+// SpecialAssigneeReplacer expands special assignee names (@me, Copilot actors)
+// in login slices. Use NewSpecialAssigneeReplacer to create one.
+type SpecialAssigneeReplacer struct {
+	meReplacer      *MeReplacer
+	copilotReplacer *CopilotReplacer
+	actorAssignees  bool
+}
+
+// NewSpecialAssigneeReplacer creates a replacer that expands @me and (when
+// actorAssignees is true) Copilot actor names in assignee slices.
+// copilotUseLogin controls whether Copilot actors are replaced with their
+// login (true) or display name (false, used for web mode).
+func NewSpecialAssigneeReplacer(client *api.Client, host string, actorAssignees bool, copilotUseLogin bool) *SpecialAssigneeReplacer {
+	return &SpecialAssigneeReplacer{
+		meReplacer:      NewMeReplacer(client, host),
+		copilotReplacer: NewCopilotReplacer(copilotUseLogin),
+		actorAssignees:  actorAssignees,
+	}
+}
+
+func (r *SpecialAssigneeReplacer) ReplaceSlice(logins []string) ([]string, error) {
+	replaced, err := r.meReplacer.ReplaceSlice(logins)
+	if err != nil {
+		return nil, err
+	}
+	if r.actorAssignees {
+		replaced = r.copilotReplacer.ReplaceSlice(replaced)
+	}
+	return replaced, nil
 }
 
 // ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.

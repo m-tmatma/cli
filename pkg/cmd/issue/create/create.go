@@ -179,18 +179,12 @@ func createRun(opts *CreateOptions) (err error) {
 
 	// Replace special values in assignees
 	// For web mode, @copilot should be replaced by name; otherwise, login.
-	assigneeSet := set.NewStringSet()
-	meReplacer := prShared.NewMeReplacer(apiClient, baseRepo.RepoHost())
-	copilotReplacer := prShared.NewCopilotReplacer(!opts.WebMode)
-	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	assigneeReplacer := prShared.NewSpecialAssigneeReplacer(apiClient, baseRepo.RepoHost(), issueFeatures.ActorIsAssignable, !opts.WebMode)
+	assignees, err := assigneeReplacer.ReplaceSlice(opts.Assignees)
 	if err != nil {
 		return err
 	}
-
-	// TODO actorIsAssignableCleanup
-	if issueFeatures.ActorIsAssignable {
-		assignees = copilotReplacer.ReplaceSlice(assignees)
-	}
+	assigneeSet := set.NewStringSet()
 	assigneeSet.AddValues(assignees)
 
 	tb := prShared.IssueMetadataState{
