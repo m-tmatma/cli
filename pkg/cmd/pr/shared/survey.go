@@ -263,7 +263,7 @@ func MetadataSurvey(p Prompt, io *iostreams.IOStreams, baseRepo ghrepo.Interface
 	}{}
 
 	if isChosen("Reviewers") {
-		if reviewerSearchFunc != nil {
+		if useReviewerSearch {
 			selectedReviewers, err := p.MultiSelectWithSearch(
 				"Reviewers",
 				"Search reviewers",
