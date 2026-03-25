@@ -424,7 +424,7 @@ func createRun(opts *CreateOptions) error {
 		assigneeSearchFunc = shared.RepoAssigneeSearchFunc(client, ctx.PRRefs.BaseRepo())
 	}
 
-	state, err := NewIssueState(*ctx, *opts)
+	state, err := NewIssueState(*ctx, *opts, issueFeatures.ApiActorsSupported)
 	if err != nil {
 		return err
 	}
@@ -672,14 +672,14 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState, u
 	return nil
 }
 
-func NewIssueState(ctx CreateContext, opts CreateOptions) (*shared.IssueMetadataState, error) {
+func NewIssueState(ctx CreateContext, opts CreateOptions, apiActorsSupported bool) (*shared.IssueMetadataState, error) {
 	var milestoneTitles []string
 	if opts.Milestone != "" {
 		milestoneTitles = []string{opts.Milestone}
 	}
 
-	meReplacer := shared.NewMeReplacer(ctx.Client, ctx.PRRefs.BaseRepo().RepoHost())
-	assignees, err := meReplacer.ReplaceSlice(opts.Assignees)
+	assigneeReplacer := shared.NewSpecialAssigneeReplacer(ctx.Client, ctx.PRRefs.BaseRepo().RepoHost(), apiActorsSupported, !opts.WebMode)
+	assignees, err := assigneeReplacer.ReplaceSlice(opts.Assignees)
 	if err != nil {
 		return nil, err
 	}

@@ -599,6 +599,12 @@ func ReplaceActorsForAssignableByLogin(client *Client, repo ghrepo.Interface, as
 
 	actorLogins := make([]githubv4.String, len(logins))
 	for i, l := range logins {
+		// The replaceActorsForAssignable mutation requires the [bot] suffix
+		// for bot actor logins (e.g. "copilot-swe-agent[bot]"), unlike
+		// requestReviewsByLogin which has a separate botLogins field.
+		if l == CopilotAssigneeLogin {
+			l = l + "[bot]"
+		}
 		actorLogins[i] = githubv4.String(l)
 	}
 
