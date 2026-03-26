@@ -1,10 +1,12 @@
 package prompter
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
 	"charm.land/huh/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	ghPrompter "github.com/cli/go-gh/v2/pkg/prompter"
@@ -22,6 +24,18 @@ func (p *huhPrompter) newForm(groups ...*huh.Group) *huh.Form {
 		WithTheme(huh.ThemeFunc(huh.ThemeBase16)).
 		WithInput(p.stdin).
 		WithOutput(p.stdout)
+}
+
+func (p *huhPrompter) runForm(form *huh.Form) error {
+	err := form.Run()
+	if errors.Is(err, huh.ErrUserAborted) {
+		// TODO(huh-prompter-improvements)
+		// It's unfortunate that we take a dependency on survey/terminal here, but our clean cancellation logic
+		// in cmd.go expects it. Better would be to have a prompter.Cancelled sentinel error, but then we need to
+		// go and change non-experimental code to do so, and I don't think we should take that on right now.
+		return terminal.InterruptErr
+	}
+	return err
 }
 
 func (p *huhPrompter) buildSelectForm(prompt, defaultValue string, options []string) (*huh.Form, *int) {
@@ -52,7 +66,7 @@ func (p *huhPrompter) buildSelectForm(prompt, defaultValue string, options []str
 
 func (p *huhPrompter) Select(prompt, defaultValue string, options []string) (int, error) {
 	form, result := p.buildSelectForm(prompt, defaultValue, options)
-	err := form.Run()
+	err := p.runForm(form)
 	return *result, err
 }
 
@@ -85,7 +99,7 @@ func (p *huhPrompter) buildMultiSelectForm(prompt string, defaults []string, opt
 
 func (p *huhPrompter) MultiSelect(prompt string, defaults []string, options []string) ([]int, error) {
 	form, result := p.buildMultiSelectForm(prompt, defaults, options)
-	err := form.Run()
+	err := p.runForm(form)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +114,7 @@ func (p *huhPrompter) buildMultiSelectWithSearchForm(prompt, searchPrompt string
 
 func (p *huhPrompter) MultiSelectWithSearch(prompt, searchPrompt string, defaultValues, persistentValues []string, searchFunc func(string) MultiSelectSearchResult) ([]string, error) {
 	form, field := p.buildMultiSelectWithSearchForm(prompt, searchPrompt, defaultValues, persistentValues, searchFunc)
-	err := form.Run()
+	err := p.runForm(form)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +135,7 @@ func (p *huhPrompter) buildInputForm(prompt, defaultValue string) (*huh.Form, *s
 
 func (p *huhPrompter) Input(prompt, defaultValue string) (string, error) {
 	form, result := p.buildInputForm(prompt, defaultValue)
-	err := form.Run()
+	err := p.runForm(form)
 	return *result, err
 }
 
@@ -140,7 +154,7 @@ func (p *huhPrompter) buildPasswordForm(prompt string) (*huh.Form, *string) {
 
 func (p *huhPrompter) Password(prompt string) (string, error) {
 	form, result := p.buildPasswordForm(prompt)
-	err := form.Run()
+	err := p.runForm(form)
 	if err != nil {
 		return "", err
 	}
@@ -161,7 +175,7 @@ func (p *huhPrompter) buildConfirmForm(prompt string, defaultValue bool) (*huh.F
 
 func (p *huhPrompter) Confirm(prompt string, defaultValue bool) (bool, error) {
 	form, result := p.buildConfirmForm(prompt, defaultValue)
-	err := form.Run()
+	err := p.runForm(form)
 	if err != nil {
 		return false, err
 	}
@@ -189,7 +203,7 @@ func (p *huhPrompter) buildAuthTokenForm() (*huh.Form, *string) {
 
 func (p *huhPrompter) AuthToken() (string, error) {
 	form, result := p.buildAuthTokenForm()
-	err := form.Run()
+	err := p.runForm(form)
 	return *result, err
 }
 
@@ -209,7 +223,7 @@ func (p *huhPrompter) buildConfirmDeletionForm(requiredValue string) *huh.Form {
 }
 
 func (p *huhPrompter) ConfirmDeletion(requiredValue string) error {
-	return p.buildConfirmDeletionForm(requiredValue).Run()
+	return p.runForm(p.buildConfirmDeletionForm(requiredValue))
 }
 
 func (p *huhPrompter) buildInputHostnameForm() (*huh.Form, *string) {
@@ -227,7 +241,7 @@ func (p *huhPrompter) buildInputHostnameForm() (*huh.Form, *string) {
 
 func (p *huhPrompter) InputHostname() (string, error) {
 	form, result := p.buildInputHostnameForm()
-	err := form.Run()
+	err := p.runForm(form)
 	if err != nil {
 		return "", err
 	}
@@ -258,7 +272,7 @@ func (p *huhPrompter) buildMarkdownEditorForm(prompt string, blankAllowed bool) 
 
 func (p *huhPrompter) MarkdownEditor(prompt, defaultValue string, blankAllowed bool) (string, error) {
 	form, result := p.buildMarkdownEditorForm(prompt, blankAllowed)
-	err := form.Run()
+	err := p.runForm(form)
 	if err != nil {
 		return "", err
 	}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/huh/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -617,4 +618,26 @@ func TestHuhPrompterMultiSelectWithSearchBackspace(t *testing.T) {
 		))
 		assert.Equal(t, []string{"alice"}, result.selectedKeys())
 	})
+}
+
+func TestRunFormTranslatesErrUserAborted(t *testing.T) {
+	p := newTestHuhPrompter()
+	form, _ := p.buildSelectForm("Pick one:", "", []string{"a", "b", "c"})
+
+	r, w := io.Pipe()
+	form.WithInput(r).WithOutput(io.Discard).WithWidth(80)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- p.runForm(form) }()
+
+	// Send Ctrl+C to trigger huh.ErrUserAborted
+	_, err := w.Write([]byte{0x03})
+	require.NoError(t, err)
+
+	select {
+	case err := <-errCh:
+		assert.ErrorIs(t, err, terminal.InterruptErr, "expected huh.ErrUserAborted to be translated to terminal.InterruptErr")
+	case <-time.After(5 * time.Second):
+		t.Fatal("runForm did not complete in time")
+	}
 }
