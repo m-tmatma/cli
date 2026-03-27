@@ -20,6 +20,7 @@ func TestNewHTTPClient(t *testing.T) {
 	type args struct {
 		config             tokenGetter
 		appVersion         string
+		invokingAgent      string
 		logVerboseHTTP     bool
 		skipDefaultHeaders bool
 	}
@@ -39,9 +40,10 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
-				"authorization": {"token MYTOKEN"},
-				"user-agent":    {"GitHub CLI v1.2.3"},
-				"accept":        {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+				"authorization":        {"token MYTOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
 			},
 			wantStderr: "",
 		},
@@ -53,9 +55,10 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "example.com",
 			wantHeader: map[string][]string{
-				"authorization": {"token GHETOKEN"},
-				"user-agent":    {"GitHub CLI v1.2.3"},
-				"accept":        {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+				"authorization":        {"token GHETOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
 			},
 			wantStderr: "",
 		},
@@ -68,9 +71,10 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
-				"authorization": nil, // should not be set
-				"user-agent":    {"GitHub CLI v1.2.3"},
-				"accept":        {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+				"authorization":        nil, // should not be set
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
 			},
 			wantStderr: "",
 		},
@@ -83,9 +87,10 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "example.com",
 			wantHeader: map[string][]string{
-				"authorization": nil, // should not be set
-				"user-agent":    {"GitHub CLI v1.2.3"},
-				"accept":        {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+				"authorization":        nil, // should not be set
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
 			},
 			wantStderr: "",
 		},
@@ -98,9 +103,10 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
-				"authorization": {"token MYTOKEN"},
-				"user-agent":    {"GitHub CLI v1.2.3"},
-				"accept":        {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+				"authorization":        {"token MYTOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
@@ -112,6 +118,7 @@ func TestNewHTTPClient(t *testing.T) {
 				> Content-Type: application/json; charset=utf-8
 				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
+				> X-Github-Api-Version: 2022-11-28
 
 				< HTTP/1.1 204 No Content
 				< Date: <time>
@@ -128,10 +135,11 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host: "github.com",
 			wantHeader: map[string][]string{
-				"accept":        nil,
-				"authorization": nil,
-				"content-type":  nil,
-				"user-agent":    {"GitHub CLI v1.2.3"},
+				"accept":               nil,
+				"authorization":        nil,
+				"content-type":         nil,
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
@@ -140,12 +148,25 @@ func TestNewHTTPClient(t *testing.T) {
 				> Host: github.com
 				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
+				> X-Github-Api-Version: 2022-11-28
 
 				< HTTP/1.1 204 No Content
 				< Date: <time>
 
 				* Request took <duration>
 			`),
+		},
+		{
+			name: "includes invoking agent in user-agent header",
+			args: args{
+				appVersion:    "v1.2.3",
+				invokingAgent: "copilot-cli",
+			},
+			host: "github.com",
+			wantHeader: map[string][]string{
+				"user-agent": {"GitHub CLI v1.2.3 Agent/copilot-cli"},
+			},
+			wantStderr: "",
 		},
 	}
 
@@ -161,6 +182,7 @@ func TestNewHTTPClient(t *testing.T) {
 			ios, _, _, stderr := iostreams.Test()
 			client, err := NewHTTPClient(HTTPClientOptions{
 				AppVersion:         tt.args.appVersion,
+				InvokingAgent:      tt.args.invokingAgent,
 				Config:             tt.args.config,
 				Log:                ios.ErrOut,
 				LogVerboseHTTP:     tt.args.logVerboseHTTP,
