@@ -573,8 +573,8 @@ func FetchBlob(client RESTClient, host, owner, repo, sha string) (string, error)
 		return "", fmt.Errorf("unexpected blob encoding: %s", blob.Encoding)
 	}
 
-	// GitHub API returns base64 with embedded newlines; use the lenient
-	// RawStdEncoding decoder via a reader to handle them transparently.
+	// GitHub API returns base64 with embedded newlines; use the StdEncoding
+	// decoder via a reader to handle them transparently.
 	decoded, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(blob.Content)))
 	if err != nil {
 		return "", fmt.Errorf("could not decode blob content: %w", err)
@@ -614,6 +614,10 @@ func DiscoverLocalSkills(dir string) ([]Skill, error) {
 	err = filepath.Walk(absDir, func(p string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
+		}
+		// Skip symlinks to avoid following links outside the source tree.
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil
 		}
 		if info.IsDir() || info.Name() != "SKILL.md" {
 			return nil

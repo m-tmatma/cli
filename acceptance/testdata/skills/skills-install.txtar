@@ -1,0 +1,10 @@
+# Install a single skill from a public repo
+exec gh skills install github/awesome-copilot git-commit --scope user --force --agent github-copilot
+stdout 'Installed git-commit'
+
+# Install with --dir to a custom directory
+exec gh skills install github/awesome-copilot git-commit --force --dir $WORK/custom-skills
+stdout 'Installed git-commit'
+
+# Verify the skill was written to the custom directory
+exists $WORK/custom-skills/git-commit/SKILL.md

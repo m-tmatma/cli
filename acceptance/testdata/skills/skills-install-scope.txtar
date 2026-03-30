@@ -1,0 +1,9 @@
+# Install with --scope project (default) inside a git repo
+exec git init $WORK/myrepo
+exec gh skills install github/awesome-copilot git-commit --scope project --force --agent github-copilot --dir $WORK/myrepo/.github/skills
+stdout 'Installed git-commit'
+exists $WORK/myrepo/.github/skills/git-commit/SKILL.md
+
+# Install with --scope user
+exec gh skills install github/awesome-copilot git-commit --scope user --force --agent github-copilot
+stdout 'Installed git-commit'

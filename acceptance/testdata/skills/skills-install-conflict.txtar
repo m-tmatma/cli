@@ -1,0 +1,8 @@
+# Install --all should handle skills with same name across conventions
+# (skills/ and plugins/ directories) without collision errors
+exec gh skills install github/awesome-copilot --all --force --dir $WORK/scope-test --agent github-copilot
+stdout 'Installed'
+! stderr 'conflicting names'
+
+# Verify skills were installed successfully
+exists $WORK/scope-test/git-commit/SKILL.md

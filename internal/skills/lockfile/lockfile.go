@@ -152,6 +152,11 @@ func acquireLock() (unlock func()) {
 			f.Close()
 			return func() { os.Remove(lkPath) }
 		}
+		// Only retry when the lock file already exists (concurrent process).
+		// For other errors (permission denied, invalid path, etc.) give up immediately.
+		if !os.IsExist(createErr) {
+			return func() {}
+		}
 		// Break stale locks older than 30s (e.g. from a crashed process).
 		if info, statErr := os.Stat(lkPath); statErr == nil && time.Since(info.ModTime()) > 30*time.Second {
 			os.Remove(lkPath)

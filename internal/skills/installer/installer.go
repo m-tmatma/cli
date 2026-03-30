@@ -50,6 +50,9 @@ type skillResult struct {
 func Install(opts *Options) (*Result, error) {
 	targetDir := opts.Dir
 	if targetDir == "" {
+		if opts.AgentHost == nil {
+			return nil, fmt.Errorf("either Dir or AgentHost must be specified")
+		}
 		var err error
 		targetDir, err = opts.AgentHost.InstallDir(opts.Scope, opts.GitRoot, opts.HomeDir)
 		if err != nil {
@@ -146,6 +149,9 @@ type LocalOptions struct {
 func InstallLocal(opts *LocalOptions) (*Result, error) {
 	targetDir := opts.Dir
 	if targetDir == "" {
+		if opts.AgentHost == nil {
+			return nil, fmt.Errorf("either Dir or AgentHost must be specified")
+		}
 		var err error
 		targetDir, err = opts.AgentHost.InstallDir(opts.Scope, opts.GitRoot, opts.HomeDir)
 		if err != nil {

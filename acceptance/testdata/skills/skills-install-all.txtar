@@ -1,0 +1,5 @@
+# Install all skills from a repo with mixed conventions (skills/ + plugins/)
+# This previously failed with "conflicting names" — now uses namespaced dirs
+exec gh skills install github/awesome-copilot --all --scope user --force --agent github-copilot
+stdout 'Installed'
+! stderr 'conflicting names'
