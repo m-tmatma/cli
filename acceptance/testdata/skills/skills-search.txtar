@@ -1,0 +1,12 @@
+# Search for skills matching a query
+exec gh skills search copilot
+stdout 'copilot'
+
+# Search with JSON output
+exec gh skills search copilot --json skillName,repo --limit 1
+stdout '"skillName"'
+stdout '"repo"'
+
+# Search with a short query should error
+! exec gh skills search a
+stderr 'at least'

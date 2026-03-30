@@ -1,6 +1,7 @@
 package install
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,14 +13,14 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
-	"github.com/cli/cli/v2/internal/skills"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
-	"github.com/cli/cli/v2/internal/skills/gitclient"
-	"github.com/cli/cli/v2/internal/skills/hosts"
 	"github.com/cli/cli/v2/internal/skills/installer"
+	"github.com/cli/cli/v2/internal/skills/registry"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -40,7 +41,8 @@ type installOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Prompter   prompter.Prompter
-	GitClient  installGitClient
+	GitClient  *git.Client
+	Remotes    func() (ghContext.Remotes, error)
 
 	// Arguments
 	SkillSource string // owner/repo or local path
@@ -61,18 +63,13 @@ type installOptions struct {
 	version   string
 }
 
-// installGitClient is the git interface needed by the install command.
-type installGitClient interface {
-	gitclient.RootResolver
-	gitclient.RemoteResolver
-}
-
 // NewCmdInstall creates the "skills install" command.
 func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.Command {
 	opts := &installOptions{
 		IO:         f.IOStreams,
 		Prompter:   f.Prompter,
-		GitClient:  &gitclient.FactoryClient{F: f},
+		GitClient:  f.GitClient,
+		Remotes:    f.Remotes,
 		HttpClient: f.HttpClient,
 	}
 
@@ -188,7 +185,7 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			}
 
 			if opts.Agent != "" {
-				if _, err := hosts.FindByID(opts.Agent); err != nil {
+				if _, err := registry.FindByID(opts.Agent); err != nil {
 					return cmdutil.FlagErrorf("invalid value for --agent: %s", err)
 				}
 			}
@@ -204,9 +201,9 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Agent, "agent", "", fmt.Sprintf("target agent (%s)", hosts.ValidHostIDs()))
+	cmd.Flags().StringVar(&opts.Agent, "agent", "", fmt.Sprintf("target agent (%s)", registry.ValidAgentIDs()))
 	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return hosts.HostIDs(), cobra.ShellCompDirectiveNoFileComp
+		return registry.AgentIDs(), cobra.ShellCompDirectiveNoFileComp
 	})
 	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "project", []string{"project", "user"}, "Installation scope")
 	cmd.Flags().StringVar(&opts.Pin, "pin", "", "pin to a specific git tag or commit SHA")
@@ -287,12 +284,12 @@ func installRun(opts *installOptions) error {
 		return err
 	}
 
-	gitRoot := gitclient.ResolveGitRoot(opts.GitClient)
-	homeDir := gitclient.ResolveHomeDir()
+	gitRoot := resolveGitRoot(opts.GitClient)
+	homeDir := resolveHomeDir()
 	source = ghrepo.FullName(opts.repo)
 
 	type hostPlan struct {
-		host   *hosts.Host
+		host   *registry.AgentHost
 		skills []discovery.Skill
 	}
 	var plans []hostPlan
@@ -426,11 +423,11 @@ func runLocalInstall(opts *installOptions) error {
 		return err
 	}
 
-	gitRoot := gitclient.ResolveGitRoot(opts.GitClient)
-	homeDir := gitclient.ResolveHomeDir()
+	gitRoot := resolveGitRoot(opts.GitClient)
+	homeDir := resolveHomeDir()
 
 	type hostPlan struct {
-		host   *hosts.Host
+		host   *registry.AgentHost
 		skills []discovery.Skill
 	}
 	var plans []hostPlan
@@ -534,18 +531,18 @@ func cutLast(s, sep string) (before, after string, found bool) {
 	return s, "", false
 }
 
-func resolveVersion(opts *installOptions, client discovery.RESTClient, hostname string) (*discovery.ResolvedRef, error) {
+func resolveVersion(opts *installOptions, client *api.Client, hostname string) (*discovery.ResolvedRef, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Resolving version")
 	resolved, err := discovery.ResolveRef(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), opts.version)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve version: %w", err)
 	}
-	fmt.Fprintf(opts.IO.ErrOut, "Using ref %s (%s)\n", resolved.Ref, gitclient.TruncateSHA(resolved.SHA))
+	fmt.Fprintf(opts.IO.ErrOut, "Using ref %s (%s)\n", resolved.Ref, git.ShortSHA(resolved.SHA))
 	return resolved, nil
 }
 
-func discoverSkills(opts *installOptions, client discovery.RESTClient, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
+func discoverSkills(opts *installOptions, client *api.Client, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
 	skills, err := discovery.DiscoverSkills(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA)
 	opts.IO.StopProgressIndicator()
@@ -755,7 +752,7 @@ func matchSelectedSkills(skills []discovery.Skill, selected []string) ([]discove
 // collisionError checks for name collisions and returns an error with
 // guidance on how to install skills individually.
 func collisionError(ss []discovery.Skill, sourceHint string) error {
-	collisions := skills.FindNameCollisions(ss)
+	collisions := discovery.FindNameCollisions(ss)
 	if len(collisions) == 0 {
 		return nil
 	}
@@ -764,28 +761,28 @@ func collisionError(ss []discovery.Skill, sourceHint string) error {
 		  %s
 		Install these skills individually using the full name:
 		  gh skills install %s namespace/skill-name
-	`, skills.FormatCollisions(collisions), sourceHint))
+	`, discovery.FormatCollisions(collisions), sourceHint))
 }
 
-func resolveHosts(opts *installOptions, canPrompt bool) ([]*hosts.Host, error) {
+func resolveHosts(opts *installOptions, canPrompt bool) ([]*registry.AgentHost, error) {
 	if opts.Agent != "" {
-		h, err := hosts.FindByID(opts.Agent)
+		h, err := registry.FindByID(opts.Agent)
 		if err != nil {
 			return nil, err
 		}
-		return []*hosts.Host{h}, nil
+		return []*registry.AgentHost{h}, nil
 	}
 
 	if !canPrompt {
-		h, err := hosts.FindByID("github-copilot")
+		h, err := registry.FindByID("github-copilot")
 		if err != nil {
 			return nil, err
 		}
-		return []*hosts.Host{h}, nil
+		return []*registry.AgentHost{h}, nil
 	}
 
 	fmt.Fprintln(opts.IO.ErrOut)
-	names := hosts.HostNames()
+	names := registry.AgentNames()
 	indices, err := opts.Prompter.MultiSelect("Select target agent(s):", []string{names[0]}, names)
 	if err != nil {
 		return nil, err
@@ -795,41 +792,43 @@ func resolveHosts(opts *installOptions, canPrompt bool) ([]*hosts.Host, error) {
 		return nil, fmt.Errorf("must select at least one target agent")
 	}
 
-	selected := make([]*hosts.Host, len(indices))
+	selected := make([]*registry.AgentHost, len(indices))
 	for i, idx := range indices {
-		selected[i] = &hosts.Registry[idx]
+		selected[i] = &registry.Agents[idx]
 	}
 	return selected, nil
 }
 
-func resolveScope(opts *installOptions, canPrompt bool) (hosts.Scope, error) {
+func resolveScope(opts *installOptions, canPrompt bool) (registry.Scope, error) {
 	if opts.Dir != "" {
-		return hosts.Scope(opts.Scope), nil
+		return registry.Scope(opts.Scope), nil
 	}
 
 	if opts.ScopeChanged || !canPrompt {
-		return hosts.Scope(opts.Scope), nil
+		return registry.Scope(opts.Scope), nil
 	}
 
 	var repoName string
-	if remote, err := opts.GitClient.RemoteURL("origin"); err == nil {
-		repoName = hosts.RepoNameFromRemote(remote)
+	if opts.Remotes != nil {
+		if remotes, err := opts.Remotes(); err == nil && len(remotes) > 0 {
+			repoName = ghrepo.FullName(remotes[0].Repo)
+		}
 	}
-	idx, err := opts.Prompter.Select("Installation scope:", "", hosts.ScopeLabels(repoName))
+	idx, err := opts.Prompter.Select("Installation scope:", "", registry.ScopeLabels(repoName))
 	if err != nil {
 		return "", err
 	}
 	if idx == 0 {
-		return hosts.ScopeProject, nil
+		return registry.ScopeProject, nil
 	}
-	return hosts.ScopeUser, nil
+	return registry.ScopeUser, nil
 }
 
 func truncateDescription(s string, maxWidth int) string {
 	return text.Truncate(maxWidth, text.RemoveExcessiveWhitespace(s))
 }
 
-func checkOverwrite(opts *installOptions, skills []discovery.Skill, host *hosts.Host, scope hosts.Scope, gitRoot, homeDir string, canPrompt bool) ([]discovery.Skill, error) {
+func checkOverwrite(opts *installOptions, skills []discovery.Skill, host *registry.AgentHost, scope registry.Scope, gitRoot, homeDir string, canPrompt bool) ([]discovery.Skill, error) {
 	targetDir := opts.Dir
 	if targetDir == "" {
 		var err error
@@ -990,4 +989,29 @@ func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo string, skillN
 		fmt.Fprintf(w, "    gh skills preview %s %s\n", repo, name)
 	}
 	fmt.Fprintln(w)
+}
+
+func resolveGitRoot(gc *git.Client) string {
+	if gc == nil {
+		if cwd, err := os.Getwd(); err == nil {
+			return cwd
+		}
+		return ""
+	}
+	root, err := gc.ToplevelDir(context.Background())
+	if err != nil {
+		if cwd, err := os.Getwd(); err == nil {
+			return cwd
+		}
+		return ""
+	}
+	return root
+}
+
+func resolveHomeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
 }

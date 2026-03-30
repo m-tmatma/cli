@@ -1,0 +1,4 @@
+# Invalid agent ID should error with valid options
+! exec gh skills install github/awesome-copilot git-commit --agent bogus-agent --force
+stderr 'unknown agent'
+stderr 'github-copilot'

@@ -1,16 +1,19 @@
 package installer
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
-	"github.com/cli/cli/v2/internal/skills/hosts"
 	"github.com/cli/cli/v2/internal/skills/lockfile"
+	"github.com/cli/cli/v2/internal/skills/registry"
 )
 
 // maxConcurrency limits parallel API requests to avoid rate limiting.
@@ -25,12 +28,12 @@ type Options struct {
 	SHA        string // resolved commit SHA
 	PinnedRef  string // user-supplied --pin value (empty if unpinned)
 	Skills     []discovery.Skill
-	AgentHost  *hosts.Host
-	Scope      hosts.Scope
+	AgentHost  *registry.AgentHost
+	Scope      registry.Scope
 	Dir        string // explicit target directory (overrides AgentHost+Scope)
 	GitRoot    string // git repository root (for project scope)
 	HomeDir    string // user home directory (for user scope)
-	Client     discovery.RESTClient
+	Client     *api.Client
 	OnProgress func(done, total int) // called after each skill is installed
 }
 
@@ -138,8 +141,8 @@ func Install(opts *Options) (*Result, error) {
 type LocalOptions struct {
 	SourceDir string
 	Skills    []discovery.Skill
-	AgentHost *hosts.Host
-	Scope     hosts.Scope
+	AgentHost *registry.AgentHost
+	Scope     registry.Scope
 	Dir       string
 	GitRoot   string
 	HomeDir   string
@@ -182,7 +185,7 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 		return fmt.Errorf("could not resolve source path: %w", err)
 	}
 
-	absSkillDir, err := filepath.Abs(skillDir)
+	safeSkillDir, err := safepaths.ParseAbsolute(skillDir)
 	if err != nil {
 		return fmt.Errorf("could not resolve target path: %w", err)
 	}
@@ -203,20 +206,17 @@ func installLocalSkill(sourceRoot string, skill discovery.Skill, baseDir string)
 			return err
 		}
 
-		cleaned := filepath.Clean(relPath)
-		if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
-			return nil
-		}
-
-		destPath := filepath.Join(skillDir, cleaned)
-
-		absDest, err := filepath.Abs(destPath)
+		// Defensive: filepath.WalkDir cannot produce traversal paths, but we
+		// guard against it in case the walk input is ever changed.
+		safeDest, err := safeSkillDir.Join(relPath)
 		if err != nil {
+			var traversalErr safepaths.PathTraversalError
+			if errors.As(err, &traversalErr) {
+				return nil
+			}
 			return fmt.Errorf("could not resolve destination path: %w", err)
 		}
-		if !strings.HasPrefix(absDest, absSkillDir+string(filepath.Separator)) && absDest != absSkillDir {
-			return nil
-		}
+		destPath := safeDest.String()
 
 		if dir := filepath.Dir(destPath); dir != skillDir {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -252,7 +252,7 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 		return fmt.Errorf("could not list skill files: %w", err)
 	}
 
-	absSkillDir, err := filepath.Abs(skillDir)
+	safeSkillDir, err := safepaths.ParseAbsolute(skillDir)
 	if err != nil {
 		return fmt.Errorf("could not resolve skill directory path: %w", err)
 	}
@@ -265,20 +265,15 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 
 		relPath := strings.TrimPrefix(file.Path, skill.Path+"/")
 
-		cleaned := filepath.Clean(relPath)
-		if cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
-			continue
-		}
-
-		destPath := filepath.Join(skillDir, cleaned)
-
-		absDest, err := filepath.Abs(destPath)
+		safeDest, err := safeSkillDir.Join(relPath)
 		if err != nil {
+			var traversalErr safepaths.PathTraversalError
+			if errors.As(err, &traversalErr) {
+				continue
+			}
 			return fmt.Errorf("could not resolve destination path: %w", err)
 		}
-		if !strings.HasPrefix(absDest, absSkillDir+string(filepath.Separator)) && absDest != absSkillDir {
-			continue
-		}
+		destPath := safeDest.String()
 
 		if dir := filepath.Dir(destPath); dir != skillDir {
 			if err := os.MkdirAll(dir, 0o755); err != nil {

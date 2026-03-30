@@ -1,3 +1,0 @@
-# Install with "add" alias
-exec gh skills add github/awesome-copilot git-commit --scope user --force --agent github-copilot
-stdout 'Installed git-commit'

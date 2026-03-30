@@ -1,0 +1,382 @@
+package preview
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"sort"
+	"strings"
+
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/skills/discovery"
+	"github.com/cli/cli/v2/internal/skills/frontmatter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/spf13/cobra"
+)
+
+type previewOptions struct {
+	IO         *iostreams.IOStreams
+	HttpClient func() (*http.Client, error)
+	Prompter   prompter.Prompter
+	Executable func() string
+
+	RepoArg   string
+	SkillName string
+
+	repo ghrepo.Interface
+}
+
+// NewCmdPreview creates the "skills preview" command.
+func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.Command {
+	opts := &previewOptions{
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
+		Executable: f.Executable,
+	}
+
+	cmd := &cobra.Command{
+		Use:   "preview <repository> [<skill>]",
+		Short: "Preview a skill from a GitHub repository",
+		Long: heredoc.Doc(`
+			Render a skill's SKILL.md content in the terminal. This fetches the
+			skill file from the repository and displays it using the configured
+			pager, without installing anything.
+
+			A file tree is shown first, followed by the rendered SKILL.md content.
+			When running interactively and the skill contains additional files
+			(scripts, references, etc.), a file picker lets you browse them
+			individually.
+
+			When run with only a repository argument, lists available skills and
+			prompts for selection.
+		`),
+		Example: heredoc.Doc(`
+			# Preview a specific skill
+			$ gh skills preview github/awesome-copilot code-review
+
+			# Browse and preview interactively
+			$ gh skills preview github/awesome-copilot
+		`),
+		Aliases: []string{"show"},
+		Args:    cobra.RangeArgs(1, 2),
+		RunE: func(c *cobra.Command, args []string) error {
+			opts.RepoArg = args[0]
+			if len(args) == 2 {
+				opts.SkillName = args[1]
+			}
+
+			repo, err := ghrepo.FromFullName(opts.RepoArg)
+			if err != nil {
+				return err
+			}
+			opts.repo = repo
+
+			if runF != nil {
+				return runF(opts)
+			}
+			return previewRun(opts)
+		},
+	}
+
+	return cmd
+}
+
+func previewRun(opts *previewOptions) error {
+	cs := opts.IO.ColorScheme()
+
+	repo := opts.repo
+	owner := repo.RepoOwner()
+	repoName := repo.RepoName()
+	hostname := repo.RepoHost()
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Resolving %s/%s", owner, repoName))
+	resolved, err := discovery.ResolveRef(apiClient, hostname, owner, repoName, "")
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return fmt.Errorf("could not resolve version: %w", err)
+	}
+
+	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
+	skills, err := discovery.DiscoverSkills(apiClient, hostname, owner, repoName, resolved.SHA)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	sort.Slice(skills, func(i, j int) bool {
+		return skills[i].DisplayName() < skills[j].DisplayName()
+	})
+
+	skill, err := selectSkill(opts, skills)
+	if err != nil {
+		return err
+	}
+
+	opts.IO.StartProgressIndicatorWithLabel("Fetching skill content")
+	var files []discovery.SkillFile
+	if skill.TreeSHA != "" {
+		files, err = discovery.ListSkillFiles(apiClient, hostname, owner, repoName, skill.TreeSHA)
+		if err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "warning: could not list skill files: %v\n", err)
+			files = nil
+		}
+	}
+	content, err := discovery.FetchBlob(apiClient, hostname, owner, repoName, skill.BlobSHA)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	parsed, parseErr := frontmatter.Parse(content)
+	if parseErr == nil {
+		content = parsed.Body
+	}
+
+	rendered, err := markdown.Render(content,
+		markdown.WithTheme(opts.IO.TerminalTheme()),
+		markdown.WithWrap(opts.IO.TerminalWidth()),
+		markdown.WithoutIndentation())
+	if err != nil {
+		rendered = content
+	}
+
+	// Collect extra files (everything that isn't SKILL.md)
+	var extraFiles []discovery.SkillFile
+	for _, f := range files {
+		if f.Path != "SKILL.md" {
+			extraFiles = append(extraFiles, f)
+		}
+	}
+
+	canPrompt := opts.IO.CanPrompt()
+
+	// Non-interactive or skill has only SKILL.md: dump through pager
+	if !canPrompt || len(extraFiles) == 0 {
+		return renderAllFiles(opts, cs, skill, files, rendered, extraFiles, apiClient, hostname, owner, repoName)
+	}
+
+	// Interactive with multiple files: show tree, then file picker
+	return renderInteractive(opts, cs, skill, files, rendered, extraFiles, apiClient, hostname, owner, repoName)
+}
+
+// renderAllFiles dumps the tree, SKILL.md, and all extra files through the pager.
+func renderAllFiles(opts *previewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
+	files []discovery.SkillFile, rendered string, extraFiles []discovery.SkillFile,
+	apiClient *api.Client, hostname, owner, repo string) error {
+
+	opts.IO.DetectTerminalTheme()
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
+	}
+	defer opts.IO.StopPager()
+
+	out := opts.IO.Out
+
+	if len(files) > 0 {
+		fmt.Fprintf(out, "%s\n", cs.Bold(skill.DisplayName()+"/"))
+		renderFileTree(out, cs, files)
+		fmt.Fprintln(out)
+	}
+
+	fmt.Fprintf(out, "%s\n\n", cs.Bold("── SKILL.md ──"))
+	fmt.Fprint(out, rendered)
+
+	const maxFiles = 20
+	const maxTotalBytes = 512 * 1024
+	fetched := 0
+	totalBytes := 0
+	for _, f := range extraFiles {
+		if fetched >= maxFiles {
+			fmt.Fprintf(out, "\n%s\n", cs.Gray(fmt.Sprintf("(skipped remaining files — showing first %d)", maxFiles)))
+			break
+		}
+		if totalBytes+f.Size > maxTotalBytes && fetched > 0 {
+			fmt.Fprintf(out, "\n%s\n", cs.Gray("(skipped remaining files — size limit reached)"))
+			break
+		}
+		fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, f.SHA)
+		if fetchErr != nil {
+			fmt.Fprintf(out, "\n%s\n\n%s\n", cs.Bold("── "+f.Path+" ──"), cs.Gray("(could not fetch file)"))
+			continue
+		}
+		fetched++
+		totalBytes += len(fileContent)
+		fmt.Fprintf(out, "\n%s\n\n", cs.Bold("── "+f.Path+" ──"))
+		fmt.Fprint(out, fileContent)
+		if !strings.HasSuffix(fileContent, "\n") {
+			fmt.Fprintln(out)
+		}
+	}
+
+	return nil
+}
+
+// renderInteractive shows the file tree, then a picker to browse individual files.
+func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
+	files []discovery.SkillFile, renderedSkillMD string, extraFiles []discovery.SkillFile,
+	apiClient *api.Client, hostname, owner, repo string) error {
+
+	// Show the file tree to stderr so it persists above the prompt
+	fmt.Fprintf(opts.IO.ErrOut, "\n%s\n", cs.Bold(skill.DisplayName()+"/"))
+	renderFileTree(opts.IO.ErrOut, cs, files)
+	fmt.Fprintln(opts.IO.ErrOut)
+
+	// Build choices: SKILL.md first, then extra files
+	choices := make([]string, 0, len(extraFiles)+1)
+	choices = append(choices, "SKILL.md")
+	for _, f := range extraFiles {
+		choices = append(choices, f.Path)
+	}
+
+	// Save original stdout — StopPager closes IO.Out, so we need to
+	// restore a working writer before each StartPager call.
+	originalOut := opts.IO.Out
+
+	for {
+		// Restore original Out before each pager cycle. StartPager replaces
+		// IO.Out with a pipe; StopPager closes that pipe but does not
+		// restore the original. The original writer remains valid.
+		opts.IO.Out = originalOut
+
+		idx, err := opts.Prompter.Select("View a file (Esc to exit):", "", choices)
+		if err != nil {
+			return nil //nolint:nilerr // Prompter returns error on Esc/Ctrl-C; treat as graceful exit
+		}
+
+		var content string
+
+		if idx == 0 {
+			content = renderedSkillMD
+		} else {
+			selectedFile := extraFiles[idx-1]
+
+			// Fetch on demand — don't hold blob data in memory
+			fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, selectedFile.SHA)
+			if fetchErr != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s could not fetch %s: %v\n", cs.Red("!"), selectedFile.Path, fetchErr)
+				continue
+			}
+			content = fileContent
+			if !strings.HasSuffix(content, "\n") {
+				content += "\n"
+			}
+		}
+
+		if err := opts.IO.StartPager(); err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
+		}
+		fmt.Fprint(opts.IO.Out, content)
+		opts.IO.StopPager()
+	}
+}
+
+func selectSkill(opts *previewOptions, skills []discovery.Skill) (discovery.Skill, error) {
+	if opts.SkillName != "" {
+		for _, s := range skills {
+			if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName {
+				return s, nil
+			}
+		}
+		return discovery.Skill{}, fmt.Errorf("skill %q not found in %s", opts.SkillName, ghrepo.FullName(opts.repo))
+	}
+
+	if !opts.IO.CanPrompt() {
+		return discovery.Skill{}, fmt.Errorf("must specify a skill name when not running interactively")
+	}
+
+	choices := make([]string, len(skills))
+	for i, s := range skills {
+		choices[i] = s.DisplayName()
+	}
+
+	idx, err := opts.Prompter.Select("Select a skill to preview:", "", choices)
+	if err != nil {
+		return discovery.Skill{}, err
+	}
+
+	return skills[idx], nil
+}
+
+// treeNode represents a file or directory in the tree for rendering.
+type treeNode struct {
+	name     string
+	children []*treeNode
+	isDir    bool
+}
+
+// renderFileTree prints a tree of skill files using box-drawing characters.
+func renderFileTree(w io.Writer, cs *iostreams.ColorScheme, files []discovery.SkillFile) {
+	root := buildTree(files)
+	printTree(w, cs, root.children, "")
+}
+
+// buildTree constructs a tree structure from flat file paths.
+func buildTree(files []discovery.SkillFile) *treeNode {
+	root := &treeNode{isDir: true}
+	for _, f := range files {
+		parts := strings.Split(f.Path, "/")
+		current := root
+		for i, part := range parts {
+			isLast := i == len(parts)-1
+			found := false
+			for _, child := range current.children {
+				if child.name == part {
+					current = child
+					found = true
+					break
+				}
+			}
+			if !found {
+				node := &treeNode{name: part, isDir: !isLast}
+				current.children = append(current.children, node)
+				current = node
+			}
+		}
+	}
+	sortTree(root)
+	return root
+}
+
+func sortTree(node *treeNode) {
+	sort.Slice(node.children, func(i, j int) bool {
+		if node.children[i].isDir != node.children[j].isDir {
+			return node.children[i].isDir
+		}
+		return node.children[i].name < node.children[j].name
+	})
+	for _, child := range node.children {
+		if child.isDir {
+			sortTree(child)
+		}
+	}
+}
+
+func printTree(w io.Writer, cs *iostreams.ColorScheme, nodes []*treeNode, indent string) {
+	for i, node := range nodes {
+		isLast := i == len(nodes)-1
+		connector := "├── "
+		childIndent := "│   "
+		if isLast {
+			connector = "└── "
+			childIndent = "    "
+		}
+		if node.isDir {
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Gray(connector), cs.Bold(node.name+"/"))
+			printTree(w, cs, node.children, indent+cs.Gray(childIndent))
+		} else {
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Gray(connector), node.name)
+		}
+	}
+}

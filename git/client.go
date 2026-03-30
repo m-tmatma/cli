@@ -713,6 +713,37 @@ func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
+// RemoteURL returns the fetch URL configured for the named remote.
+func (c *Client) RemoteURL(ctx context.Context, name string) (string, error) {
+	cmd, err := c.Command(ctx, "remote", "get-url", name)
+	if err != nil {
+		return "", err
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return firstLine(out), nil
+}
+
+// IsIgnored reports whether the given path is ignored by .gitignore rules.
+func (c *Client) IsIgnored(ctx context.Context, path string) bool {
+	cmd, err := c.Command(ctx, "check-ignore", "-q", path)
+	if err != nil {
+		return false
+	}
+	_, err = cmd.Output()
+	return err == nil
+}
+
+// ShortSHA returns the first 8 characters of a SHA hash for display purposes.
+func ShortSHA(sha string) string {
+	if len(sha) > 8 {
+		return sha[:8]
+	}
+	return sha
+}
+
 func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
 	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
 	cmd, err := c.Command(ctx, args...)

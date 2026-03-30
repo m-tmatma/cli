@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 )
 
@@ -71,18 +72,6 @@ type ResolvedRef struct {
 	SHA string // commit SHA
 }
 
-// RESTClient is the interface for making GitHub REST API calls.
-// It mirrors the subset of api.Client used by discovery.
-type RESTClient interface {
-	// REST performs a REST API call.
-	// hostname is the GitHub host (e.g. "github.com").
-	// method is the HTTP method (e.g. "GET").
-	// path is the API path (e.g. "repos/owner/repo/releases/latest").
-	// body is the request body (nil for GET).
-	// data is the response data to unmarshal into.
-	REST(hostname string, method string, path string, body io.Reader, data interface{}) error
-}
-
 type treeEntry struct {
 	Path string `json:"path"`
 	Mode string `json:"mode"`
@@ -120,7 +109,7 @@ type repoResponse struct {
 
 // ResolveRef determines the git ref to use for a given owner/repo.
 // Priority: explicit version → latest release tag → default branch.
-func ResolveRef(client RESTClient, host, owner, repo, version string) (*ResolvedRef, error) {
+func ResolveRef(client *api.Client, host, owner, repo, version string) (*ResolvedRef, error) {
 	if version != "" {
 		return resolveExplicitRef(client, host, owner, repo, version)
 	}
@@ -134,7 +123,7 @@ func ResolveRef(client RESTClient, host, owner, repo, version string) (*Resolved
 // resolveExplicitRef resolves a user-supplied --pin value. It tries, in order:
 // tag → commit SHA. Branches are deliberately excluded because they are mutable
 // and pinning to one gives a false sense of reproducibility.
-func resolveExplicitRef(client RESTClient, host, owner, repo, ref string) (*ResolvedRef, error) {
+func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*ResolvedRef, error) {
 	tagPath := fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", owner, repo, ref)
 	var refResp struct {
 		Object struct {
@@ -170,7 +159,7 @@ func resolveExplicitRef(client RESTClient, host, owner, repo, ref string) (*Reso
 	return nil, fmt.Errorf("ref %q not found as tag or commit in %s/%s", ref, owner, repo)
 }
 
-func resolveLatestRelease(client RESTClient, host, owner, repo string) (*ResolvedRef, error) {
+func resolveLatestRelease(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/releases/latest", owner, repo)
 	var release releaseResponse
 	if err := client.REST(host, "GET", apiPath, nil, &release); err != nil {
@@ -182,7 +171,7 @@ func resolveLatestRelease(client RESTClient, host, owner, repo string) (*Resolve
 	return resolveExplicitRef(client, host, owner, repo, release.TagName)
 }
 
-func resolveDefaultBranch(client RESTClient, host, owner, repo string) (*ResolvedRef, error) {
+func resolveDefaultBranch(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s", owner, repo)
 	var repoResp repoResponse
 	if err := client.REST(host, "GET", apiPath, nil, &repoResp); err != nil {
@@ -235,7 +224,7 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 	parentDir := path.Dir(dir)
 	skillName := path.Base(dir)
 
-	if !ValidateName(skillName) {
+	if !validateName(skillName) {
 		return nil
 	}
 
@@ -246,7 +235,7 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 	grandparentDir := path.Dir(parentDir)
 	if grandparentDir == "skills" {
 		namespace := path.Base(parentDir)
-		if !ValidateName(namespace) {
+		if !validateName(namespace) {
 			return nil
 		}
 		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "skills-namespaced"}
@@ -254,7 +243,7 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 
 	if path.Base(parentDir) == "skills" && path.Dir(grandparentDir) == "plugins" {
 		namespace := path.Base(grandparentDir)
-		if !ValidateName(namespace) {
+		if !validateName(namespace) {
 			return nil
 		}
 		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "plugins"}
@@ -268,7 +257,7 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 }
 
 // DiscoverSkills finds all skills in a repository at the given commit SHA.
-func DiscoverSkills(client RESTClient, host, owner, repo, commitSHA string) ([]Skill, error) {
+func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]Skill, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", owner, repo, commitSHA)
 	var tree treeResponse
 	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
@@ -332,8 +321,8 @@ func DiscoverSkills(client RESTClient, host, owner, repo, commitSHA string) ([]S
 	return skills, nil
 }
 
-// FetchDescription fetches and parses the frontmatter description for a skill.
-func FetchDescription(client RESTClient, host, owner, repo string, skill *Skill) string {
+// fetchDescription fetches and parses the frontmatter description for a skill.
+func fetchDescription(client *api.Client, host, owner, repo string, skill *Skill) string {
 	if skill.BlobSHA == "" {
 		return ""
 	}
@@ -348,17 +337,8 @@ func FetchDescription(client RESTClient, host, owner, repo string, skill *Skill)
 	return result.Metadata.Description
 }
 
-// FetchDescriptions fetches descriptions for a batch of skills.
-func FetchDescriptions(client RESTClient, host, owner, repo string, skills []Skill) {
-	for i := range skills {
-		if skills[i].Description == "" {
-			skills[i].Description = FetchDescription(client, host, owner, repo, &skills[i])
-		}
-	}
-}
-
 // FetchDescriptionsConcurrent fetches descriptions with bounded concurrency.
-func FetchDescriptionsConcurrent(client RESTClient, host, owner, repo string, skills []Skill, onProgress func(done, total int)) {
+func FetchDescriptionsConcurrent(client *api.Client, host, owner, repo string, skills []Skill, onProgress func(done, total int)) {
 	total := 0
 	for _, s := range skills {
 		if s.Description == "" {
@@ -385,7 +365,7 @@ func FetchDescriptionsConcurrent(client RESTClient, host, owner, repo string, sk
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			desc := FetchDescription(client, host, owner, repo, &skills[idx])
+			desc := fetchDescription(client, host, owner, repo, &skills[idx])
 
 			mu.Lock()
 			skills[idx].Description = desc
@@ -401,12 +381,12 @@ func FetchDescriptionsConcurrent(client RESTClient, host, owner, repo string, sk
 }
 
 // DiscoverSkillByPath looks up a single skill by its exact path in the repository.
-func DiscoverSkillByPath(client RESTClient, host, owner, repo, commitSHA, skillPath string) (*Skill, error) {
+func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skillPath string) (*Skill, error) {
 	skillPath = strings.TrimSuffix(skillPath, "/SKILL.md")
 	skillPath = strings.TrimSuffix(skillPath, "/")
 
 	skillName := path.Base(skillPath)
-	if !ValidateName(skillName) {
+	if !validateName(skillName) {
 		return nil, fmt.Errorf("invalid skill name %q", skillName)
 	}
 
@@ -465,14 +445,14 @@ func DiscoverSkillByPath(client RESTClient, host, owner, repo, commitSHA, skillP
 		TreeSHA:   treeSHA,
 	}
 
-	skill.Description = FetchDescription(client, host, owner, repo, skill)
+	skill.Description = fetchDescription(client, host, owner, repo, skill)
 
 	return skill, nil
 }
 
 // DiscoverSkillFiles returns all file paths belonging to a skill directory
 // by fetching the skill's subtree directly using its tree SHA.
-func DiscoverSkillFiles(client RESTClient, host, owner, repo, treeSHA, skillPath string) ([]treeEntry, error) {
+func DiscoverSkillFiles(client *api.Client, host, owner, repo, treeSHA, skillPath string) ([]SkillFile, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", owner, repo, treeSHA)
 	var tree treeResponse
 	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
@@ -484,10 +464,10 @@ func DiscoverSkillFiles(client RESTClient, host, owner, repo, treeSHA, skillPath
 		return walkTree(client, host, owner, repo, treeSHA, skillPath)
 	}
 
-	var files []treeEntry
+	var files []SkillFile
 	for _, entry := range tree.Tree {
 		if entry.Type == "blob" {
-			files = append(files, treeEntry{
+			files = append(files, SkillFile{
 				Path: skillPath + "/" + entry.Path,
 				SHA:  entry.SHA,
 				Size: entry.Size,
@@ -500,7 +480,7 @@ func DiscoverSkillFiles(client RESTClient, host, owner, repo, treeSHA, skillPath
 
 // ListSkillFiles returns all files in a skill directory as public SkillFile
 // structs with paths relative to the skill root.
-func ListSkillFiles(client RESTClient, host, owner, repo, treeSHA string) ([]SkillFile, error) {
+func ListSkillFiles(client *api.Client, host, owner, repo, treeSHA string) ([]SkillFile, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s?recursive=true", owner, repo, treeSHA)
 	var tree treeResponse
 	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
@@ -509,17 +489,7 @@ func ListSkillFiles(client RESTClient, host, owner, repo, treeSHA string) ([]Ski
 
 	if tree.Truncated {
 		// Fall back to non-recursive traversal when the tree is too large.
-		entries, err := walkTree(client, host, owner, repo, treeSHA, "")
-		if err != nil {
-			return nil, err
-		}
-		var files []SkillFile
-		for _, e := range entries {
-			// walkTree prefixes with "/{path}", trim the leading slash.
-			p := strings.TrimPrefix(e.Path, "/")
-			files = append(files, SkillFile{Path: p, SHA: e.SHA, Size: e.Size})
-		}
-		return files, nil
+		return walkTree(client, host, owner, repo, treeSHA, "")
 	}
 
 	var files []SkillFile
@@ -537,19 +507,22 @@ func ListSkillFiles(client RESTClient, host, owner, repo, treeSHA string) ([]Ski
 
 // walkTree enumerates files by fetching each tree level individually,
 // avoiding the truncation limit of the recursive tree API.
-func walkTree(client RESTClient, host, owner, repo, sha, prefix string) ([]treeEntry, error) {
+func walkTree(client *api.Client, host, owner, repo, sha, prefix string) ([]SkillFile, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/trees/%s", owner, repo, sha)
 	var tree treeResponse
 	if err := client.REST(host, "GET", apiPath, nil, &tree); err != nil {
 		return nil, fmt.Errorf("could not fetch tree %s: %w", prefix, err)
 	}
 
-	var files []treeEntry
+	var files []SkillFile
 	for _, entry := range tree.Tree {
-		entryPath := prefix + "/" + entry.Path
+		entryPath := entry.Path
+		if prefix != "" {
+			entryPath = prefix + "/" + entry.Path
+		}
 		switch entry.Type {
 		case "blob":
-			files = append(files, treeEntry{Path: entryPath, SHA: entry.SHA, Size: entry.Size})
+			files = append(files, SkillFile{Path: entryPath, SHA: entry.SHA, Size: entry.Size})
 		case "tree":
 			sub, err := walkTree(client, host, owner, repo, entry.SHA, entryPath)
 			if err != nil {
@@ -562,7 +535,7 @@ func walkTree(client RESTClient, host, owner, repo, sha, prefix string) ([]treeE
 }
 
 // FetchBlob retrieves the content of a blob by SHA.
-func FetchBlob(client RESTClient, host, owner, repo, sha string) (string, error) {
+func FetchBlob(client *api.Client, host, owner, repo, sha string) (string, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/git/blobs/%s", owner, repo, sha)
 	var blob blobResponse
 	if err := client.REST(host, "GET", apiPath, nil, &blob); err != nil {
@@ -683,7 +656,7 @@ func localSkillFromDir(dir string) (*Skill, error) {
 		description = result.Metadata.Description
 	}
 
-	if !ValidateName(name) {
+	if !validateName(name) {
 		return nil, fmt.Errorf("invalid skill name %q in %s", name, dir)
 	}
 
@@ -694,8 +667,8 @@ func localSkillFromDir(dir string) (*Skill, error) {
 	}, nil
 }
 
-// ValidateName checks if a skill name is safe for use (filesystem-safe).
-func ValidateName(name string) bool {
+// validateName checks if a skill name is safe for use (filesystem-safe).
+func validateName(name string) bool {
 	if len(name) == 0 || len(name) > 64 {
 		return false
 	}
@@ -714,60 +687,4 @@ func IsSpecCompliant(name string) bool {
 		return false
 	}
 	return specNamePattern.MatchString(name)
-}
-
-// verifyBatchSize controls how many repos are checked per code-search API call.
-const verifyBatchSize = 8
-
-type codeSearchResponse struct {
-	Items []codeSearchItem `json:"items"`
-}
-
-type codeSearchItem struct {
-	Repository codeSearchRepo `json:"repository"`
-}
-
-type codeSearchRepo struct {
-	FullName string `json:"full_name"`
-}
-
-// VerifySkillRepos filters a list of repository names to only those that
-// actually contain SKILL.md files. It uses the GitHub code search API with
-// batched repo: qualifiers.
-//
-// If a verification call fails (e.g. rate limit), repos in that batch are
-// kept rather than silently dropped — we fail open.
-func VerifySkillRepos(client RESTClient, host string, repos []string) map[string]bool {
-	verified := make(map[string]bool)
-
-	for i := 0; i < len(repos); i += verifyBatchSize {
-		end := i + verifyBatchSize
-		if end > len(repos) {
-			end = len(repos)
-		}
-		batch := repos[i:end]
-
-		var queryParts []string
-		queryParts = append(queryParts, "filename:SKILL.md")
-		for _, r := range batch {
-			queryParts = append(queryParts, "repo:"+r)
-		}
-		query := strings.Join(queryParts, "+")
-		apiPath := fmt.Sprintf("search/code?q=%s&per_page=%d", query, verifyBatchSize*3)
-
-		var resp codeSearchResponse
-		if err := client.REST(host, "GET", apiPath, nil, &resp); err != nil {
-			// Fail open: if we can't verify, assume all repos in the batch are valid
-			for _, r := range batch {
-				verified[r] = true
-			}
-			continue
-		}
-
-		for _, item := range resp.Items {
-			verified[item.Repository.FullName] = true
-		}
-	}
-
-	return verified
 }

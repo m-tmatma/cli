@@ -13,8 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/skills/discovery"
-	"github.com/cli/cli/v2/internal/skills/gitclient"
-	"github.com/cli/cli/v2/internal/skills/hosts"
+	"github.com/cli/cli/v2/internal/skills/registry"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -22,27 +21,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// mockGitClient implements installGitClient for testing.
-type mockGitClient struct {
-	root   string
-	remote string
-	err    error
-}
-
-func (m *mockGitClient) ToplevelDir() (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	return m.root, nil
-}
-
-func (m *mockGitClient) RemoteURL(_ string) (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	return m.remote, nil
-}
 
 func TestNewCmdInstall_Help(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
@@ -184,7 +162,7 @@ func TestInstallRun_NonInteractive_NoRepo(t *testing.T) {
 
 	opts := &installOptions{
 		IO:        ios,
-		GitClient: &mockGitClient{root: "/tmp", remote: ""},
+		GitClient: &git.Client{RepoDir: t.TempDir()},
 	}
 
 	err := installRun(opts)
@@ -368,11 +346,6 @@ func TestResolveHosts_NoneSelected(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestTruncateSHA(t *testing.T) {
-	assert.Equal(t, "abc123de", gitclient.TruncateSHA("abc123def456"))
-	assert.Equal(t, "short", gitclient.TruncateSHA("short"))
-}
-
 func TestTruncateDescription(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -457,7 +430,7 @@ func TestRunLocalInstall_NonInteractive(t *testing.T) {
 		Agent:       "github-copilot",
 		Scope:       "project",
 		Dir:         targetDir,
-		GitClient:   &mockGitClient{root: t.TempDir(), remote: ""},
+		GitClient:   &git.Client{RepoDir: t.TempDir()},
 	}
 
 	err := installRun(opts)
@@ -489,7 +462,7 @@ func TestRunLocalInstall_SingleSkillDir(t *testing.T) {
 		Agent:       "github-copilot",
 		Scope:       "project",
 		Dir:         targetDir,
-		GitClient:   &mockGitClient{root: t.TempDir(), remote: ""},
+		GitClient:   &git.Client{RepoDir: t.TempDir()},
 	}
 
 	err := installRun(opts)
@@ -577,7 +550,7 @@ func TestResolveScope_ExplicitFlag(t *testing.T) {
 		IO:           ios,
 		Scope:        "user",
 		ScopeChanged: true,
-		GitClient:    &mockGitClient{root: "/tmp", remote: ""},
+		GitClient:    &git.Client{RepoDir: t.TempDir()},
 	}
 	scope, err := resolveScope(opts, true)
 	require.NoError(t, err)
@@ -590,7 +563,7 @@ func TestResolveScope_DirBypasses(t *testing.T) {
 		IO:        ios,
 		Dir:       "/tmp/custom",
 		Scope:     "project",
-		GitClient: &mockGitClient{root: "/tmp", remote: ""},
+		GitClient: &git.Client{RepoDir: t.TempDir()},
 	}
 	scope, err := resolveScope(opts, true)
 	require.NoError(t, err)
@@ -601,10 +574,10 @@ func TestCheckOverwrite_NoExisting(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	targetDir := t.TempDir()
 	skills := []discovery.Skill{{Name: "new-skill"}}
-	host := &hosts.Host{ID: "test", ProjectDir: "skills"}
+	host := &registry.AgentHost{ID: "test", ProjectDir: "skills"}
 	opts := &installOptions{IO: ios, Dir: targetDir}
 
-	got, err := checkOverwrite(opts, skills, host, hosts.ScopeProject, "/tmp", "/home", false)
+	got, err := checkOverwrite(opts, skills, host, registry.ScopeProject, "/tmp", "/home", false)
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 }
@@ -615,10 +588,10 @@ func TestCheckOverwrite_ExistingWithForce(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	skills := []discovery.Skill{{Name: "existing-skill"}}
-	host := &hosts.Host{ID: "test", ProjectDir: "skills"}
+	host := &registry.AgentHost{ID: "test", ProjectDir: "skills"}
 	opts := &installOptions{IO: ios, Dir: targetDir, Force: true}
 
-	got, err := checkOverwrite(opts, skills, host, hosts.ScopeProject, "/tmp", "/home", false)
+	got, err := checkOverwrite(opts, skills, host, registry.ScopeProject, "/tmp", "/home", false)
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 }
@@ -629,10 +602,10 @@ func TestCheckOverwrite_ExistingNonInteractive(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	skills := []discovery.Skill{{Name: "existing-skill"}}
-	host := &hosts.Host{ID: "test", ProjectDir: "skills"}
+	host := &registry.AgentHost{ID: "test", ProjectDir: "skills"}
 	opts := &installOptions{IO: ios, Dir: targetDir}
 
-	_, err := checkOverwrite(opts, skills, host, hosts.ScopeProject, "/tmp", "/home", false)
+	_, err := checkOverwrite(opts, skills, host, registry.ScopeProject, "/tmp", "/home", false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already installed")
 }
@@ -755,7 +728,7 @@ func TestInstallRun_RemoteInstall(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
-		GitClient:   &mockGitClient{root: t.TempDir(), remote: ""},
+		GitClient:   &git.Client{RepoDir: t.TempDir()},
 		SkillSource: "owner/repo",
 		SkillName:   "test-skill",
 		Agent:       "github-copilot",
@@ -880,7 +853,7 @@ func TestRunLocalInstall_NamespacedSkills(t *testing.T) {
 		Agent:       "github-copilot",
 		Scope:       "project",
 		Dir:         targetDir,
-		GitClient:   &mockGitClient{root: t.TempDir(), remote: ""},
+		GitClient:   &git.Client{RepoDir: t.TempDir()},
 	}
 
 	err := installRun(opts)
@@ -908,10 +881,10 @@ func TestCheckOverwrite_NamespacedSkill(t *testing.T) {
 		{Name: "xlsx-pro", Namespace: "alice"},
 		{Name: "xlsx-pro", Namespace: "bob"},
 	}
-	host := &hosts.Host{ID: "test", ProjectDir: "skills"}
+	host := &registry.AgentHost{ID: "test", ProjectDir: "skills"}
 	opts := &installOptions{IO: ios, Dir: targetDir, Force: true}
 
-	got, err := checkOverwrite(opts, skills, host, hosts.ScopeProject, "/tmp", "/home", false)
+	got, err := checkOverwrite(opts, skills, host, registry.ScopeProject, "/tmp", "/home", false)
 	require.NoError(t, err)
 	assert.Len(t, got, 2, "both skills should be installable (force mode)")
 }

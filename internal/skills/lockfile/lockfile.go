@@ -15,8 +15,8 @@ const (
 	lockFile    = ".skill-lock.json"
 )
 
-// Entry represents a single installed skill in the lock file.
-type Entry struct {
+// entry represents a single installed skill in the lock file.
+type entry struct {
 	Source          string `json:"source"`
 	SourceType      string `json:"sourceType"`
 	SourceURL       string `json:"sourceUrl"`
@@ -27,15 +27,15 @@ type Entry struct {
 	PinnedRef       string `json:"pinnedRef,omitempty"`
 }
 
-// File is the top-level structure of .skill-lock.json.
-type File struct {
+// file is the top-level structure of .skill-lock.json.
+type file struct {
 	Version   int              `json:"version"`
-	Skills    map[string]Entry `json:"skills"`
+	Skills    map[string]entry `json:"skills"`
 	Dismissed map[string]bool  `json:"dismissed,omitempty"`
 }
 
-// Path returns the absolute path to the lock file.
-func Path() (string, error) {
+// lockfilePath returns the absolute path to the lock file.
+func lockfilePath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -43,10 +43,10 @@ func Path() (string, error) {
 	return filepath.Join(home, agentsDir, lockFile), nil
 }
 
-// Read loads the lock file, returning an empty file if it doesn't exist
+// read loads the lock file, returning an empty file if it doesn't exist
 // or if it's an incompatible version.
-func Read() (*File, error) {
-	lockPath, err := Path()
+func read() (*file, error) {
+	lockPath, err := lockfilePath()
 	if err != nil {
 		return newFile(), nil //nolint:nilerr // graceful: no home dir means fresh state
 	}
@@ -59,7 +59,7 @@ func Read() (*File, error) {
 		return nil, fmt.Errorf("could not read lock file: %w", err)
 	}
 
-	var f File
+	var f file
 	if err := json.Unmarshal(data, &f); err != nil {
 		return newFile(), nil //nolint:nilerr // graceful: corrupt file means fresh state
 	}
@@ -71,9 +71,9 @@ func Read() (*File, error) {
 	return &f, nil
 }
 
-// Write persists the lock file to disk.
-func Write(f *File) error {
-	lockPath, err := Path()
+// write persists the lock file to disk.
+func write(f *file) error {
+	lockPath, err := lockfilePath()
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string)
 	unlock := acquireLock()
 	defer unlock()
 
-	f, err := Read()
+	f, err := read()
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string)
 		installedAt = existing.InstalledAt
 	}
 
-	f.Skills[skillName] = Entry{
+	f.Skills[skillName] = entry{
 		Source:          owner + "/" + repo,
 		SourceType:      "github",
 		SourceURL:       "https://github.com/" + owner + "/" + repo + ".git",
@@ -121,13 +121,13 @@ func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string)
 		PinnedRef:       pinnedRef,
 	}
 
-	return Write(f)
+	return write(f)
 }
 
-func newFile() *File {
-	return &File{
+func newFile() *file {
+	return &file{
 		Version: lockVersion,
-		Skills:  make(map[string]Entry),
+		Skills:  make(map[string]entry),
 	}
 }
 
@@ -135,7 +135,7 @@ func newFile() *File {
 // Returns an unlock function. If locking fails after retries, it proceeds
 // unlocked rather than blocking the user indefinitely.
 func acquireLock() (unlock func()) {
-	lockPath, pathErr := Path()
+	lockPath, pathErr := lockfilePath()
 	if pathErr != nil {
 		return func() {}
 	}

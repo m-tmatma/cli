@@ -1,11 +1,9 @@
-package skills
+package discovery
 
 import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/cli/cli/v2/internal/skills/discovery"
 )
 
 // NameCollision represents a group of skills that share the same InstallName
@@ -18,8 +16,8 @@ type NameCollision struct {
 // FindNameCollisions detects skills that share the same InstallName and returns a
 // sorted slice of collisions. Callers decide how to present the conflict to
 // the user (different flows need different error messages).
-func FindNameCollisions(skills []discovery.Skill) []NameCollision {
-	byName := make(map[string][]discovery.Skill)
+func FindNameCollisions(skills []Skill) []NameCollision {
+	byName := make(map[string][]Skill)
 	for _, s := range skills {
 		byName[s.InstallName()] = append(byName[s.InstallName()], s)
 	}

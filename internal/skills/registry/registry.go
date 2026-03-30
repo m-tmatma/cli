@@ -1,16 +1,17 @@
-package hosts
+package registry
 
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-// Host represents an AI agent that can use skills.
-type Host struct {
-	// ID is the canonical identifier for this host.
+// AgentHost represents an AI agent that can use skills.
+type AgentHost struct {
+	// ID is the canonical identifier for this agent host.
 	ID string
 	// Name is the human-readable display name.
 	Name string
@@ -28,8 +29,8 @@ const (
 	ScopeUser    Scope = "user"
 )
 
-// Registry contains all known agent hosts.
-var Registry = []Host{
+// Agents contains all known agent hosts.
+var Agents = []AgentHost{
 	{
 		ID:         "github-copilot",
 		Name:       "GitHub Copilot",
@@ -68,52 +69,45 @@ var Registry = []Host{
 	},
 }
 
-// FindByID returns the host with the given ID, or an error if not found.
-func FindByID(id string) (*Host, error) {
-	for i := range Registry {
-		if Registry[i].ID == id {
-			return &Registry[i], nil
+// FindByID returns the agent host with the given ID, or an error if not found.
+func FindByID(id string) (*AgentHost, error) {
+	for i := range Agents {
+		if Agents[i].ID == id {
+			return &Agents[i], nil
 		}
 	}
-	return nil, fmt.Errorf("unknown host %q, valid hosts: %s", id, ValidHostIDs())
+	return nil, fmt.Errorf("unknown agent %q, valid agents: %s", id, ValidAgentIDs())
 }
 
-// ValidHostIDs returns a comma-separated list of valid host IDs.
-func ValidHostIDs() string {
-	ids := ""
-	for i, h := range Registry {
-		if i > 0 {
-			ids += ", "
-		}
-		ids += h.ID
-	}
-	return ids
+// ValidAgentIDs returns a comma-separated list of valid agent IDs.
+func ValidAgentIDs() string {
+	return strings.Join(AgentIDs(), ", ")
 }
 
-// HostIDs returns the IDs of all known hosts as a slice.
-func HostIDs() []string {
-	ids := make([]string, len(Registry))
-	for i, h := range Registry {
+// AgentIDs returns the IDs of all known agents as a slice.
+func AgentIDs() []string {
+	ids := make([]string, len(Agents))
+	for i, h := range Agents {
 		ids[i] = h.ID
 	}
 	return ids
 }
 
-// HostNames returns the display names of all hosts for prompting.
-func HostNames() []string {
-	names := make([]string, len(Registry))
-	for i, h := range Registry {
+// AgentNames returns the display names of all agents for prompting.
+func AgentNames() []string {
+	names := make([]string, len(Agents))
+	for i, h := range Agents {
 		names[i] = h.Name
 	}
 	return names
 }
 
 // UniqueProjectDirs returns the deduplicated set of project-scope skill
-// directories from the Registry, preserving insertion order.
+// directories from the Agents list, preserving insertion order.
 func UniqueProjectDirs() []string {
 	seen := map[string]bool{}
 	var dirs []string
-	for _, h := range Registry {
+	for _, h := range Agents {
 		if !seen[h.ProjectDir] {
 			seen[h.ProjectDir] = true
 			dirs = append(dirs, h.ProjectDir)
@@ -122,12 +116,12 @@ func UniqueProjectDirs() []string {
 	return dirs
 }
 
-// InstallDir resolves the absolute installation directory for a host and scope.
+// InstallDir resolves the absolute installation directory for an agent host and scope.
 // For project scope, it uses the provided git root directory so that skills are
 // installed at the top level regardless of which subdirectory the user is in.
 // Returns an error when gitRoot is empty (not in a git repository).
 // For user scope, it uses the home directory.
-func (h *Host) InstallDir(scope Scope, gitRoot, homeDir string) (string, error) {
+func (h *AgentHost) InstallDir(scope Scope, gitRoot, homeDir string) (string, error) {
 	switch scope {
 	case ScopeProject:
 		if gitRoot == "" {
