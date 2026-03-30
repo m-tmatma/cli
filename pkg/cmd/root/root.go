@@ -38,6 +38,7 @@ import (
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
+	skillsCmd "github.com/cli/cli/v2/pkg/cmd/skills"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	variableCmd "github.com/cli/cli/v2/pkg/cmd/variable"
@@ -164,6 +165,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
+	cmd.AddCommand(skillsCmd.NewCmdSkills(f))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))
