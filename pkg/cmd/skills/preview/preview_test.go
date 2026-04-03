@@ -3,9 +3,12 @@ package preview
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -13,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdPreview(t *testing.T) {
@@ -62,31 +66,32 @@ func TestNewCmdPreview(t *testing.T) {
 
 			args, _ := shlex.Split(tt.input)
 			cmd.SetArgs(args)
-			cmd.SetOut(&discardWriter{})
-			cmd.SetErr(&discardWriter{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 			err := cmd.Execute()
 
 			if tt.wantErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.wantRepo, gotOpts.RepoArg)
 			assert.Equal(t, tt.wantSkillName, gotOpts.SkillName)
 		})
 	}
 }
 
-func TestNewCmdPreview_Alias(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
-	f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}}
-	cmd := NewCmdPreview(f, func(_ *previewOptions) error { return nil })
-	assert.Contains(t, cmd.Aliases, "show")
-}
-
 func TestPreviewRun(t *testing.T) {
-	skillContent := "---\nname: my-skill\ndescription: A test skill\n---\n# My Skill\n\nThis is the skill content."
+	skillContent := heredoc.Doc(`
+		---
+		name: my-skill
+		description: A test skill
+		---
+		# My Skill
+
+		This is the skill content.
+	`)
 	encodedContent := base64.StdEncoding.EncodeToString([]byte(skillContent))
 
 	tests := []struct {
@@ -266,11 +271,11 @@ func TestPreviewRun(t *testing.T) {
 			err := previewRun(tt.opts)
 
 			if tt.wantErr != "" {
-				assert.EqualError(t, err, tt.wantErr)
+				require.EqualError(t, err, tt.wantErr)
 				return
 			}
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			if tt.wantStdout != "" {
 				assert.Contains(t, stdout.String(), tt.wantStdout)
 			}
@@ -338,12 +343,19 @@ func TestPreviewRun_Interactive(t *testing.T) {
 	}
 
 	err := previewRun(opts)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, stdout.String(), "Selected Skill")
 }
 
 func TestPreviewRun_ShowsFileTree(t *testing.T) {
-	skillContent := "---\nname: my-skill\ndescription: test\n---\n# My Skill\nBody."
+	skillContent := heredoc.Doc(`
+		---
+		name: my-skill
+		description: test
+		---
+		# My Skill
+		Body.
+	`)
 	encodedContent := base64.StdEncoding.EncodeToString([]byte(skillContent))
 
 	scriptContent := "#!/bin/bash\necho hello"
@@ -426,7 +438,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 		}
 
 		err := previewRun(opts)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		out := stdout.String()
 		assert.Contains(t, out, "echo hello")
@@ -450,7 +462,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 		}
 
 		err := previewRun(opts)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		out := stdout.String()
 		assert.Contains(t, out, "my-skill/")
@@ -460,7 +472,174 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 	})
 }
 
-// discardWriter is a no-op writer for suppressing cobra output in tests.
-type discardWriter struct{}
+func TestPreviewRun_RenderLimits(t *testing.T) {
+	skillContent := heredoc.Doc(`
+		---
+		name: my-skill
+		description: test
+		---
+		# My Skill
+	`)
+	encodedSkill := base64.StdEncoding.EncodeToString([]byte(skillContent))
 
-func (d *discardWriter) Write(p []byte) (int, error) { return len(p), nil }
+	// Helper: build a tree JSON with N extra files (beyond SKILL.md)
+	buildTree := func(n int) string {
+		entries := []string{
+			`{"path": "skills/my-skill", "type": "tree", "sha": "treeSHA"}`,
+			`{"path": "skills/my-skill/SKILL.md", "type": "blob", "sha": "blobSKILL"}`,
+		}
+		for i := range n {
+			entries = append(entries, fmt.Sprintf(
+				`{"path": "skills/my-skill/file%03d.txt", "type": "blob", "sha": "blob%03d"}`, i, i))
+		}
+		return fmt.Sprintf(`{"sha":"abc123","truncated":false,"tree":[%s]}`,
+			strings.Join(entries, ","))
+	}
+
+	// Helper: build subtree JSON with N extra files
+	buildSubtree := func(n int, sizes []int) string {
+		entries := []string{
+			`{"path": "SKILL.md", "type": "blob", "sha": "blobSKILL", "size": 50}`,
+		}
+		for i := range n {
+			sz := 10
+			if i < len(sizes) {
+				sz = sizes[i]
+			}
+			entries = append(entries, fmt.Sprintf(
+				`{"path": "file%03d.txt", "type": "blob", "sha": "blob%03d", "size": %d}`, i, i, sz))
+		}
+		return fmt.Sprintf(`{"tree":[%s]}`, strings.Join(entries, ","))
+	}
+
+	// Common stubs for resolve + discover
+	registerBase := func(reg *httpmock.Registry, treeJSON, subtreeJSON string) {
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/releases/latest"),
+			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v1.0.0"),
+			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/trees/abc123"),
+			httpmock.StringResponse(treeJSON),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/trees/treeSHA"),
+			httpmock.StringResponse(subtreeJSON),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blobSKILL"),
+			httpmock.StringResponse(`{"sha": "blobSKILL", "content": "`+encodedSkill+`", "encoding": "base64"}`),
+		)
+	}
+
+	t.Run("maxFiles cap truncates at 20", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+
+		n := 22
+		treeJSON := buildTree(n)
+		subtreeJSON := buildSubtree(n, nil)
+		registerBase(reg, treeJSON, subtreeJSON)
+
+		// Register blob stubs for files 0-19 (first 20 get fetched)
+		tinyContent := base64.StdEncoding.EncodeToString([]byte("tiny"))
+		for i := range 20 {
+			reg.Register(
+				httpmock.REST("GET", fmt.Sprintf("repos/monalisa/skills-repo/git/blobs/blob%03d", i)),
+				httpmock.StringResponse(fmt.Sprintf(`{"sha": "blob%03d", "content": "%s", "encoding": "base64"}`, i, tinyContent)),
+			)
+		}
+		// Files 20 and 21 should NOT be fetched
+
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+
+		opts := &previewOptions{
+			IO:         ios,
+			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:   &prompter.PrompterMock{},
+			repo:       ghrepo.New("monalisa", "skills-repo"),
+			SkillName:  "my-skill",
+		}
+
+		err := previewRun(opts)
+		require.NoError(t, err)
+
+		out := stdout.String()
+		assert.Contains(t, out, "showing first 20")
+		assert.Contains(t, out, "file019.txt") // last fetched
+	})
+
+	t.Run("maxBytes cap stops fetching", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+
+		// Two files: first is 500KB, second would exceed 512KB cap
+		sizes := []int{500 * 1024, 100 * 1024}
+		treeJSON := buildTree(2)
+		subtreeJSON := buildSubtree(2, sizes)
+		registerBase(reg, treeJSON, subtreeJSON)
+
+		bigContent := base64.StdEncoding.EncodeToString(make([]byte, 500*1024))
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blob000"),
+			httpmock.StringResponse(fmt.Sprintf(`{"sha": "blob000", "content": "%s", "encoding": "base64"}`, bigContent)),
+		)
+		// blob001 should NOT be fetched — size limit reached
+
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+
+		opts := &previewOptions{
+			IO:         ios,
+			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:   &prompter.PrompterMock{},
+			repo:       ghrepo.New("monalisa", "skills-repo"),
+			SkillName:  "my-skill",
+		}
+
+		err := previewRun(opts)
+		require.NoError(t, err)
+
+		out := stdout.String()
+		assert.Contains(t, out, "size limit reached")
+	})
+
+	t.Run("blob fetch error shows fallback message", func(t *testing.T) {
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+
+		treeJSON := buildTree(1)
+		subtreeJSON := buildSubtree(1, nil)
+		registerBase(reg, treeJSON, subtreeJSON)
+
+		reg.Register(
+			httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blob000"),
+			httpmock.StatusStringResponse(500, "server error"),
+		)
+
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+
+		opts := &previewOptions{
+			IO:         ios,
+			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:   &prompter.PrompterMock{},
+			repo:       ghrepo.New("monalisa", "skills-repo"),
+			SkillName:  "my-skill",
+		}
+
+		err := previewRun(opts)
+		require.NoError(t, err)
+
+		out := stdout.String()
+		assert.Contains(t, out, "could not fetch file")
+	})
+}

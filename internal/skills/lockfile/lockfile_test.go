@@ -5,16 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// setupHome redirects HOME to a temp dir and returns the expected lockfile path.
-func setupHome(t *testing.T) string {
+// setupTestHome redirects HOME to a temp dir and returns the expected lockfile path.
+func setupTestHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	return filepath.Join(home, agentsDir, lockFile)
 }
 
@@ -39,7 +41,7 @@ func TestRecordInstall(t *testing.T) {
 			treeSHA:   "abc123",
 			verify: func(t *testing.T, lockPath string) {
 				t.Helper()
-				f := readLockfile(t, lockPath)
+				f := readTestLockfile(t, lockPath)
 				require.Contains(t, f.Skills, "code-review")
 				e := f.Skills["code-review"]
 				assert.Equal(t, "monalisa/octocat-skills", e.Source)
@@ -62,28 +64,8 @@ func TestRecordInstall(t *testing.T) {
 			pinnedRef: "v1.0.0",
 			verify: func(t *testing.T, lockPath string) {
 				t.Helper()
-				f := readLockfile(t, lockPath)
+				f := readTestLockfile(t, lockPath)
 				assert.Equal(t, "v1.0.0", f.Skills["pr-summary"].PinnedRef)
-			},
-		},
-		{
-			name: "update preserves InstalledAt and updates treeSHA",
-			setup: func(t *testing.T) {
-				t.Helper()
-				require.NoError(t, RecordInstall("code-review", "monalisa", "octocat-skills", "skills/code-review/SKILL.md", "old-sha", ""))
-			},
-			skill:     "code-review",
-			owner:     "monalisa",
-			repo:      "octocat-skills",
-			skillPath: "skills/code-review/SKILL.md",
-			treeSHA:   "new-sha",
-			verify: func(t *testing.T, lockPath string) {
-				t.Helper()
-				f := readLockfile(t, lockPath)
-				e := f.Skills["code-review"]
-				assert.Equal(t, "new-sha", e.SkillFolderHash, "treeSHA should be updated")
-				// InstalledAt should be preserved (not empty proves it wasn't clobbered)
-				assert.NotEmpty(t, e.InstalledAt, "InstalledAt should be preserved from first install")
 			},
 		},
 		{
@@ -99,15 +81,118 @@ func TestRecordInstall(t *testing.T) {
 			treeSHA:   "sha2",
 			verify: func(t *testing.T, lockPath string) {
 				t.Helper()
-				f := readLockfile(t, lockPath)
+				f := readTestLockfile(t, lockPath)
 				assert.Contains(t, f.Skills, "code-review")
 				assert.Contains(t, f.Skills, "issue-triage")
+			},
+		},
+		{
+			name: "succeeds despite stale lock file",
+			setup: func(t *testing.T) {
+				t.Helper()
+				lockPath, err := lockfilePath()
+				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
+				lkPath := lockPath + ".lk"
+				f, err := os.Create(lkPath)
+				require.NoError(t, err)
+				f.Close()
+				staleTime := time.Now().Add(-60 * time.Second)
+				require.NoError(t, os.Chtimes(lkPath, staleTime, staleTime))
+			},
+			skill:     "code-review",
+			owner:     "monalisa",
+			repo:      "octocat-skills",
+			skillPath: "skills/code-review/SKILL.md",
+			treeSHA:   "abc123",
+			verify: func(t *testing.T, lockPath string) {
+				t.Helper()
+				f := readTestLockfile(t, lockPath)
+				require.Contains(t, f.Skills, "code-review")
+				_, err := os.Stat(lockPath + ".lk")
+				assert.True(t, os.IsNotExist(err), "stale lock should be removed after RecordInstall")
+			},
+		},
+		{
+			name: "proceeds without lock after retries exhausted",
+			setup: func(t *testing.T) {
+				t.Helper()
+				// Reduce retries to avoid 3s wait in tests.
+				origRetries := lockRetries
+				origInterval := lockRetryInterval
+				lockRetries = 1
+				lockRetryInterval = 0
+				t.Cleanup(func() {
+					lockRetries = origRetries
+					lockRetryInterval = origInterval
+				})
+				// Create a fresh (non-stale) lock file that won't be broken.
+				lockPath, err := lockfilePath()
+				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
+				f, err := os.Create(lockPath + ".lk")
+				require.NoError(t, err)
+				f.Close()
+			},
+			skill:     "code-review",
+			owner:     "monalisa",
+			repo:      "octocat-skills",
+			skillPath: "skills/code-review/SKILL.md",
+			treeSHA:   "abc123",
+			verify: func(t *testing.T, lockPath string) {
+				t.Helper()
+				f := readTestLockfile(t, lockPath)
+				require.Contains(t, f.Skills, "code-review", "should succeed best-effort without lock")
+			},
+		},
+		{
+			name: "recovers from corrupt lockfile",
+			setup: func(t *testing.T) {
+				t.Helper()
+				lockPath, err := lockfilePath()
+				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
+				require.NoError(t, os.WriteFile(lockPath, []byte("{invalid json"), 0o644))
+			},
+			skill:     "code-review",
+			owner:     "monalisa",
+			repo:      "octocat-skills",
+			skillPath: "skills/code-review/SKILL.md",
+			treeSHA:   "abc123",
+			verify: func(t *testing.T, lockPath string) {
+				t.Helper()
+				f := readTestLockfile(t, lockPath)
+				assert.Equal(t, lockVersion, f.Version)
+				require.Contains(t, f.Skills, "code-review")
+			},
+		},
+		{
+			name: "recovers from wrong version lockfile",
+			setup: func(t *testing.T) {
+				t.Helper()
+				lockPath, err := lockfilePath()
+				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
+				data, _ := json.Marshal(file{Version: 999, Skills: map[string]entry{"old-skill": {}}})
+				require.NoError(t, os.WriteFile(lockPath, data, 0o644))
+			},
+			skill:     "code-review",
+			owner:     "monalisa",
+			repo:      "octocat-skills",
+			skillPath: "skills/code-review/SKILL.md",
+			treeSHA:   "abc123",
+			verify: func(t *testing.T, lockPath string) {
+				t.Helper()
+				f := readTestLockfile(t, lockPath)
+				assert.Equal(t, lockVersion, f.Version)
+				require.Contains(t, f.Skills, "code-review")
+				assert.NotContains(t, f.Skills, "old-skill", "wrong-version data should be discarded")
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lockPath := setupHome(t)
+			lockPath := setupTestHome(t)
 			if tt.setup != nil {
 				tt.setup(t)
 			}
@@ -117,73 +202,25 @@ func TestRecordInstall(t *testing.T) {
 			tt.verify(t, lockPath)
 		})
 	}
+
+	// This case lives outside the table because it needs to read the lockfile
+	// between two RecordInstall calls to capture the first InstalledAt value.
+	t.Run("update preserves InstalledAt and updates treeSHA", func(t *testing.T) {
+		lockPath := setupTestHome(t)
+
+		require.NoError(t, RecordInstall("code-review", "monalisa", "octocat-skills", "skills/code-review/SKILL.md", "old-sha", ""))
+		firstInstalledAt := readTestLockfile(t, lockPath).Skills["code-review"].InstalledAt
+
+		require.NoError(t, RecordInstall("code-review", "monalisa", "octocat-skills", "skills/code-review/SKILL.md", "new-sha", ""))
+		entry := readTestLockfile(t, lockPath).Skills["code-review"]
+
+		assert.Equal(t, "new-sha", entry.SkillFolderHash, "treeSHA should be updated")
+		assert.Equal(t, firstInstalledAt, entry.InstalledAt, "InstalledAt should be preserved from first install")
+	})
 }
 
-func TestRead(t *testing.T) {
-	tests := []struct {
-		name      string
-		setup     func(t *testing.T, lockPath string)
-		wantSkill bool
-	}{
-		{
-			name:  "missing file returns fresh state",
-			setup: func(t *testing.T, lockPath string) {},
-		},
-		{
-			name: "corrupt JSON returns fresh state",
-			setup: func(t *testing.T, lockPath string) {
-				t.Helper()
-				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
-				require.NoError(t, os.WriteFile(lockPath, []byte("{invalid json"), 0o644))
-			},
-		},
-		{
-			name: "wrong version returns fresh state",
-			setup: func(t *testing.T, lockPath string) {
-				t.Helper()
-				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
-				data, _ := json.Marshal(file{Version: 999, Skills: map[string]entry{"x": {}}})
-				require.NoError(t, os.WriteFile(lockPath, data, 0o644))
-			},
-		},
-		{
-			name: "valid lockfile",
-			setup: func(t *testing.T, lockPath string) {
-				t.Helper()
-				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
-				f := &file{
-					Version: lockVersion,
-					Skills: map[string]entry{
-						"code-review": {Source: "monalisa/octocat-skills", SourceType: "github"},
-					},
-				}
-				data, err := json.MarshalIndent(f, "", "  ")
-				require.NoError(t, err)
-				require.NoError(t, os.WriteFile(lockPath, data, 0o644))
-			},
-			wantSkill: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lockPath := setupHome(t)
-			tt.setup(t, lockPath)
-
-			loaded, err := read()
-			require.NoError(t, err)
-			assert.Equal(t, lockVersion, loaded.Version)
-
-			if tt.wantSkill {
-				assert.Contains(t, loaded.Skills, "code-review")
-			} else {
-				assert.Empty(t, loaded.Skills)
-			}
-		})
-	}
-}
-
-// readLockfile is a test helper that reads and parses the lockfile from disk.
-func readLockfile(t *testing.T, path string) *file {
+// readTestLockfile is a test helper that reads and parses the lockfile from disk.
+func readTestLockfile(t *testing.T, path string) *file {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	require.NoError(t, err, "lockfile should exist at %s", path)

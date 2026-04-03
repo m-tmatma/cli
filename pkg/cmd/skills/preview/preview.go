@@ -199,16 +199,16 @@ func renderAllFiles(opts *previewOptions, cs *iostreams.ColorScheme, skill disco
 	totalBytes := 0
 	for _, f := range extraFiles {
 		if fetched >= maxFiles {
-			fmt.Fprintf(out, "\n%s\n", cs.Gray(fmt.Sprintf("(skipped remaining files — showing first %d)", maxFiles)))
+			fmt.Fprintf(out, "\n%s\n", cs.Muted(fmt.Sprintf("(skipped remaining files — showing first %d)", maxFiles)))
 			break
 		}
 		if totalBytes+f.Size > maxTotalBytes && fetched > 0 {
-			fmt.Fprintf(out, "\n%s\n", cs.Gray("(skipped remaining files — size limit reached)"))
+			fmt.Fprintf(out, "\n%s\n", cs.Muted("(skipped remaining files — size limit reached)"))
 			break
 		}
 		fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, f.SHA)
 		if fetchErr != nil {
-			fmt.Fprintf(out, "\n%s\n\n%s\n", cs.Bold("── "+f.Path+" ──"), cs.Gray("(could not fetch file)"))
+			fmt.Fprintf(out, "\n%s\n\n%s\n", cs.Bold("── "+f.Path+" ──"), cs.Muted("(could not fetch file)"))
 			continue
 		}
 		fetched++
@@ -373,10 +373,10 @@ func printTree(w io.Writer, cs *iostreams.ColorScheme, nodes []*treeNode, indent
 			childIndent = "    "
 		}
 		if node.isDir {
-			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Gray(connector), cs.Bold(node.name+"/"))
-			printTree(w, cs, node.children, indent+cs.Gray(childIndent))
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), cs.Bold(node.name+"/"))
+			printTree(w, cs, node.children, indent+cs.Muted(childIndent))
 		} else {
-			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Gray(connector), node.name)
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), node.name)
 		}
 	}
 }

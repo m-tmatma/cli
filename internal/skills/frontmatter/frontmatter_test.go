@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,8 +19,14 @@ func TestParse(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "valid frontmatter",
-			content:  "---\nname: test-skill\ndescription: A test skill\n---\n# Body\n",
+			name: "valid frontmatter",
+			content: heredoc.Doc(`
+				---
+				name: test-skill
+				description: A test skill
+				---
+				# Body
+			`),
 			wantName: "test-skill",
 			wantDesc: "A test skill",
 			wantBody: "# Body\n",
@@ -71,18 +78,24 @@ func TestInjectGitHubMetadata(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name:      "injects metadata without pin",
-			content:   "---\nname: my-skill\ndescription: desc\n---\n# Body\n",
-			owner:     "owner",
-			repo:      "repo",
+			name: "injects metadata without pin",
+			content: heredoc.Doc(`
+				---
+				name: my-skill
+				description: desc
+				---
+				# Body
+			`),
+			owner:     "monalisa",
+			repo:      "octocat-skills",
 			ref:       "v1.0.0",
 			sha:       "abc123",
 			treeSHA:   "tree456",
 			pinnedRef: "",
 			skillPath: "skills/my-skill",
 			wantContains: []string{
-				"github-owner: owner",
-				"github-repo: repo",
+				"github-owner: monalisa",
+				"github-repo: octocat-skills",
 				"github-ref: v1.0.0",
 				"github-sha: abc123",
 				"github-tree-sha: tree456",
@@ -94,10 +107,15 @@ func TestInjectGitHubMetadata(t *testing.T) {
 			},
 		},
 		{
-			name:      "injects pinned ref",
-			content:   "---\nname: my-skill\n---\n# Body\n",
-			owner:     "owner",
-			repo:      "repo",
+			name: "injects pinned ref",
+			content: heredoc.Doc(`
+				---
+				name: my-skill
+				---
+				# Body
+			`),
+			owner:     "monalisa",
+			repo:      "octocat-skills",
 			ref:       "v1.0.0",
 			sha:       "abc",
 			treeSHA:   "tree",
@@ -105,6 +123,22 @@ func TestInjectGitHubMetadata(t *testing.T) {
 			skillPath: "skills/my-skill",
 			wantContains: []string{
 				"github-pinned: v1.0.0",
+			},
+		},
+		{
+			name:      "injects metadata into content with no frontmatter",
+			content:   "# Body only\n",
+			owner:     "monalisa",
+			repo:      "octocat-skills",
+			ref:       "v1.0.0",
+			sha:       "abc123",
+			treeSHA:   "tree456",
+			pinnedRef: "",
+			skillPath: "skills/my-skill",
+			wantContains: []string{
+				"github-owner: monalisa",
+				"github-repo: octocat-skills",
+				"# Body only",
 			},
 		},
 	}
@@ -124,13 +158,49 @@ func TestInjectGitHubMetadata(t *testing.T) {
 }
 
 func TestInjectLocalMetadata(t *testing.T) {
-	content := "---\nname: my-skill\nmetadata:\n    github-owner: old\n    github-repo: old\n---\n# Body\n"
-	got, err := InjectLocalMetadata(content, "/home/user/skills/my-skill")
-	require.NoError(t, err)
-
-	assert.Contains(t, got, "local-path: /home/user/skills/my-skill")
-	assert.NotContains(t, got, "github-owner")
-	assert.NotContains(t, got, "github-repo")
+	tests := []struct {
+		name           string
+		content        string
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "strips all github keys and injects local-path",
+			content: heredoc.Doc(`
+				---
+				name: my-skill
+				metadata:
+				    github-owner: old
+				    github-repo: old
+				    github-ref: v1.0.0
+				    github-sha: abc123
+				    github-tree-sha: tree456
+				    github-pinned: v1.0.0
+				    github-path: skills/my-skill
+				---
+				# Body
+			`),
+			wantContains:   []string{"local-path: /home/monalisa/skills/my-skill"},
+			wantNotContain: []string{"github-owner", "github-repo", "github-ref", "github-sha", "github-tree-sha", "github-pinned", "github-path"},
+		},
+		{
+			name:         "injects into content with no existing metadata",
+			content:      "# Body only\n",
+			wantContains: []string{"local-path: /home/monalisa/skills/my-skill"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := InjectLocalMetadata(tt.content, "/home/monalisa/skills/my-skill")
+			require.NoError(t, err)
+			for _, s := range tt.wantContains {
+				assert.Contains(t, got, s)
+			}
+			for _, s := range tt.wantNotContain {
+				assert.NotContains(t, got, s)
+			}
+		})
+	}
 }
 
 func TestSerialize(t *testing.T) {
@@ -157,6 +227,12 @@ func TestSerialize(t *testing.T) {
 			frontmatter: map[string]interface{}{"name": "test"},
 			body:        "",
 			wantSuffix:  "---\n",
+		},
+		{
+			name:        "body without trailing newline gets one added",
+			frontmatter: map[string]interface{}{"name": "test"},
+			body:        "# No trailing newline",
+			wantSuffix:  "# No trailing newline\n",
 		},
 	}
 

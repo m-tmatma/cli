@@ -70,6 +70,20 @@ func TestInstallDir(t *testing.T) {
 			homeDir: "/home/monalisa",
 			wantErr: true,
 		},
+		{
+			name:    "user scope without home dir",
+			scope:   ScopeUser,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "",
+			wantErr: true,
+		},
+		{
+			name:    "invalid scope",
+			scope:   "bogus",
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -95,6 +109,7 @@ func TestRepoNameFromRemote(t *testing.T) {
 		{"git@github.com:monalisa/octocat-skills", "monalisa/octocat-skills"},
 		{"ssh://git@github.com/monalisa/octocat-skills.git", "monalisa/octocat-skills"},
 		{"ssh://git@github.com/monalisa/octocat-skills", "monalisa/octocat-skills"},
+		{"not-a-url", ""},
 		{"", ""},
 	}
 	for _, tt := range tests {

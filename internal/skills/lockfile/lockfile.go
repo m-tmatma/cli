@@ -131,6 +131,11 @@ func newFile() *file {
 	}
 }
 
+var (
+	lockRetries       = 30
+	lockRetryInterval = 100 * time.Millisecond
+)
+
 // acquireLock creates an exclusive lock file to serialize concurrent access.
 // Returns an unlock function. If locking fails after retries, it proceeds
 // unlocked rather than blocking the user indefinitely.
@@ -146,7 +151,7 @@ func acquireLock() (unlock func()) {
 		return func() {}
 	}
 
-	for i := 0; i < 30; i++ {
+	for range lockRetries {
 		f, createErr := os.OpenFile(lkPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 		if createErr == nil {
 			f.Close()
@@ -162,7 +167,7 @@ func acquireLock() (unlock func()) {
 			os.Remove(lkPath)
 			continue
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(lockRetryInterval)
 	}
 
 	// Best-effort: proceed without lock.

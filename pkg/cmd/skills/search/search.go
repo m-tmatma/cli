@@ -365,18 +365,32 @@ func truncateForProcessing(skills []skillResult, page, limit int) []skillResult 
 }
 
 // enrichSkills fetches descriptions and star counts concurrently.
+// Each function collects results into a map; merges happen after both complete
+// to avoid concurrent writes to the shared skills slice.
 func enrichSkills(client *api.Client, host string, skills []skillResult) {
+	var descMap map[int]string
+	var starsMap map[int]int
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		fetchDescriptions(client, host, skills)
+		descMap = fetchDescriptions(client, host, skills)
 	}()
 	go func() {
 		defer wg.Done()
-		fetchRepoStars(client, host, skills)
+		starsMap = fetchRepoStars(client, host, skills)
 	}()
 	wg.Wait()
+
+	for i := range skills {
+		if desc, ok := descMap[i]; ok {
+			skills[i].Description = desc
+		}
+		if stars, ok := starsMap[i]; ok {
+			skills[i].Stars = stars
+		}
+	}
 }
 
 // paginate slices results to the requested page window.
@@ -423,7 +437,7 @@ func renderResults(opts *searchOptions, skills []skillResult, totalPages int) er
 	cs := opts.IO.ColorScheme()
 	header := fmt.Sprintf("\n%s Showing %s matching %q",
 		cs.SuccessIcon(),
-		pluralize(len(skills), "skill"),
+		text.Pluralize(len(skills), "skill"),
 		opts.Query,
 	)
 	if totalPages > 1 {
@@ -498,14 +512,14 @@ func promptInstall(opts *searchOptions, skills []skillResult) error {
 	for i, s := range skills {
 		starStr := ""
 		if s.Stars > 0 {
-			starStr = "  " + cs.Gray("★ "+formatStars(s.Stars))
+			starStr = "  " + cs.Muted("★ "+formatStars(s.Stars))
 		}
 		descStr := ""
 		if s.Description != "" {
-			desc := collapseWhitespace(s.Description)
-			descStr = "\n       " + cs.Gray(text.Truncate(descWidth, desc))
+			desc := strings.Join(strings.Fields(s.Description), " ")
+			descStr = "\n       " + cs.Muted(text.Truncate(descWidth, desc))
 		}
-		options[i] = s.SkillName + "  " + cs.Gray(s.Repo) + starStr + descStr
+		options[i] = s.SkillName + "  " + cs.Muted(s.Repo) + starStr + descStr
 	}
 
 	indices, err := opts.Prompter.MultiSelect(
@@ -564,7 +578,7 @@ func promptInstall(opts *searchOptions, skills []skillResult) error {
 //   - Exact skill name match (10 000 points)
 //   - Partial skill name match (1 000 points)
 //   - Description contains query (100 points)
-//   - Repository stars (logarithmic bonus, up to ~700 points)
+//   - Repository stars (sqrt bonus, ~2 400 for 6k stars)
 func relevanceScore(s skillResult, query string) int {
 	term := strings.ToLower(query)
 	termHyphen := strings.ReplaceAll(term, " ", "-")
@@ -574,7 +588,7 @@ func relevanceScore(s skillResult, query string) int {
 	// use hyphens as word separators (e.g. query "mcp apps" → "mcp-apps").
 	skillLower := strings.ToLower(s.SkillName)
 	if skillLower == term || skillLower == termHyphen {
-		score += 10_000
+		score += 3_000
 	} else if strings.Contains(skillLower, term) || strings.Contains(skillLower, termHyphen) {
 		score += 1_000
 	}
@@ -584,10 +598,10 @@ func relevanceScore(s skillResult, query string) int {
 		score += 100
 	}
 
-	// Stars bonus: use log₁₀ scaling so popular repos rank higher without
-	// completely drowning out less-popular but more relevant results.
+	// Stars bonus: use √n scaling so popular repos rank meaningfully higher
+	// without completely drowning out less-popular but more relevant results.
 	if s.Stars > 0 {
-		score += int(math.Log10(float64(s.Stars)) * 150)
+		score += int(math.Sqrt(float64(s.Stars)) * 30)
 	}
 
 	return score
@@ -763,11 +777,13 @@ func splitRepo(fullName string) (string, string) {
 
 // fetchDescriptions fetches SKILL.md frontmatter descriptions concurrently
 // for all search results. Each result may come from a different repo.
-func fetchDescriptions(client *api.Client, host string, skills []skillResult) {
+func fetchDescriptions(client *api.Client, host string, skills []skillResult) map[int]string {
 	const maxWorkers = 10
 	sem := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+
+	descs := make(map[int]string)
 
 	for i := range skills {
 		if skills[i].BlobSHA == "" {
@@ -789,11 +805,13 @@ func fetchDescriptions(client *api.Client, host string, skills []skillResult) {
 			}
 
 			mu.Lock()
-			skills[idx].Description = result.Metadata.Description
+			descs[idx] = result.Metadata.Description
 			mu.Unlock()
 		}(i)
 	}
 	wg.Wait()
+
+	return descs
 }
 
 // extractSkillName derives the skill name from a SKILL.md path, but only if
@@ -803,21 +821,8 @@ func extractSkillName(filePath string) string {
 	return discovery.MatchesSkillPath(filePath)
 }
 
-func pluralize(count int, singular string) string {
-	if count == 1 {
-		return fmt.Sprintf("%d %s", count, singular)
-	}
-	return fmt.Sprintf("%d %ss", count, singular)
-}
-
-// collapseWhitespace replaces runs of whitespace (newlines, tabs, etc.)
-// with a single space.
-func collapseWhitespace(s string) string {
-	fields := strings.Fields(s)
-	return strings.Join(fields, " ")
-}
-
 // formatStars formats a star count for display (e.g. 1700 → "1.7k").
+// TODO kw: Could be swaped for go-humanize.
 func formatStars(n int) string {
 	if n >= 1000 {
 		return fmt.Sprintf("%.1fk", float64(n)/1000)
@@ -832,7 +837,7 @@ type repoInfo struct {
 
 // fetchRepoStars fetches stargazer counts for each unique repository in
 // the result set, using bounded concurrency.
-func fetchRepoStars(client *api.Client, host string, skills []skillResult) {
+func fetchRepoStars(client *api.Client, host string, skills []skillResult) map[int]int {
 	const maxWorkers = 10
 	sem := make(chan struct{}, maxWorkers)
 	var wg sync.WaitGroup
@@ -865,9 +870,11 @@ func fetchRepoStars(client *api.Client, host string, skills []skillResult) {
 	}
 	wg.Wait()
 
-	for i := range skills {
-		if stars, ok := repoStars[skills[i].Repo]; ok {
-			skills[i].Stars = stars
+	result := make(map[int]int, len(skills))
+	for i, s := range skills {
+		if stars, ok := repoStars[s.Repo]; ok {
+			result[i] = stars
 		}
 	}
+	return result
 }

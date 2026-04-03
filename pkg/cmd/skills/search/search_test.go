@@ -1,7 +1,9 @@
 package search
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
@@ -88,19 +90,15 @@ func TestNewCmdSearch(t *testing.T) {
 
 			argv := []string{}
 			if tt.args != "" {
-				for _, part := range splitOnSpaces(tt.args) {
-					if part != "" {
-						argv = append(argv, part)
-					}
-				}
+				argv = strings.Fields(tt.args)
 			}
 			cmd.SetArgs(argv)
-			cmd.SetOut(&discardWriter{})
-			cmd.SetErr(&discardWriter{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err := cmd.ExecuteC()
 			if tt.wantErr != "" {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
@@ -252,6 +250,78 @@ func TestSearchRun(t *testing.T) {
 			},
 			wantErr: rateLimitErrorMessage,
 		},
+		{
+			name: "HTTP 429 returns rate limit error",
+			tty:  false,
+			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			httpStubs: func(reg *httpmock.Registry) {
+				for range 3 {
+					reg.Register(
+						httpmock.REST("GET", "search/code"),
+						httpmock.StatusStringResponse(429, `{"message": "Too Many Requests"}`),
+					)
+				}
+			},
+			wantErr: rateLimitErrorMessage,
+		},
+		{
+			name: "HTTP 403 with Retry-After returns rate limit error",
+			tty:  false,
+			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			httpStubs: func(reg *httpmock.Registry) {
+				for range 3 {
+					reg.Register(
+						httpmock.REST("GET", "search/code"),
+						httpmock.WithHeader(
+							httpmock.StatusJSONResponse(403, map[string]string{"message": "secondary rate limit"}),
+							"Retry-After", "60",
+						),
+					)
+				}
+			},
+			wantErr: rateLimitErrorMessage,
+		},
+		{
+			name: "no results with owner scope",
+			tty:  true,
+			opts: &searchOptions{Query: "nonexistent", Owner: "monalisa", Page: 1, Limit: defaultLimit},
+			httpStubs: func(reg *httpmock.Registry) {
+				// With --owner set, only path + primary searches fire (no owner search).
+				for range 2 {
+					reg.Register(
+						httpmock.REST("GET", "search/code"),
+						httpmock.StringResponse(emptyCodeResponse),
+					)
+				}
+			},
+			wantErr: `no skills found matching "nonexistent" from owner "monalisa"`,
+		},
+		{
+			name: "enriches results with blob descriptions",
+			tty:  false,
+			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			httpStubs: func(reg *httpmock.Registry) {
+				codeResponse := `{"total_count": 1, "incomplete_results": false, "items": [
+					{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "sha": "abc123",
+					 "repository": {"full_name": "org/repo"}}
+				]}`
+				stubKeywordSearch(reg, codeResponse)
+				// Blob fetch for description enrichment
+				reg.Register(
+					httpmock.REST("GET", "repos/org/repo/git/blobs/abc123"),
+					httpmock.JSONResponse(map[string]string{
+						"content":  "LS0tCmRlc2NyaXB0aW9uOiBBdXRvbWF0ZXMgVGVycmFmb3JtIGluZnJhc3RydWN0dXJlCi0tLQojIFRlcnJhZm9ybSBTa2lsbAo=",
+						"encoding": "base64",
+					}),
+				)
+				// Repo stars fetch
+				reg.Register(
+					httpmock.REST("GET", "repos/org/repo"),
+					httpmock.JSONResponse(map[string]int{"stargazers_count": 42}),
+				)
+			},
+			wantStdout: "org/repo\tterraform\tAutomates Terraform infrastructure\t42\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -395,29 +465,4 @@ func TestFormatStars(t *testing.T) {
 	assert.Equal(t, "1.0k", formatStars(1000))
 	assert.Equal(t, "1.7k", formatStars(1700))
 	assert.Equal(t, "12.5k", formatStars(12500))
-}
-
-func splitOnSpaces(s string) []string {
-	var parts []string
-	current := ""
-	for _, c := range s {
-		if c == ' ' {
-			if current != "" {
-				parts = append(parts, current)
-				current = ""
-			}
-		} else {
-			current += string(c)
-		}
-	}
-	if current != "" {
-		parts = append(parts, current)
-	}
-	return parts
-}
-
-type discardWriter struct{}
-
-func (d *discardWriter) Write(p []byte) (n int, err error) {
-	return len(p), nil
 }

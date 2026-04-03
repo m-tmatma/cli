@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/safepaths"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
@@ -294,4 +296,30 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 	}
 
 	return nil
+}
+
+// ResolveGitRoot returns the git repository root using the provided client,
+// falling back to the current working directory on error.
+func ResolveGitRoot(gc *git.Client) string {
+	if gc != nil && gc.RepoDir != "" {
+		return gc.RepoDir
+	}
+	if gc != nil {
+		if root, err := gc.ToplevelDir(context.Background()); err == nil {
+			return root
+		}
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		return cwd
+	}
+	return ""
+}
+
+// ResolveHomeDir returns the user's home directory, or "" on error.
+func ResolveHomeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
 }

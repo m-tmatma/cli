@@ -15,7 +15,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
-	giturl "github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -40,10 +39,9 @@ type publishOptions struct {
 	Dir string // directory to validate (default: cwd)
 
 	// Flags
-	Fix     bool   // --fix flag: auto-fix issues where possible
-	Plugins bool   // --plugins flag: generate .claude-plugin/ manifest
-	DryRun  bool   // --dry-run flag: validate only, don't publish
-	Tag     string // --tag flag: release tag to create
+	Fix    bool   // --fix flag: auto-fix issues where possible
+	DryRun bool   // --dry-run flag: validate only, don't publish
+	Tag    string // --tag flag: release tag to create
 
 	// Testing overrides
 	client *api.Client // injectable for tests; nil means use factory HttpClient
@@ -126,8 +124,6 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.
 			Use --dry-run to validate without publishing.
 			Use --tag to publish non-interactively with a specific tag.
 			Use --fix to automatically strip install metadata from committed files.
-			Use --plugins to generate a .claude-plugin/plugin.json manifest for
-			Claude Code plugin discovery.
 		`),
 		Example: heredoc.Doc(`
 			# Validate and publish interactively
@@ -141,9 +137,6 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.
 
 			# Validate and strip install metadata
 			$ gh skills publish --fix
-
-			# Generate Claude Code plugin manifest
-			$ gh skills publish --plugins
 		`),
 		Aliases: []string{"validate"},
 		Args:    cobra.MaximumNArgs(1),
@@ -159,7 +152,6 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.
 	}
 
 	cmd.Flags().BoolVar(&opts.Fix, "fix", false, "Auto-fix issues where possible (e.g. strip install metadata)")
-	cmd.Flags().BoolVar(&opts.Plugins, "plugins", false, "Generate .claude-plugin/ manifest for Claude Code plugin discovery")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Validate without publishing")
 	cmd.Flags().StringVar(&opts.Tag, "tag", "", "Version tag for the release (e.g. v1.0.0)")
 
@@ -181,7 +173,6 @@ func publishRun(opts *publishOptions) error {
 		return fmt.Errorf("could not resolve path: %w", err)
 	}
 
-	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
 	// Use injected client or create one from the factory HttpClient
@@ -405,19 +396,6 @@ func publishRun(opts *publishOptions) error {
 		renderDiagnosticsPlain(opts, diagnostics, errors, warnings)
 	}
 
-	// Generate Claude Code plugin manifest if requested
-	if opts.Plugins {
-		pluginDiags := generateClaudePlugin(dir, skillDirs, owner, repo)
-		for _, d := range pluginDiags {
-			switch d.severity {
-			case "error":
-				fmt.Fprintf(opts.IO.ErrOut, "%s %s\n", cs.FailureIcon(), d.message)
-			default:
-				fmt.Fprintf(opts.IO.Out, "%s %s\n", cs.SuccessIcon(), d.message)
-			}
-		}
-	}
-
 	if errors > 0 {
 		return fmt.Errorf("validation failed with %d error(s)", errors)
 	}
@@ -577,9 +555,9 @@ func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, re
 	// 4. Inform if not on default branch
 	var currentBranch string
 	if opts.GitClient != nil {
-		bc := *opts.GitClient
-		bc.RepoDir = dir
-		if b, err := bc.CurrentBranch(context.Background()); err == nil {
+		branchGitClient := opts.GitClient.Copy()
+		branchGitClient.RepoDir = dir
+		if b, err := branchGitClient.CurrentBranch(context.Background()); err == nil {
 			currentBranch = b
 		}
 	}
@@ -597,7 +575,7 @@ func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, re
 		}
 		if !confirmed {
 			fmt.Fprintf(opts.IO.ErrOut, "Publish cancelled.\n")
-			return nil
+			return cmdutil.CancelError
 		}
 	}
 
@@ -825,9 +803,9 @@ func checkInstalledSkillDirs(gitClient *git.Client, repoDir string) []publishDia
 		}
 
 		if gitClient != nil {
-			ic := *gitClient
-			ic.RepoDir = repoDir
-			if ic.IsIgnored(context.Background(), relPath) {
+			ignoreGitClient := gitClient.Copy()
+			ignoreGitClient.RepoDir = repoDir
+			if ignoreGitClient.IsIgnored(context.Background(), relPath) {
 				continue
 			}
 		}
@@ -899,7 +877,7 @@ func detectGitHubRemote(gitClient *git.Client) (owner, repo string) {
 // parseGitHubURL extracts owner/repo from a GitHub remote URL.
 // Only GitHub.com URLs are recognized.
 func parseGitHubURL(rawURL string) (owner, repo string) {
-	u, err := giturl.ParseURL(rawURL)
+	u, err := git.ParseURL(rawURL)
 	if err != nil {
 		return "", ""
 	}
@@ -921,16 +899,16 @@ func detectMissingRepoDiagnostic(gitClient *git.Client, dir string) []publishDia
 		return nil
 	}
 
-	dc := *gitClient
-	dc.RepoDir = dir
-	if _, err := dc.GitDir(context.Background()); err != nil {
+	dirGitClient := gitClient.Copy()
+	dirGitClient.RepoDir = dir
+	if _, err := dirGitClient.GitDir(context.Background()); err != nil {
 		return []publishDiagnostic{{
 			severity: "warning",
 			message:  "not a git repository — initialize with: git init && gh repo create",
 		}}
 	}
 
-	remotes, err := dc.Remotes(context.Background())
+	remotes, err := dirGitClient.Remotes(context.Background())
 	if err != nil || len(remotes) == 0 {
 		return []publishDiagnostic{{
 			severity: "warning",
@@ -940,7 +918,7 @@ func detectMissingRepoDiagnostic(gitClient *git.Client, dir string) []publishDia
 
 	var urls []string
 	for _, r := range remotes {
-		if url, err := dc.RemoteURL(context.Background(), r.Name); err == nil {
+		if url, err := dirGitClient.RemoteURL(context.Background(), r.Name); err == nil {
 			urls = append(urls, url)
 		}
 	}
@@ -1061,186 +1039,4 @@ func stripGitHubMetadata(content string) (string, error) {
 	}
 
 	return frontmatter.Serialize(result.RawYAML, result.Body)
-}
-
-// claudePluginJSON is the .claude-plugin/plugin.json structure.
-type claudePluginJSON struct {
-	Name        string        `json:"name"`
-	Description string        `json:"description,omitempty"`
-	Version     string        `json:"version,omitempty"`
-	Author      *claudeAuthor `json:"author,omitempty"`
-	Homepage    string        `json:"homepage,omitempty"`
-	Repository  string        `json:"repository,omitempty"`
-	License     string        `json:"license,omitempty"`
-	Keywords    []string      `json:"keywords,omitempty"`
-}
-
-type claudeAuthor struct {
-	Name string `json:"name"`
-}
-
-// claudeMarketplaceJSON is the .claude-plugin/marketplace.json structure.
-type claudeMarketplaceJSON struct {
-	Name    string                    `json:"name"`
-	Owner   claudeAuthor              `json:"owner"`
-	Plugins []claudeMarketplacePlugin `json:"plugins"`
-}
-
-type claudeMarketplacePlugin struct {
-	Name        string `json:"name"`
-	Source      string `json:"source"`
-	Description string `json:"description,omitempty"`
-}
-
-// generateClaudePlugin creates .claude-plugin/plugin.json (and optionally
-// marketplace.json for multi-skill repos).
-func generateClaudePlugin(dir string, skillDirs []string, owner, repo string) []publishDiagnostic {
-	var diags []publishDiagnostic
-
-	pluginDir := filepath.Join(dir, ".claude-plugin")
-	pluginPath := filepath.Join(pluginDir, "plugin.json")
-
-	// Don't overwrite existing plugin.json
-	if _, err := os.Stat(pluginPath); err == nil {
-		diags = append(diags, publishDiagnostic{
-			severity: "info",
-			message:  ".claude-plugin/plugin.json already exists (skipped)",
-		})
-		return diags
-	}
-
-	pluginName := filepath.Base(dir)
-	if repo != "" {
-		pluginName = repo
-	}
-
-	description := buildPluginDescription(dir, skillDirs)
-
-	plugin := claudePluginJSON{
-		Name:        pluginName,
-		Description: description,
-		Version:     "1.0.0",
-		Keywords:    []string{"agent-skills"},
-	}
-
-	if owner != "" && repo != "" {
-		plugin.Repository = fmt.Sprintf("https://github.com/%s/%s", owner, repo)
-		plugin.Homepage = fmt.Sprintf("https://github.com/%s/%s", owner, repo)
-		plugin.Author = &claudeAuthor{Name: owner}
-	}
-
-	// Collect license from any skill
-	for _, skillName := range skillDirs {
-		skillPath := filepath.Join(dir, "skills", skillName, "SKILL.md")
-		content, err := os.ReadFile(skillPath)
-		if err != nil {
-			continue
-		}
-		result, err := frontmatter.Parse(string(content))
-		if err != nil {
-			continue
-		}
-		if result.Metadata.License != "" {
-			plugin.License = result.Metadata.License
-			break
-		}
-	}
-
-	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
-		diags = append(diags, publishDiagnostic{
-			severity: "error",
-			message:  fmt.Sprintf("could not create .claude-plugin/: %v", err),
-		})
-		return diags
-	}
-
-	data, err := json.MarshalIndent(plugin, "", "  ")
-	if err != nil {
-		diags = append(diags, publishDiagnostic{
-			severity: "error",
-			message:  fmt.Sprintf("could not serialize plugin.json: %v", err),
-		})
-		return diags
-	}
-
-	if err := os.WriteFile(pluginPath, append(data, '\n'), 0o644); err != nil {
-		diags = append(diags, publishDiagnostic{
-			severity: "error",
-			message:  fmt.Sprintf("could not write plugin.json: %v", err),
-		})
-		return diags
-	}
-
-	diags = append(diags, publishDiagnostic{
-		severity: "info",
-		message:  fmt.Sprintf("generated .claude-plugin/plugin.json for %q with %d skill(s)", pluginName, len(skillDirs)),
-	})
-
-	// Generate marketplace.json for multi-skill repos with a GitHub remote
-	if len(skillDirs) > 1 && owner != "" && repo != "" {
-		marketplacePath := filepath.Join(pluginDir, "marketplace.json")
-		if _, err := os.Stat(marketplacePath); err != nil {
-			mDiags := generateMarketplace(marketplacePath, pluginName, owner, skillDirs, dir)
-			diags = append(diags, mDiags...)
-		}
-	}
-
-	return diags
-}
-
-// generateMarketplace creates a marketplace.json for plugin marketplace discovery.
-func generateMarketplace(path, pluginName, owner string, skillDirs []string, dir string) []publishDiagnostic {
-	desc := buildPluginDescription(dir, skillDirs)
-	plugins := []claudeMarketplacePlugin{{
-		Name:        pluginName,
-		Source:      ".",
-		Description: desc,
-	}}
-
-	marketplace := claudeMarketplaceJSON{
-		Name:    pluginName,
-		Owner:   claudeAuthor{Name: owner},
-		Plugins: plugins,
-	}
-
-	data, err := json.MarshalIndent(marketplace, "", "  ")
-	if err != nil {
-		return []publishDiagnostic{{
-			severity: "error",
-			message:  fmt.Sprintf("could not serialize marketplace.json: %v", err),
-		}}
-	}
-
-	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
-		return []publishDiagnostic{{
-			severity: "error",
-			message:  fmt.Sprintf("could not write marketplace.json: %v", err),
-		}}
-	}
-
-	return []publishDiagnostic{{
-		severity: "info",
-		message:  "generated .claude-plugin/marketplace.json for plugin marketplace discovery",
-	}}
-}
-
-// buildPluginDescription creates a description from skill names and descriptions.
-func buildPluginDescription(dir string, skillDirs []string) string {
-	if len(skillDirs) == 1 {
-		skillPath := filepath.Join(dir, "skills", skillDirs[0], "SKILL.md")
-		if content, err := os.ReadFile(skillPath); err == nil {
-			if result, err := frontmatter.Parse(string(content)); err == nil && result.Metadata.Description != "" {
-				return result.Metadata.Description
-			}
-		}
-	}
-
-	var names []string
-	for _, name := range skillDirs {
-		names = append(names, name)
-	}
-	if len(names) <= 5 {
-		return fmt.Sprintf("Agent skills: %s", strings.Join(names, ", "))
-	}
-	return fmt.Sprintf("Agent skills collection with %d skills", len(names))
 }

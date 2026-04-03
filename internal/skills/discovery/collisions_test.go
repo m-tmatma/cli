@@ -21,13 +21,13 @@ func TestFindNameCollisions(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "single collision",
+			name: "single collision with different conventions",
 			skills: []Skill{
 				{Name: "pr-summary", Path: "skills/pr-summary"},
-				{Name: "pr-summary", Path: "skills/monalisa/pr-summary"},
+				{Name: "pr-summary", Path: "plugins/hubot/skills/pr-summary", Convention: "plugins"},
 			},
 			want: []NameCollision{
-				{Name: "pr-summary", DisplayNames: []string{"pr-summary", "pr-summary"}},
+				{Name: "pr-summary", DisplayNames: []string{"pr-summary", "[plugins] pr-summary"}},
 			},
 		},
 		{
@@ -53,10 +53,28 @@ func TestFindNameCollisions(t *testing.T) {
 }
 
 func TestFormatCollisions(t *testing.T) {
-	collisions := []NameCollision{
-		{Name: "pr-summary", DisplayNames: []string{"skills/pr-summary", "plugins/hubot/pr-summary"}},
-		{Name: "code-review", DisplayNames: []string{"skills/code-review", "skills/monalisa/code-review"}},
+	tests := []struct {
+		name       string
+		collisions []NameCollision
+		want       string
+	}{
+		{
+			name: "formats multiple collisions",
+			collisions: []NameCollision{
+				{Name: "pr-summary", DisplayNames: []string{"skills/pr-summary", "plugins/hubot/pr-summary"}},
+				{Name: "code-review", DisplayNames: []string{"skills/code-review", "skills/monalisa/code-review"}},
+			},
+			want: "pr-summary: skills/pr-summary, plugins/hubot/pr-summary\n  code-review: skills/code-review, skills/monalisa/code-review",
+		},
+		{
+			name:       "nil input returns empty string",
+			collisions: nil,
+			want:       "",
+		},
 	}
-	got := FormatCollisions(collisions)
-	assert.Equal(t, "pr-summary: skills/pr-summary, plugins/hubot/pr-summary\n  code-review: skills/code-review, skills/monalisa/code-review", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, FormatCollisions(tt.collisions))
+		})
+	}
 }

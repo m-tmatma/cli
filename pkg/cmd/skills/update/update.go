@@ -1,7 +1,6 @@
 package update
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -38,6 +37,7 @@ type updateOptions struct {
 	All    bool   // --all flag (update without prompting)
 	Force  bool   // --force flag (re-download even if SHAs match)
 	DryRun bool   // --dry-run flag (report only, no changes)
+	Unpin  bool   // --unpin flag (clear pinned ref and include in update)
 	Dir    string // --dir flag (scan a custom directory)
 }
 
@@ -86,7 +86,8 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Co
 			checks only those specific skills.
 
 			Pinned skills (installed with --pin) are skipped with a notice.
-			Use "gh skills install --pin <new-ref>" to change the pinned version.
+			Use --unpin to clear the pinned version and include those skills
+			in the update.
 
 			Skills without GitHub metadata (e.g. installed manually or by another
 			tool) are prompted for their source repository in interactive mode.
@@ -116,6 +117,9 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Co
 
 			# Check for updates without applying (read-only)
 			$ gh skills update --dry-run
+
+			# Unpin skills and update them to latest
+			$ gh skills update --unpin
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Skills = args
@@ -129,6 +133,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.All, "all", false, "Update all skills without prompting")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "Re-download even if already up to date")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Report available updates without modifying files")
+	cmd.Flags().BoolVar(&opts.Unpin, "unpin", false, "Clear pinned version and include pinned skills in update")
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Scan a custom directory for installed skills")
 
 	return cmd
@@ -150,8 +155,8 @@ func updateRun(opts *updateOptions) error {
 	}
 	hostname, _ := cfg.Authentication().DefaultHost()
 
-	gitRoot := resolveGitRoot(opts.GitClient)
-	homeDir := resolveHomeDir()
+	gitRoot := installer.ResolveGitRoot(opts.GitClient)
+	homeDir := installer.ResolveHomeDir()
 
 	// Scan for installed skills
 	var installed []installedSkill
@@ -162,7 +167,7 @@ func updateRun(opts *updateOptions) error {
 		}
 		installed = skills
 	} else {
-		installed = scanAllHosts(gitRoot, homeDir)
+		installed = scanAllAgents(gitRoot, homeDir)
 	}
 
 	if len(installed) == 0 {
@@ -238,7 +243,7 @@ func updateRun(opts *updateOptions) error {
 		if s.owner == "" || s.repo == "" {
 			continue
 		}
-		if s.pinned != "" {
+		if s.pinned != "" && !opts.Unpin {
 			pinned = append(pinned, s)
 			continue
 		}
@@ -315,7 +320,7 @@ func updateRun(opts *updateOptions) error {
 	}
 
 	for _, s := range pinned {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s is pinned to %s (skipped)\n", cs.Gray("⊘"), s.name, s.pinned)
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s is pinned to %s (skipped)\n", cs.Muted("⊘"), s.name, s.pinned)
 	}
 	for _, name := range noMeta {
 		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no GitHub metadata — reinstall to enable updates\n", cs.WarningIcon(), name)
@@ -339,7 +344,7 @@ func updateRun(opts *updateOptions) error {
 		} else {
 			fmt.Fprintf(opts.IO.Out, "  %s %s (%s/%s) %s → %s [%s]\n",
 				cs.Cyan("•"), u.local.name, u.local.owner, u.local.repo,
-				cs.Gray(git.ShortSHA(u.local.treeSHA)), git.ShortSHA(u.newSHA),
+				cs.Muted(git.ShortSHA(u.local.treeSHA)), git.ShortSHA(u.newSHA),
 				u.resolved.Ref)
 		}
 	}
@@ -359,7 +364,7 @@ func updateRun(opts *updateOptions) error {
 		}
 		if !confirmed {
 			fmt.Fprintf(opts.IO.ErrOut, "Update cancelled.\n")
-			return nil
+			return cmdutil.CancelError
 		}
 	}
 
@@ -409,9 +414,9 @@ func updateRun(opts *updateOptions) error {
 	return nil
 }
 
-// scanAllHosts walks every known host directory (project + user scope) and
+// scanAllAgents walks every registered agent's skill directory (project + user scope) and
 // collects installed skills. Skills are deduplicated by directory path.
-func scanAllHosts(gitRoot, homeDir string) []installedSkill {
+func scanAllAgents(gitRoot, homeDir string) []installedSkill {
 	seen := make(map[string]bool)
 	var all []installedSkill
 
@@ -532,29 +537,4 @@ func promptForSkillOrigin(p prompter.Prompter, skillName string) (owner, repo, r
 		return "", "", fmt.Sprintf("invalid repository %q: expected owner/repo", input), false, nil
 	}
 	return r.RepoOwner(), r.RepoName(), "", true, nil
-}
-
-func resolveGitRoot(gc *git.Client) string {
-	if gc == nil {
-		if cwd, err := os.Getwd(); err == nil {
-			return cwd
-		}
-		return ""
-	}
-	root, err := gc.ToplevelDir(context.Background())
-	if err != nil {
-		if cwd, err := os.Getwd(); err == nil {
-			return cwd
-		}
-		return ""
-	}
-	return root
-}
-
-func resolveHomeDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return home
 }

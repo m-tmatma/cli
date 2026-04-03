@@ -1,7 +1,6 @@
 package install
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -284,8 +283,8 @@ func installRun(opts *installOptions) error {
 		return err
 	}
 
-	gitRoot := resolveGitRoot(opts.GitClient)
-	homeDir := resolveHomeDir()
+	gitRoot := installer.ResolveGitRoot(opts.GitClient)
+	homeDir := installer.ResolveHomeDir()
 	source = ghrepo.FullName(opts.repo)
 
 	type hostPlan struct {
@@ -423,8 +422,8 @@ func runLocalInstall(opts *installOptions) error {
 		return err
 	}
 
-	gitRoot := resolveGitRoot(opts.GitClient)
-	homeDir := resolveHomeDir()
+	gitRoot := installer.ResolveGitRoot(opts.GitClient)
+	homeDir := installer.ResolveHomeDir()
 
 	type hostPlan struct {
 		host   *registry.AgentHost
@@ -570,7 +569,7 @@ func logConventions(io *iostreams.IOStreams, skills []discovery.Skill) {
 		fmt.Fprintf(io.ErrOut, "Note: found %d namespaced skill(s) in skills/{author}/ directories\n", n)
 	}
 	if n, ok := conventions["plugins"]; ok {
-		fmt.Fprintf(io.ErrOut, "Note: found %d skill(s) using the Claude Code plugins/ convention\n", n)
+		fmt.Fprintf(io.ErrOut, "Note: found %d skill(s) using the plugins/ convention\n", n)
 	}
 	if n, ok := conventions["root"]; ok {
 		fmt.Fprintf(io.ErrOut, "Note: found %d skill(s) at the repository root\n", n)
@@ -952,7 +951,7 @@ func printFileTree(w io.Writer, cs *iostreams.ColorScheme, dir string, skillName
 func printTreeDir(w io.Writer, cs *iostreams.ColorScheme, dir, indent string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		fmt.Fprintf(w, "%s%s\n", indent, cs.Gray("(could not read directory)"))
+		fmt.Fprintf(w, "%s%s\n", indent, cs.Muted("(could not read directory)"))
 		return
 	}
 	for i, entry := range entries {
@@ -965,10 +964,10 @@ func printTreeDir(w io.Writer, cs *iostreams.ColorScheme, dir, indent string) {
 		}
 		name := entry.Name()
 		if entry.IsDir() {
-			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Gray(connector), cs.Bold(name+"/"))
-			printTreeDir(w, cs, filepath.Join(dir, name), indent+cs.Gray(childIndent))
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), cs.Bold(name+"/"))
+			printTreeDir(w, cs, filepath.Join(dir, name), indent+cs.Muted(childIndent))
 		} else {
-			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Gray(connector), name)
+			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), name)
 		}
 	}
 }
@@ -989,29 +988,4 @@ func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo string, skillN
 		fmt.Fprintf(w, "    gh skills preview %s %s\n", repo, name)
 	}
 	fmt.Fprintln(w)
-}
-
-func resolveGitRoot(gc *git.Client) string {
-	if gc == nil {
-		if cwd, err := os.Getwd(); err == nil {
-			return cwd
-		}
-		return ""
-	}
-	root, err := gc.ToplevelDir(context.Background())
-	if err != nil {
-		if cwd, err := os.Getwd(); err == nil {
-			return cwd
-		}
-		return ""
-	}
-	return root
-}
-
-func resolveHomeDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return home
 }
