@@ -3,7 +3,7 @@
 ## Recommended _(Official)_
 
 > [!IMPORTANT]
-> All Linux packages and repository metadata are signed with the following PGP key fingerprints:
+> Our Linux packages and repository metadata are signed with the following PGP key fingerprints:
 > - `2C6106201985B60E6C7AC87323F3D4EA75716059`
 > - `7F38BBB59D064DBCB3D84D725612B36462313325`
 >
@@ -41,7 +41,7 @@ sudo apt install gh
 ```
 
 > [!TIP]
-> To verify the imported PGP keys, you can run this and match the listed fingerprints with those at the top of this document:
+> To verify downloaded PGP keys, you can run this and match the listed fingerprints with those at the top of this document:
 >
 > ```shell
 > gpg --show-keys /etc/apt/keyrings/githubcli-archive-keyring.gpg
