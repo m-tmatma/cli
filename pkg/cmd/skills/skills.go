@@ -10,12 +10,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmdSkills returns the top-level "skills" command.
+// NewCmdSkills returns the top-level "skill" command.
 func NewCmdSkills(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "skills <command>",
+		Use:     "skill <command>",
 		Short:   "Install and manage agent skills",
 		Long:    "Install and manage agent skills from GitHub repositories.",
+		Aliases: []string{"skills"},
 		GroupID: "core",
 	}
 

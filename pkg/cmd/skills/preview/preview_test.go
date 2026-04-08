@@ -25,6 +25,7 @@ func TestNewCmdPreview(t *testing.T) {
 		input         string
 		wantRepo      string
 		wantSkillName string
+		wantVersion   string
 		wantErr       bool
 	}{
 		{
@@ -32,6 +33,20 @@ func TestNewCmdPreview(t *testing.T) {
 			input:         "github/awesome-copilot my-skill",
 			wantRepo:      "github/awesome-copilot",
 			wantSkillName: "my-skill",
+		},
+		{
+			name:          "repo and skill with version",
+			input:         "github/awesome-copilot my-skill@v1.2.0",
+			wantRepo:      "github/awesome-copilot",
+			wantSkillName: "my-skill",
+			wantVersion:   "v1.2.0",
+		},
+		{
+			name:          "repo and skill with SHA",
+			input:         "github/awesome-copilot my-skill@abc123def456",
+			wantRepo:      "github/awesome-copilot",
+			wantSkillName: "my-skill",
+			wantVersion:   "abc123def456",
 		},
 		{
 			name:     "repo only",
@@ -78,6 +93,7 @@ func TestNewCmdPreview(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantRepo, gotOpts.RepoArg)
 			assert.Equal(t, tt.wantSkillName, gotOpts.SkillName)
+			assert.Equal(t, tt.wantVersion, gotOpts.Version)
 		})
 	}
 }
@@ -247,6 +263,55 @@ func TestPreviewRun(t *testing.T) {
 				)
 			},
 			wantErr: "must specify a skill name when not running interactively",
+		},
+		{
+			name: "preview with explicit version",
+			tty:  true,
+			opts: &previewOptions{
+				repo:      ghrepo.New("github", "awesome-copilot"),
+				SkillName: "my-skill",
+				Version:   "abc123def456",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// ResolveRef with explicit version tries branch first, then tag, then commit
+				reg.Register(
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/heads/abc123def456"),
+					httpmock.StatusStringResponse(404, "not found"),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/ref/tags/abc123def456"),
+					httpmock.StatusStringResponse(404, "not found"),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/github/awesome-copilot/commits/abc123def456"),
+					httpmock.StringResponse(`{"sha": "abc123def456789012345678901234567890abcd"}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/trees/abc123def456789012345678901234567890abcd"),
+					httpmock.StringResponse(`{
+						"sha": "abc123def456789012345678901234567890abcd",
+						"truncated": false,
+						"tree": [
+							{"path": "skills", "type": "tree", "sha": "tree1"},
+							{"path": "skills/my-skill", "type": "tree", "sha": "treeSHA"},
+							{"path": "skills/my-skill/SKILL.md", "type": "blob", "sha": "blob123"}
+						]
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/trees/treeSHA"),
+					httpmock.StringResponse(`{
+						"tree": [
+							{"path": "SKILL.md", "type": "blob", "sha": "blob123", "size": 50}
+						]
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "repos/github/awesome-copilot/git/blobs/blob123"),
+					httpmock.StringResponse(`{"sha": "blob123", "content": "`+encodedContent+`", "encoding": "base64"}`),
+				)
+			},
+			wantStdout: "My Skill",
 		},
 	}
 

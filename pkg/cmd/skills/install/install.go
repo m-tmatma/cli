@@ -54,7 +54,6 @@ type installOptions struct {
 	ScopeChanged bool   // true when --scope was explicitly set
 	Pin          string // --pin flag
 	Dir          string // --dir flag (overrides host+scope)
-	All          bool   // --all flag
 	Force        bool   // --force flag
 
 	// Resolved at runtime
@@ -129,47 +128,44 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			Installed skills have GitHub tracking metadata injected into their
 			frontmatter (%[1]sgithub-repo%[1]s, %[1]sgithub-ref%[1]s,
 			%[1]sgithub-tree-sha%[1]s, %[1]sgithub-path%[1]s). This
-			metadata identifies the source repository and enables %[1]sgh skills update%[1]s
+			metadata identifies the source repository and enables %[1]sgh skill update%[1]s
 			to detect changes — the tree SHA serves as an ETag for staleness checks.
 			The %[1]sgithub-repo%[1]s value is stored as a full repository URL.
 
 			When run interactively, the command prompts for any missing arguments.
-			When run non-interactively, %[1]srepository%[1]s is required, and either a
-			skill name or %[1]s--all%[1]s must be specified.
+			When run non-interactively, %[1]srepository%[1]s and a skill name are
+			required.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# Interactive: choose repo, skill, and agent
-			$ gh skills install
+			$ gh skill install
 
 			# Choose a skill from the repo interactively
-			$ gh skills install github/awesome-copilot
+			$ gh skill install github/awesome-copilot
 
 			# Install a specific skill
-			$ gh skills install github/awesome-copilot git-commit
+			$ gh skill install github/awesome-copilot git-commit
 
 			# Install a specific version
-			$ gh skills install github/awesome-copilot git-commit@v1.2.0
-
-			# Install all skills from a repo
-			$ gh skills install github/awesome-copilot --all
+			$ gh skill install github/awesome-copilot git-commit@v1.2.0
 
 			# Install from a large namespaced repo by path (efficient, skips full discovery)
-			$ gh skills install github/awesome-copilot skills/monalisa/code-review
+			$ gh skill install github/awesome-copilot skills/monalisa/code-review
 
 			# Install from a local directory (auto-discovers skills)
-			$ gh skills install ./my-skills-repo
+			$ gh skill install ./my-skills-repo
 
 			# Install from current directory
-			$ gh skills install .
+			$ gh skill install .
 
 			# Install a single local skill directory
-			$ gh skills install ./skills/git-commit
+			$ gh skill install ./skills/git-commit
 
 			# Install for Claude Code at user scope
-			$ gh skills install github/awesome-copilot git-commit --agent claude-code --scope user
+			$ gh skill install github/awesome-copilot git-commit --agent claude-code --scope user
 
 			# Pin to a specific git ref
-			$ gh skills install github/awesome-copilot git-commit --pin v2.0.0
+			$ gh skill install github/awesome-copilot git-commit --pin v2.0.0
 		`),
 		Aliases: []string{"add"},
 		Args:    cobra.MaximumNArgs(2),
@@ -214,7 +210,6 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "project", []string{"project", "user"}, "Installation scope")
 	cmd.Flags().StringVar(&opts.Pin, "pin", "", "pin to a specific git tag or commit SHA")
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "install to a custom directory (overrides --agent and --scope)")
-	cmd.Flags().BoolVar(&opts.All, "all", false, "install all skills from the repository")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "overwrite existing skills without prompting")
 
 	return cmd
@@ -327,11 +322,11 @@ func installRun(opts *installOptions) error {
 
 			for _, name := range result.Installed {
 				fmt.Fprintf(opts.IO.Out, "%s Installed %s (from %s@%s) in %s\n",
-					cs.SuccessIcon(), name, repoSource, resolved.Ref, friendlyDir(result.Dir))
+					cs.SuccessIcon(), name, repoSource, discovery.ShortRef(resolved.Ref), friendlyDir(result.Dir))
 			}
 
 			printFileTree(opts.IO.Out, cs, result.Dir, result.Installed)
-			printReviewHint(opts.IO.ErrOut, cs, repoSource, result.Installed)
+			printReviewHint(opts.IO.ErrOut, cs, repoSource, resolved.SHA, result.Installed)
 		}
 
 		if err != nil {
@@ -444,7 +439,7 @@ func runLocalInstall(opts *installOptions) error {
 		}
 
 		printFileTree(opts.IO.Out, cs, result.Dir, result.Installed)
-		printReviewHint(opts.IO.ErrOut, cs, "", result.Installed)
+		printReviewHint(opts.IO.ErrOut, cs, "", "", result.Installed)
 	}
 
 	return nil
@@ -515,7 +510,7 @@ func resolveVersion(opts *installOptions, client *api.Client, hostname string) (
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve version: %w", err)
 	}
-	fmt.Fprintf(opts.IO.ErrOut, "Using ref %s (%s)\n", resolved.Ref, git.ShortSHA(resolved.SHA))
+	fmt.Fprintf(opts.IO.ErrOut, "Using ref %s (%s)\n", discovery.ShortRef(resolved.Ref), git.ShortSHA(resolved.SHA))
 	return resolved, nil
 }
 
@@ -575,19 +570,12 @@ func selectSkillsWithSelector(opts *installOptions, skills []discovery.Skill, ca
 		return collisionError(ss, sel.sourceHint)
 	}
 
-	if opts.All {
-		if err := checkCollisions(skills); err != nil {
-			return nil, err
-		}
-		return skills, nil
-	}
-
 	if opts.SkillName != "" {
 		return sel.matchByName(opts, skills)
 	}
 
 	if !canPrompt {
-		return nil, cmdutil.FlagErrorf("must specify a skill name or use --all when not running interactively")
+		return nil, cmdutil.FlagErrorf("must specify a skill name when not running interactively")
 	}
 
 	if sel.fetchDescriptions != nil {
@@ -743,7 +731,7 @@ func collisionError(ss []discovery.Skill, sourceHint string) error {
 		cannot install skills with conflicting names — they would overwrite each other:
 		  %s
 		Install these skills individually using the full name:
-		  gh skills install %s namespace/skill-name
+		  gh skill install %s namespace/skill-name
 	`, discovery.FormatCollisions(collisions), sourceHint))
 }
 
@@ -1004,7 +992,9 @@ func printTreeDir(w io.Writer, cs *iostreams.ColorScheme, dir, indent string) {
 }
 
 // printReviewHint warns the user to review installed skills and suggests preview commands.
-func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo string, skillNames []string) {
+// When sha is non-empty the suggested commands include @SHA so the user previews
+// exactly the version that was installed.
+func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo, sha string, skillNames []string) {
 	if len(skillNames) == 0 {
 		return
 	}
@@ -1016,7 +1006,11 @@ func printReviewHint(w io.Writer, cs *iostreams.ColorScheme, repo string, skillN
 	fmt.Fprintln(w, "  Review installed content before use:")
 	fmt.Fprintln(w)
 	for _, name := range skillNames {
-		fmt.Fprintf(w, "    gh skills preview %s %s\n", repo, name)
+		if sha != "" {
+			fmt.Fprintf(w, "    gh skill preview %s %s@%s\n", repo, name, sha)
+		} else {
+			fmt.Fprintf(w, "    gh skill preview %s %s\n", repo, name)
+		}
 	}
 	fmt.Fprintln(w)
 }

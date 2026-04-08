@@ -162,6 +162,45 @@ func TestIsSpecCompliant(t *testing.T) {
 	}
 }
 
+func TestIsFullyQualifiedRef(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  string
+		want bool
+	}{
+		{name: "branch ref", ref: "refs/heads/main", want: true},
+		{name: "tag ref", ref: "refs/tags/v1.0", want: true},
+		{name: "short branch name", ref: "main", want: false},
+		{name: "short tag name", ref: "v1.0", want: false},
+		{name: "bare SHA", ref: "abc123def456", want: false},
+		{name: "empty", ref: "", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsFullyQualifiedRef(tt.ref))
+		})
+	}
+}
+
+func TestShortRef(t *testing.T) {
+	tests := []struct {
+		name string
+		ref  string
+		want string
+	}{
+		{name: "branch ref", ref: "refs/heads/main", want: "main"},
+		{name: "tag ref", ref: "refs/tags/v1.0", want: "v1.0"},
+		{name: "short name passthrough", ref: "main", want: "main"},
+		{name: "bare SHA passthrough", ref: "abc123", want: "abc123"},
+		{name: "empty passthrough", ref: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ShortRef(tt.ref))
+		})
+	}
+}
+
 func TestResolveRef(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -172,22 +211,41 @@ func TestResolveRef(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "explicit version resolves lightweight tag",
+			name:    "short name resolves as branch first",
+			version: "main",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/main"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"object": map[string]interface{}{"sha": "branch-sha"},
+					}))
+			},
+			wantRef: "refs/heads/main",
+			wantSHA: "branch-sha",
+		},
+		{
+			name:    "short name falls back to tag when branch not found",
 			version: "v1.0",
 			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/v1.0"),
+					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0"),
 					httpmock.JSONResponse(map[string]interface{}{
 						"object": map[string]interface{}{"sha": "abc123", "type": "commit"},
 					}))
 			},
-			wantRef: "v1.0",
+			wantRef: "refs/tags/v1.0",
 			wantSHA: "abc123",
 		},
 		{
-			name:    "explicit version resolves annotated tag",
+			name:    "short name resolves annotated tag",
 			version: "v2.0",
 			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/v2.0"),
+					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v2.0"),
 					httpmock.JSONResponse(map[string]interface{}{
@@ -199,13 +257,16 @@ func TestResolveRef(t *testing.T) {
 						"object": map[string]interface{}{"sha": "real-commit-sha"},
 					}))
 			},
-			wantRef: "v2.0",
+			wantRef: "refs/tags/v2.0",
 			wantSHA: "real-commit-sha",
 		},
 		{
-			name:    "explicit version falls back to commit SHA",
+			name:    "short name falls back to commit SHA",
 			version: "deadbeef",
 			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/deadbeef"),
+					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/deadbeef"),
 					httpmock.StatusStringResponse(404, "not found"))
@@ -217,9 +278,12 @@ func TestResolveRef(t *testing.T) {
 			wantSHA: "deadbeef",
 		},
 		{
-			name:    "explicit version not found anywhere",
+			name:    "short name not found anywhere",
 			version: "nonexistent",
 			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/nonexistent"),
+					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/nonexistent"),
 					httpmock.StatusStringResponse(404, "not found"))
@@ -227,10 +291,70 @@ func TestResolveRef(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/commits/nonexistent"),
 					httpmock.StatusStringResponse(404, "not found"))
 			},
-			wantErr: `ref "nonexistent" not found as tag or commit in monalisa/octocat-skills`,
+			wantErr: `ref "nonexistent" not found as branch, tag, or commit in monalisa/octocat-skills`,
 		},
 		{
-			name: "no version uses latest release",
+			name:    "branch wins over tag with same short name",
+			version: "release",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/release"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"object": map[string]interface{}{"sha": "branch-sha"},
+					}))
+				// tag stub is not registered because branch succeeds first
+			},
+			wantRef: "refs/heads/release",
+			wantSHA: "branch-sha",
+		},
+		{
+			name:    "fully qualified tag ref resolved directly",
+			version: "refs/tags/v1.0",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v1.0"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"object": map[string]interface{}{"sha": "tag-sha", "type": "commit"},
+					}))
+			},
+			wantRef: "refs/tags/v1.0",
+			wantSHA: "tag-sha",
+		},
+		{
+			name:    "fully qualified branch ref resolved directly",
+			version: "refs/heads/feature",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/feature"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"object": map[string]interface{}{"sha": "feature-sha"},
+					}))
+			},
+			wantRef: "refs/heads/feature",
+			wantSHA: "feature-sha",
+		},
+		{
+			name:    "fully qualified tag ref not found",
+			version: "refs/tags/nonexistent",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/nonexistent"),
+					httpmock.StatusStringResponse(404, "not found"))
+			},
+			wantErr: `tag "nonexistent" not found in monalisa/octocat-skills`,
+		},
+		{
+			name:    "fully qualified branch ref not found",
+			version: "refs/heads/nonexistent",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/nonexistent"),
+					httpmock.StatusStringResponse(404, "not found"))
+			},
+			wantErr: `branch "nonexistent" not found in monalisa/octocat-skills`,
+		},
+		{
+			name: "no version uses latest release with fully qualified ref",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
@@ -241,11 +365,11 @@ func TestResolveRef(t *testing.T) {
 						"object": map[string]interface{}{"sha": "release-sha", "type": "commit"},
 					}))
 			},
-			wantRef: "v3.0",
+			wantRef: "refs/tags/v3.0",
 			wantSHA: "release-sha",
 		},
 		{
-			name: "no version falls back to default branch when no releases",
+			name: "no version falls back to default branch with fully qualified ref",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
@@ -259,12 +383,12 @@ func TestResolveRef(t *testing.T) {
 						"object": map[string]interface{}{"sha": "branch-sha"},
 					}))
 			},
-			wantRef: "main",
+			wantRef: "refs/heads/main",
 			wantSHA: "branch-sha",
 		},
 		{
 			name:    "annotated tag dereference failure",
-			version: "v4.0",
+			version: "refs/tags/v4.0",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v4.0"),
@@ -276,6 +400,24 @@ func TestResolveRef(t *testing.T) {
 					httpmock.StatusStringResponse(500, "server error"))
 			},
 			wantErr: "could not dereference annotated tag",
+		},
+		{
+			name: "no version with server error does not fall back to default branch",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StatusStringResponse(500, "internal server error"))
+			},
+			wantErr: "could not fetch latest release",
+		},
+		{
+			name: "no version with forbidden error does not fall back to default branch",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
+					httpmock.StatusStringResponse(403, "forbidden"))
+			},
+			wantErr: "could not fetch latest release",
 		},
 		{
 			name: "empty tag_name in latest release falls back to default branch",
@@ -292,7 +434,7 @@ func TestResolveRef(t *testing.T) {
 						"object": map[string]interface{}{"sha": "fallback-sha"},
 					}))
 			},
-			wantRef: "main",
+			wantRef: "refs/heads/main",
 			wantSHA: "fallback-sha",
 		},
 		{
@@ -310,7 +452,7 @@ func TestResolveRef(t *testing.T) {
 						"object": map[string]interface{}{"sha": "main-sha"},
 					}))
 			},
-			wantRef: "main",
+			wantRef: "refs/heads/main",
 			wantSHA: "main-sha",
 		},
 	}

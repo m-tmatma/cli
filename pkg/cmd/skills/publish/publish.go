@@ -127,13 +127,13 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.
 		`),
 		Example: heredoc.Doc(`
 			# Validate and publish interactively
-			$ gh skills publish
+			$ gh skill publish
 
 			# Publish with a specific tag (non-interactive)
-			$ gh skills publish --tag v1.0.0
+			$ gh skill publish --tag v1.0.0
 
 			# Validate only (no publish)
-			$ gh skills publish --dry-run
+			$ gh skill publish --dry-run
 
 			# Validate and strip install metadata
 			$ gh skills publish --fix
@@ -621,8 +621,8 @@ func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, re
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s Published %s\n", cs.SuccessIcon(), tag)
-	fmt.Fprintf(opts.IO.Out, "%s Install with: gh skills install %s/%s\n", cs.SuccessIcon(), owner, repo)
-	fmt.Fprintf(opts.IO.Out, "%s Pin with:     gh skills install %s/%s <skill> --pin %s\n", cs.SuccessIcon(), owner, repo, tag)
+	fmt.Fprintf(opts.IO.Out, "%s Install with: gh skill install %s/%s\n", cs.SuccessIcon(), owner, repo)
+	fmt.Fprintf(opts.IO.Out, "%s Pin with:     gh skill install %s/%s <skill> --pin %s\n", cs.SuccessIcon(), owner, repo, tag)
 
 	return nil
 }

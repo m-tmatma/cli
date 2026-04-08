@@ -107,22 +107,22 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Co
 		`),
 		Example: heredoc.Doc(`
 			# Check and update all skills interactively
-			$ gh skills update
+			$ gh skill update
 
 			# Update specific skills
-			$ gh skills update mcp-cli git-commit
+			$ gh skill update mcp-cli git-commit
 
 			# Update all without prompting
-			$ gh skills update --all
+			$ gh skill update --all
 
 			# Re-download all skills (restore locally modified files)
-			$ gh skills update --force --all
+			$ gh skill update --force --all
 
 			# Check for updates without applying (read-only)
-			$ gh skills update --dry-run
+			$ gh skill update --dry-run
 
 			# Unpin skills and update them to latest
-			$ gh skills update --unpin
+			$ gh skill update --unpin
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Skills = args
@@ -344,12 +344,12 @@ func updateRun(opts *updateOptions) error {
 		if u.local.treeSHA == u.newSHA {
 			fmt.Fprintf(opts.IO.Out, "  %s %s (%s/%s) %s (reinstall) [%s]\n",
 				cs.Cyan("•"), u.local.name, u.local.owner, u.local.repo,
-				git.ShortSHA(u.newSHA), u.resolved.Ref)
+				git.ShortSHA(u.newSHA), discovery.ShortRef(u.resolved.Ref))
 		} else {
 			fmt.Fprintf(opts.IO.Out, "  %s %s (%s/%s) %s → %s [%s]\n",
 				cs.Cyan("•"), u.local.name, u.local.owner, u.local.repo,
 				cs.Muted(git.ShortSHA(u.local.treeSHA)), git.ShortSHA(u.newSHA),
-				u.resolved.Ref)
+				discovery.ShortRef(u.resolved.Ref))
 		}
 	}
 	fmt.Fprintln(opts.IO.ErrOut)

@@ -54,11 +54,6 @@ func TestNewCmdInstall(t *testing.T) {
 			},
 		},
 		{
-			name:     "all flag",
-			cli:      "monalisa/skills-repo --all",
-			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", All: true, Scope: "project"},
-		},
-		{
 			name:     "dir flag",
 			cli:      "monalisa/skills-repo git-commit --dir ./custom-skills",
 			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Dir: "./custom-skills", Scope: "project"},
@@ -142,7 +137,6 @@ func TestNewCmdInstall(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.Scope, gotOpts.Scope)
 			assert.Equal(t, tt.wantOpts.Pin, gotOpts.Pin)
 			assert.Equal(t, tt.wantOpts.Dir, gotOpts.Dir)
-			assert.Equal(t, tt.wantOpts.All, gotOpts.All)
 			assert.Equal(t, tt.wantOpts.Force, gotOpts.Force)
 			if tt.wantLocalPath {
 				assert.NotEmpty(t, gotOpts.localPath, "expected localPath to be set")
@@ -164,7 +158,7 @@ func TestNewCmdInstall(t *testing.T) {
 		assert.NotEmpty(t, cmd.Example)
 		assert.Contains(t, cmd.Aliases, "add")
 
-		for _, flag := range []string{"agent", "scope", "pin", "all", "dir", "force"} {
+		for _, flag := range []string{"agent", "scope", "pin", "dir", "force"} {
 			assert.NotNil(t, cmd.Flags().Lookup(flag), "missing flag: --%s", flag)
 		}
 	})
@@ -287,7 +281,7 @@ func TestInstallRun(t *testing.T) {
 					ScopeChanged: true,
 				}
 			},
-			wantErr: "must specify a skill name or use --all",
+			wantErr: "must specify a skill name when not running interactively",
 		},
 		{
 			name:  "remote install writes files with tracking metadata",
@@ -313,36 +307,6 @@ func TestInstallRun(t *testing.T) {
 				}
 			},
 			wantStdout: "Installed git-commit",
-		},
-		{
-			name:  "remote install with --all installs multiple skills",
-			isTTY: true,
-			stubs: func(reg *httpmock.Registry) {
-				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
-				treeJSON := fmt.Sprintf("%s, %s",
-					singleSkillTreeJSON("code-review", "tree0", "blob0"),
-					singleSkillTreeJSON("git-commit", "tree1", "blob1"))
-				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
-				stubInstallFiles(reg, "monalisa", "skills-repo", "tree0", "blob0",
-					"---\nname: code-review\ndescription: Reviews\n---\n# B\n")
-				stubInstallFiles(reg, "monalisa", "skills-repo", "tree1", "blob1",
-					"---\nname: git-commit\ndescription: Commits\n---\n# A\n")
-			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
-				t.Helper()
-				return &installOptions{
-					IO:           ios,
-					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
-					GitClient:    &git.Client{RepoDir: t.TempDir()},
-					SkillSource:  "monalisa/skills-repo",
-					All:          true,
-					Agent:        "github-copilot",
-					Scope:        "project",
-					ScopeChanged: true,
-					Dir:          t.TempDir(),
-				}
-			},
-			wantStdout: "Installed",
 		},
 		{
 			name:  "remote install with --agent claude-code",
@@ -598,6 +562,9 @@ func TestInstallRun(t *testing.T) {
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads/v2.0.0"),
+					httpmock.StatusStringResponse(404, "not found"))
+				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v2.0.0"),
 					httpmock.StringResponse(`{"object": {"sha": "def456", "type": "commit"}}`),
 				)
@@ -647,7 +614,7 @@ func TestInstallRun(t *testing.T) {
 				}
 			},
 			wantStdout: "Installed git-commit",
-			wantStderr: "prompt injections or malicious scripts",
+			wantStderr: "gh skill preview monalisa/skills-repo git-commit@abc123",
 		},
 		{
 			name:  "remote install outputs file tree for TTY",
@@ -678,6 +645,9 @@ func TestInstallRun(t *testing.T) {
 			name:  "remote install with inline version parses name and version",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/heads/v1.2.0"),
+					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/git/ref/tags/v1.2.0"),
 					httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
@@ -757,7 +727,7 @@ func TestInstallRun(t *testing.T) {
 		},
 		{
 			name:  "remote install all with collisions errors",
-			isTTY: false,
+			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
 				// Two skills with the same install name: skills/xlsx-pro and root xlsx-pro
@@ -769,12 +739,17 @@ func TestInstallRun(t *testing.T) {
 			},
 			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
 				t.Helper()
+				pm := &prompter.PrompterMock{
+					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+						return []string{allSkillsKey}, nil
+					},
+				}
 				return &installOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
-					All:          true,
 					Agent:        "github-copilot",
 					Scope:        "project",
 					ScopeChanged: true,
@@ -795,6 +770,15 @@ func TestInstallRun(t *testing.T) {
 					`{"path": "skills/bob/xlsx-pro", "type": "tree", "sha": "treeB"}, ` +
 					`{"path": "skills/bob/xlsx-pro/SKILL.md", "type": "blob", "sha": "blobB"}`
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
+				// Extra blob stubs consumed by FetchDescriptionsConcurrent during interactive selection.
+				contentA := base64.StdEncoding.EncodeToString([]byte("---\nname: xlsx-pro\ndescription: Alice\n---\n# A\n"))
+				contentB := base64.StdEncoding.EncodeToString([]byte("---\nname: xlsx-pro\ndescription: Bob\n---\n# B\n"))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blobA"),
+					httpmock.StringResponse(fmt.Sprintf(`{"sha": "blobA", "content": %q, "encoding": "base64"}`, contentA)))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blobB"),
+					httpmock.StringResponse(fmt.Sprintf(`{"sha": "blobB", "content": %q, "encoding": "base64"}`, contentB)))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeA", "blobA",
 					"---\nname: xlsx-pro\ndescription: Alice\n---\n# A\n")
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeB", "blobB",
@@ -802,12 +786,17 @@ func TestInstallRun(t *testing.T) {
 			},
 			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
 				t.Helper()
+				pm := &prompter.PrompterMock{
+					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+						return []string{allSkillsKey}, nil
+					},
+				}
 				return &installOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					Prompter:     pm,
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
-					All:          true,
 					Agent:        "github-copilot",
 					Scope:        "project",
 					ScopeChanged: true,
@@ -1418,7 +1407,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					SkillName:    "git-commit",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1455,7 +1444,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					SkillName:    "direct-skill",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1468,7 +1457,7 @@ func TestRunLocalInstall(t *testing.T) {
 		},
 		{
 			name:  "namespaced skills install to separate directories",
-			isTTY: false,
+			isTTY: true,
 			setup: func(t *testing.T, sourceDir, _ string) {
 				t.Helper()
 				for _, ns := range []string{"alice", "bob"} {
@@ -1478,11 +1467,16 @@ func TestRunLocalInstall(t *testing.T) {
 			},
 			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
 				t.Helper()
+				pm := &prompter.PrompterMock{
+					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+						return []string{allSkillsKey}, nil
+					},
+				}
 				return &installOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					Prompter:     pm,
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1502,7 +1496,7 @@ func TestRunLocalInstall(t *testing.T) {
 		},
 		{
 			name:  "local install with --force overwrites namespaced skill",
-			isTTY: false,
+			isTTY: true,
 			setup: func(t *testing.T, sourceDir, targetDir string) {
 				t.Helper()
 				for _, ns := range []string{"alice", "bob"} {
@@ -1513,11 +1507,16 @@ func TestRunLocalInstall(t *testing.T) {
 			},
 			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
 				t.Helper()
+				pm := &prompter.PrompterMock{
+					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+						return []string{allSkillsKey}, nil
+					},
+				}
 				return &installOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					Prompter:     pm,
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1568,7 +1567,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					SkillName:    "anything",
 					Agent:        "github-copilot",
 					Scope:        "project",
 					ScopeChanged: true,
@@ -1597,7 +1596,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					SkillName:    "git-commit",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1627,7 +1626,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					SkillName:    "git-commit",
 					Force:        true,
 					Agent:        "claude-code",
 					Scope:        "project",
@@ -1693,7 +1692,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
-					All:          true,
+					SkillName:    "git-commit",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1725,7 +1724,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  "~/",
 					localPath:    "~/",
-					All:          true,
+					SkillName:    "git-commit",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1757,7 +1756,7 @@ func TestRunLocalInstall(t *testing.T) {
 					IO:           ios,
 					SkillSource:  "~",
 					localPath:    "~",
-					All:          true,
+					SkillName:    "git-commit",
 					Force:        true,
 					Agent:        "github-copilot",
 					Scope:        "project",
@@ -1835,6 +1834,66 @@ func TestRunLocalInstall(t *testing.T) {
 			}
 			if tt.verify != nil {
 				tt.verify(t, targetDir)
+			}
+		})
+	}
+}
+
+func Test_printReviewHint(t *testing.T) {
+	tests := []struct {
+		name       string
+		repo       string
+		sha        string
+		skillNames []string
+		wantOutput string
+	}{
+		{
+			name:       "remote install with SHA includes SHA in preview command",
+			repo:       "owner/repo",
+			sha:        "abc123def456",
+			skillNames: []string{"my-skill"},
+			wantOutput: "gh skill preview owner/repo my-skill@abc123def456",
+		},
+		{
+			name:       "remote install without SHA omits SHA from preview command",
+			repo:       "owner/repo",
+			sha:        "",
+			skillNames: []string{"my-skill"},
+			wantOutput: "gh skill preview owner/repo my-skill\n",
+		},
+		{
+			name:       "multiple skills with SHA",
+			repo:       "owner/repo",
+			sha:        "deadbeef",
+			skillNames: []string{"skill-a", "skill-b"},
+			wantOutput: "skill-a@deadbeef",
+		},
+		{
+			name:       "local install shows generic message",
+			repo:       "",
+			sha:        "",
+			skillNames: []string{"my-skill"},
+			wantOutput: "Review the installed files before use",
+		},
+		{
+			name:       "no skills produces no output",
+			repo:       "owner/repo",
+			sha:        "abc123",
+			skillNames: []string{},
+			wantOutput: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			cs := ios.ColorScheme()
+			var buf strings.Builder
+			printReviewHint(&buf, cs, tt.repo, tt.sha, tt.skillNames)
+			if tt.wantOutput == "" {
+				assert.Empty(t, buf.String())
+			} else {
+				assert.Contains(t, buf.String(), tt.wantOutput)
 			}
 		})
 	}

@@ -2,8 +2,10 @@ package discovery
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -68,8 +70,25 @@ func (s Skill) InstallName() string {
 
 // ResolvedRef contains the resolved git reference and its SHA.
 type ResolvedRef struct {
-	Ref string // tag name, branch name, or SHA
+	Ref string // fully qualified ref (refs/heads/*, refs/tags/*) or commit SHA
 	SHA string // commit SHA
+}
+
+// IsFullyQualifiedRef returns true if ref uses the "refs/heads/" or "refs/tags/" prefix.
+func IsFullyQualifiedRef(ref string) bool {
+	return strings.HasPrefix(ref, "refs/heads/") || strings.HasPrefix(ref, "refs/tags/")
+}
+
+// ShortRef strips the "refs/heads/" or "refs/tags/" prefix from a fully qualified ref,
+// returning the short name. If the ref is not fully qualified it is returned as-is.
+func ShortRef(ref string) string {
+	if after, ok := strings.CutPrefix(ref, "refs/heads/"); ok {
+		return after
+	}
+	if after, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
+		return after
+	}
+	return ref
 }
 
 type treeEntry struct {
@@ -117,35 +136,41 @@ func ResolveRef(client *api.Client, host, owner, repo, version string) (*Resolve
 	if err == nil {
 		return ref, nil
 	}
+	// Only fall back to the default branch when the repository genuinely
+	// has no releases (404) or the latest release has no tag. Any other
+	// API error (403, 500, network failure, …) is surfaced immediately
+	// so it cannot silently mask problems and cause an unexpected ref to
+	// be used.
+	var nre *noReleasesError
+	if !errors.As(err, &nre) {
+		return nil, err
+	}
 	return resolveDefaultBranch(client, host, owner, repo)
 }
 
-// resolveExplicitRef resolves a user-supplied --pin value. It tries, in order:
-// tag → commit SHA. Branches are deliberately excluded because they are mutable
-// and pinning to one gives a false sense of reproducibility.
+// resolveExplicitRef resolves a user-supplied version string. It supports:
+//   - fully qualified refs: "refs/tags/v1.0" or "refs/heads/main"
+//   - short names: tried as branch first, then tag, then commit SHA
+//   - bare SHAs: resolved as commit SHA
+//
+// When a short name matches both a branch and a tag, the branch wins.
+// The returned Ref is always a fully qualified ref (refs/heads/* or refs/tags/*)
+// unless the input resolves to a bare commit SHA.
 func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*ResolvedRef, error) {
-	tagPath := fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", owner, repo, ref)
-	var refResp struct {
-		Object struct {
-			SHA  string `json:"sha"`
-			Type string `json:"type"`
-		} `json:"object"`
+	// Handle fully-qualified refs: resolve directly without ambiguity.
+	if after, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
+		return resolveTagRef(client, host, owner, repo, after)
 	}
-	if err := client.REST(host, "GET", tagPath, nil, &refResp); err == nil {
-		sha := refResp.Object.SHA
-		if refResp.Object.Type == "tag" {
-			derefPath := fmt.Sprintf("repos/%s/%s/git/tags/%s", owner, repo, sha)
-			var tagResp struct {
-				Object struct {
-					SHA string `json:"sha"`
-				} `json:"object"`
-			}
-			if err := client.REST(host, "GET", derefPath, nil, &tagResp); err != nil {
-				return nil, fmt.Errorf("could not dereference annotated tag %q: %w", ref, err)
-			}
-			sha = tagResp.Object.SHA
-		}
-		return &ResolvedRef{Ref: ref, SHA: sha}, nil
+	if after, ok := strings.CutPrefix(ref, "refs/heads/"); ok {
+		return resolveBranchRef(client, host, owner, repo, after)
+	}
+
+	// Short name: try branch first, then tag, then commit SHA.
+	if resolved, err := resolveBranchRef(client, host, owner, repo, ref); err == nil {
+		return resolved, nil
+	}
+	if resolved, err := resolveTagRef(client, host, owner, repo, ref); err == nil {
+		return resolved, nil
 	}
 
 	commitPath := fmt.Sprintf("repos/%s/%s/commits/%s", owner, repo, ref)
@@ -156,19 +181,80 @@ func resolveExplicitRef(client *api.Client, host, owner, repo, ref string) (*Res
 		return &ResolvedRef{Ref: commitResp.SHA, SHA: commitResp.SHA}, nil
 	}
 
-	return nil, fmt.Errorf("ref %q not found as tag or commit in %s/%s", ref, owner, repo)
+	return nil, fmt.Errorf("ref %q not found as branch, tag, or commit in %s/%s", ref, owner, repo)
 }
+
+// resolveTagRef looks up a tag by short name and returns a fully qualified ref.
+// For annotated tags, the tag object is dereferenced to obtain the commit SHA.
+func resolveTagRef(client *api.Client, host, owner, repo, tag string) (*ResolvedRef, error) {
+	tagPath := fmt.Sprintf("repos/%s/%s/git/ref/tags/%s", owner, repo, tag)
+	var refResp struct {
+		Object struct {
+			SHA  string `json:"sha"`
+			Type string `json:"type"`
+		} `json:"object"`
+	}
+	if err := client.REST(host, "GET", tagPath, nil, &refResp); err != nil {
+		return nil, fmt.Errorf("tag %q not found in %s/%s: %w", tag, owner, repo, err)
+	}
+	sha := refResp.Object.SHA
+	if refResp.Object.Type == "tag" {
+		derefPath := fmt.Sprintf("repos/%s/%s/git/tags/%s", owner, repo, sha)
+		var tagResp struct {
+			Object struct {
+				SHA string `json:"sha"`
+			} `json:"object"`
+		}
+		if err := client.REST(host, "GET", derefPath, nil, &tagResp); err != nil {
+			return nil, fmt.Errorf("could not dereference annotated tag %q: %w", tag, err)
+		}
+		sha = tagResp.Object.SHA
+	}
+	return &ResolvedRef{Ref: "refs/tags/" + tag, SHA: sha}, nil
+}
+
+// resolveBranchRef looks up a branch by short name and returns a fully qualified ref.
+func resolveBranchRef(client *api.Client, host, owner, repo, branch string) (*ResolvedRef, error) {
+	refPath := fmt.Sprintf("repos/%s/%s/git/ref/heads/%s", owner, repo, branch)
+	var refResp struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := client.REST(host, "GET", refPath, nil, &refResp); err != nil {
+		return nil, fmt.Errorf("branch %q not found in %s/%s: %w", branch, owner, repo, err)
+	}
+	return &ResolvedRef{Ref: "refs/heads/" + branch, SHA: refResp.Object.SHA}, nil
+}
+
+// noReleasesError signals that the repository has no usable releases,
+// which is the only case where ResolveRef should fall back to the
+// default branch.
+type noReleasesError struct {
+	reason string
+}
+
+func (e *noReleasesError) Error() string { return e.reason }
 
 func resolveLatestRelease(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/releases/latest", owner, repo)
 	var release releaseResponse
 	if err := client.REST(host, "GET", apiPath, nil, &release); err != nil {
-		return nil, fmt.Errorf("no releases found: %w", err)
+		// A 404 means the repository has no releases — this is the
+		// only case where falling back to the default branch is safe.
+		// Any other HTTP error (403, 500, …) or network failure is
+		// returned as-is so ResolveRef surfaces it rather than
+		// silently falling back.
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			return nil, &noReleasesError{reason: fmt.Sprintf("no releases found for %s/%s", owner, repo)}
+		}
+		return nil, fmt.Errorf("could not fetch latest release: %w", err)
 	}
 	if release.TagName == "" {
-		return nil, fmt.Errorf("latest release has no tag")
+		return nil, &noReleasesError{reason: "latest release has no tag"}
 	}
-	return resolveExplicitRef(client, host, owner, repo, release.TagName)
+	return resolveTagRef(client, host, owner, repo, release.TagName)
 }
 
 func resolveDefaultBranch(client *api.Client, host, owner, repo string) (*ResolvedRef, error) {
@@ -181,18 +267,7 @@ func resolveDefaultBranch(client *api.Client, host, owner, repo string) (*Resolv
 	if branch == "" {
 		branch = "main"
 	}
-
-	refPath := fmt.Sprintf("repos/%s/%s/git/ref/heads/%s", owner, repo, branch)
-	var refResp struct {
-		Object struct {
-			SHA string `json:"sha"`
-		} `json:"object"`
-	}
-	if err := client.REST(host, "GET", refPath, nil, &refResp); err != nil {
-		return nil, fmt.Errorf("could not resolve branch %q: %w", branch, err)
-	}
-
-	return &ResolvedRef{Ref: branch, SHA: refResp.Object.SHA}, nil
+	return resolveBranchRef(client, host, owner, repo, branch)
 }
 
 // skillMatch represents a matched SKILL.md file and its convention.
@@ -267,7 +342,7 @@ func DiscoverSkills(client *api.Client, host, owner, repo, commitSHA string) ([]
 	if tree.Truncated {
 		return nil, fmt.Errorf(
 			"repository tree for %s/%s is too large for full discovery\n"+
-				"  Use path-based install instead: gh skills install %s/%s skills/<skill-name>",
+				"  Use path-based install instead: gh skill install %s/%s skills/<skill-name>",
 			owner, repo, owner, repo,
 		)
 	}

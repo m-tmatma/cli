@@ -30,6 +30,7 @@ type previewOptions struct {
 
 	RepoArg   string
 	SkillName string
+	Version   string // resolved from @suffix on SkillName
 
 	repo ghrepo.Interface
 }
@@ -61,13 +62,23 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.
 
 			When run with only a repository argument, lists available skills and
 			prompts for selection.
+
+			To preview a specific version of the skill, append @VERSION to the
+			skill name. The version is resolved as a git tag, branch, or commit
+			SHA.
 		`),
 		Example: heredoc.Doc(`
 			# Preview a specific skill
-			$ gh skills preview github/awesome-copilot code-review
+			$ gh skill preview github/awesome-copilot code-review
+
+			# Preview a skill at a specific version
+			$ gh skill preview github/awesome-copilot code-review@v1.2.0
+
+			# Preview a skill at a specific commit SHA
+			$ gh skill preview github/awesome-copilot code-review@abc123def456
 
 			# Browse and preview interactively
-			$ gh skills preview github/awesome-copilot
+			$ gh skill preview github/awesome-copilot
 		`),
 		Aliases: []string{"show"},
 		Args:    cobra.RangeArgs(1, 2),
@@ -75,6 +86,11 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.
 			opts.RepoArg = args[0]
 			if len(args) == 2 {
 				opts.SkillName = args[1]
+			}
+
+			if i := strings.LastIndex(opts.SkillName, "@"); i > 0 {
+				opts.Version = opts.SkillName[i+1:]
+				opts.SkillName = opts.SkillName[:i]
 			}
 
 			repo, err := ghrepo.FromFullName(opts.RepoArg)
@@ -111,7 +127,7 @@ func previewRun(opts *previewOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Resolving %s/%s", owner, repoName))
-	resolved, err := discovery.ResolveRef(apiClient, hostname, owner, repoName, "")
+	resolved, err := discovery.ResolveRef(apiClient, hostname, owner, repoName, opts.Version)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("could not resolve version: %w", err)

@@ -89,16 +89,16 @@ func NewCmdSearch(f *cmdutil.Factory, runF func(*searchOptions) error) *cobra.Co
 		`),
 		Example: heredoc.Doc(`
 			# Search for skills related to terraform
-			$ gh skills search terraform
+			$ gh skill search terraform
 
 			# Search for skills from a specific owner
-			$ gh skills search terraform --owner hashicorp
+			$ gh skill search terraform --owner hashicorp
 
 			# View the second page of results
-			$ gh skills search terraform --page 2
+			$ gh skill search terraform --page 2
 
 			# Limit results to 5
-			$ gh skills search terraform --limit 5
+			$ gh skill search terraform --limit 5
 		`),
 		Args: cmdutil.MinimumArgs(1, "cannot search: query argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
