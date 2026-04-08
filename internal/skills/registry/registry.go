@@ -27,6 +27,8 @@ type Scope string
 const (
 	ScopeProject Scope = "project"
 	ScopeUser    Scope = "user"
+
+	sharedProjectSkillsDir = ".agents/skills"
 )
 
 // Agents contains all known agent hosts.
@@ -34,7 +36,7 @@ var Agents = []AgentHost{
 	{
 		ID:         "github-copilot",
 		Name:       "GitHub Copilot",
-		ProjectDir: ".github/skills",
+		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".copilot/skills",
 	},
 	{
@@ -46,25 +48,25 @@ var Agents = []AgentHost{
 	{
 		ID:         "cursor",
 		Name:       "Cursor",
-		ProjectDir: ".cursor/skills",
+		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".cursor/skills",
 	},
 	{
 		ID:         "codex",
 		Name:       "Codex",
-		ProjectDir: ".agents/skills",
+		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".codex/skills",
 	},
 	{
 		ID:         "gemini",
 		Name:       "Gemini CLI",
-		ProjectDir: ".agent/skills",
+		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/skills",
 	},
 	{
 		ID:         "antigravity",
 		Name:       "Antigravity",
-		ProjectDir: ".agent/skills",
+		ProjectDir: sharedProjectSkillsDir,
 		UserDir:    ".gemini/antigravity/skills",
 	},
 }

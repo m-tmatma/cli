@@ -415,9 +415,9 @@ func updateRun(opts *updateOptions) error {
 }
 
 // scanAllAgents walks every registered agent's skill directory (project + user scope) and
-// collects installed skills. Skills are deduplicated by directory path.
+// collects installed skills. Shared install roots are scanned only once.
 func scanAllAgents(gitRoot, homeDir string) []installedSkill {
-	seen := make(map[string]bool)
+	scannedDirs := make(map[string]bool)
 	var all []installedSkill
 
 	for i := range registry.Agents {
@@ -427,17 +427,15 @@ func scanAllAgents(gitRoot, homeDir string) []installedSkill {
 			if err != nil {
 				continue
 			}
+			if scannedDirs[dir] {
+				continue
+			}
+			scannedDirs[dir] = true
 			skills, err := scanInstalledSkills(dir, host, scope)
 			if err != nil {
 				continue
 			}
-			for _, s := range skills {
-				if seen[s.dir] {
-					continue
-				}
-				seen[s.dir] = true
-				all = append(all, s)
-			}
+			all = append(all, skills...)
 		}
 	}
 

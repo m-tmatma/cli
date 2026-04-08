@@ -82,16 +82,21 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			scope (in your home directory, available everywhere):
 
 			  Host             Project                 User
-			  GitHub Copilot   .github/skills          ~/.copilot/skills
+			  GitHub Copilot   .agents/skills          ~/.copilot/skills
 			  Claude Code      .claude/skills          ~/.claude/skills
-			  Cursor           .cursor/skills          ~/.cursor/skills
+			  Cursor           .agents/skills          ~/.cursor/skills
 			  Codex            .agents/skills          ~/.codex/skills
-			  Gemini CLI       .agent/skills           ~/.gemini/skills
-			  Antigravity      .agent/skills           ~/.gemini/antigravity/skills
+			  Gemini CLI       .agents/skills          ~/.gemini/skills
+			  Antigravity      .agents/skills          ~/.gemini/antigravity/skills
 
 			Use %[1]s--agent%[1]s and %[1]s--scope%[1]s to control placement, or %[1]s--dir%[1]s for a
 			custom directory. The default scope is %[1]sproject%[1]s, and the default
 			agent is %[1]sgithub-copilot%[1]s (when running non-interactively).
+
+			At project scope, GitHub Copilot, Cursor, Codex, Gemini CLI, and
+			Antigravity all use the shared %[1]s.agents/skills%[1]s directory. If you
+			select multiple hosts that resolve to the same destination, each skill is
+			installed there only once.
 
 			The first argument can be a GitHub repository in %[1]sOWNER/REPO%[1]s format
 			or a local directory path (e.g. %[1]s.%[1]s, %[1]s./my-skills%[1]s, %[1]s~/skills%[1]s).
@@ -287,26 +292,14 @@ func installRun(opts *installOptions) error {
 	homeDir := installer.ResolveHomeDir()
 	source = ghrepo.FullName(opts.repo)
 
-	type hostPlan struct {
-		host   *registry.AgentHost
-		skills []discovery.Skill
-	}
-	var plans []hostPlan
-	for _, host := range selectedHosts {
-		installSkills, err := checkOverwrite(opts, selectedSkills, host, scope, gitRoot, homeDir, canPrompt)
-		if err != nil {
-			return err
-		}
-		if len(installSkills) == 0 {
-			fmt.Fprintf(opts.IO.ErrOut, "No skills to install for %s.\n", host.Name)
-			continue
-		}
-		plans = append(plans, hostPlan{host: host, skills: installSkills})
+	plans, err := buildInstallPlans(opts, selectedSkills, selectedHosts, scope, gitRoot, homeDir, canPrompt)
+	if err != nil {
+		return err
 	}
 
 	for _, plan := range plans {
 		if len(plans) > 1 {
-			fmt.Fprintf(opts.IO.ErrOut, "\nInstalling to %s...\n", plan.host.Name)
+			fmt.Fprintf(opts.IO.ErrOut, "\nInstalling to %s for %s...\n", friendlyDir(plan.dir), formatPlanHosts(plan.hosts))
 		}
 
 		result, err := installer.Install(&installer.Options{
@@ -317,11 +310,7 @@ func installRun(opts *installOptions) error {
 			SHA:        resolved.SHA,
 			PinnedRef:  opts.Pin,
 			Skills:     plan.skills,
-			AgentHost:  plan.host,
-			Scope:      scope,
-			Dir:        opts.Dir,
-			GitRoot:    gitRoot,
-			HomeDir:    homeDir,
+			Dir:        plan.dir,
 			Client:     apiClient,
 			OnProgress: installProgress(opts.IO, len(plan.skills)),
 		})
@@ -425,36 +414,20 @@ func runLocalInstall(opts *installOptions) error {
 	gitRoot := installer.ResolveGitRoot(opts.GitClient)
 	homeDir := installer.ResolveHomeDir()
 
-	type hostPlan struct {
-		host   *registry.AgentHost
-		skills []discovery.Skill
-	}
-	var plans []hostPlan
-	for _, host := range selectedHosts {
-		installSkills, err := checkOverwrite(opts, selectedSkills, host, scope, gitRoot, homeDir, canPrompt)
-		if err != nil {
-			return err
-		}
-		if len(installSkills) == 0 {
-			fmt.Fprintf(opts.IO.ErrOut, "No skills to install for %s.\n", host.Name)
-			continue
-		}
-		plans = append(plans, hostPlan{host: host, skills: installSkills})
+	plans, err := buildInstallPlans(opts, selectedSkills, selectedHosts, scope, gitRoot, homeDir, canPrompt)
+	if err != nil {
+		return err
 	}
 
 	for _, plan := range plans {
 		if len(plans) > 1 {
-			fmt.Fprintf(opts.IO.ErrOut, "\nInstalling to %s...\n", plan.host.Name)
+			fmt.Fprintf(opts.IO.ErrOut, "\nInstalling to %s for %s...\n", friendlyDir(plan.dir), formatPlanHosts(plan.hosts))
 		}
 
 		result, err := installer.InstallLocal(&installer.LocalOptions{
 			SourceDir: absSource,
 			Skills:    plan.skills,
-			AgentHost: plan.host,
-			Scope:     scope,
-			Dir:       opts.Dir,
-			GitRoot:   gitRoot,
-			HomeDir:   homeDir,
+			Dir:       plan.dir,
 		})
 		if err != nil {
 			return err
@@ -584,6 +557,12 @@ type skillSelector struct {
 	sourceHint string
 	// fetchDescriptions, if non-nil, is called before prompting to pre-populate descriptions.
 	fetchDescriptions func()
+}
+
+type installPlan struct {
+	dir    string
+	hosts  []*registry.AgentHost
+	skills []discovery.Skill
 }
 
 func selectSkillsWithSelector(opts *installOptions, skills []discovery.Skill, canPrompt bool, sel skillSelector) ([]discovery.Skill, error) {
@@ -823,20 +802,63 @@ func resolveScope(opts *installOptions, canPrompt bool) (registry.Scope, error) 
 	return registry.ScopeUser, nil
 }
 
+func buildInstallPlans(opts *installOptions, selectedSkills []discovery.Skill, selectedHosts []*registry.AgentHost, scope registry.Scope, gitRoot, homeDir string, canPrompt bool) ([]installPlan, error) {
+	byDir := make(map[string]*installPlan)
+	orderedDirs := make([]string, 0, len(selectedHosts))
+
+	for _, host := range selectedHosts {
+		targetDir, err := resolveInstallDir(opts, host, scope, gitRoot, homeDir)
+		if err != nil {
+			return nil, err
+		}
+
+		plan, ok := byDir[targetDir]
+		if !ok {
+			plan = &installPlan{dir: targetDir}
+			byDir[targetDir] = plan
+			orderedDirs = append(orderedDirs, targetDir)
+		}
+		plan.hosts = append(plan.hosts, host)
+	}
+
+	plans := make([]installPlan, 0, len(orderedDirs))
+	for _, dir := range orderedDirs {
+		plan := byDir[dir]
+		installSkills, err := checkOverwrite(opts, selectedSkills, plan.dir, canPrompt)
+		if err != nil {
+			return nil, err
+		}
+		if len(installSkills) == 0 {
+			fmt.Fprintf(opts.IO.ErrOut, "No skills to install in %s for %s.\n", friendlyDir(plan.dir), formatPlanHosts(plan.hosts))
+			continue
+		}
+		plan.skills = installSkills
+		plans = append(plans, *plan)
+	}
+
+	return plans, nil
+}
+
+func resolveInstallDir(opts *installOptions, host *registry.AgentHost, scope registry.Scope, gitRoot, homeDir string) (string, error) {
+	if opts.Dir != "" {
+		return opts.Dir, nil
+	}
+	return host.InstallDir(scope, gitRoot, homeDir)
+}
+
+func formatPlanHosts(hosts []*registry.AgentHost) string {
+	names := make([]string, len(hosts))
+	for i, host := range hosts {
+		names[i] = host.Name
+	}
+	return strings.Join(names, ", ")
+}
+
 func truncateDescription(s string, maxWidth int) string {
 	return text.Truncate(maxWidth, text.RemoveExcessiveWhitespace(s))
 }
 
-func checkOverwrite(opts *installOptions, skills []discovery.Skill, host *registry.AgentHost, scope registry.Scope, gitRoot, homeDir string, canPrompt bool) ([]discovery.Skill, error) {
-	targetDir := opts.Dir
-	if targetDir == "" {
-		var err error
-		targetDir, err = host.InstallDir(scope, gitRoot, homeDir)
-		if err != nil {
-			return nil, err
-		}
-	}
-
+func checkOverwrite(opts *installOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
 	var existing, fresh []discovery.Skill
 	for _, s := range skills {
 		dir := filepath.Join(targetDir, filepath.FromSlash(s.InstallName()))

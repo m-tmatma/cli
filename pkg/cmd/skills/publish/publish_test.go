@@ -661,7 +661,7 @@ func TestPublishRun(t *testing.T) {
 			},
 			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
 				t.Helper()
-				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".github", "skills", "installed"), 0o755))
+				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills", "installed"), 0o755))
 				runGitInDir(t, dir, "init", "--initial-branch=main")
 				runGitInDir(t, dir, "config", "user.email", "monalisa@github.com")
 				runGitInDir(t, dir, "config", "user.name", "Monalisa Octocat")
@@ -686,12 +686,12 @@ func TestPublishRun(t *testing.T) {
 					---
 					Body.
 				`))
-				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".github", "skills", "installed"), 0o755))
+				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills", "installed"), 0o755))
 
 				runGitInDir(t, dir, "init", "--initial-branch=main")
 				runGitInDir(t, dir, "config", "user.email", "monalisa@github.com")
 				runGitInDir(t, dir, "config", "user.name", "Monalisa Octocat")
-				require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".github/skills\n"), 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".agents/skills\n"), 0o644))
 				runGitInDir(t, dir, "add", ".gitignore")
 				runGitInDir(t, dir, "commit", "-m", "init")
 			},

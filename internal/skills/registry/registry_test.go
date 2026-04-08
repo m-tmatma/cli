@@ -38,11 +38,9 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestInstallDir(t *testing.T) {
-	host, err := FindByID("github-copilot")
-	require.NoError(t, err)
-
 	tests := []struct {
 		name    string
+		hostID  string
 		scope   Scope
 		gitRoot string
 		homeDir string
@@ -50,21 +48,64 @@ func TestInstallDir(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "project scope",
+			name:    "github copilot project scope",
+			hostID:  "github-copilot",
 			scope:   ScopeProject,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
-			wantDir: filepath.Join("/tmp/monalisa-repo", ".github", "skills"),
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
 		},
 		{
-			name:    "user scope",
+			name:    "github copilot user scope",
+			hostID:  "github-copilot",
 			scope:   ScopeUser,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
 			wantDir: filepath.Join("/home/monalisa", ".copilot", "skills"),
 		},
 		{
+			name:    "claude code project scope",
+			hostID:  "claude-code",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".claude", "skills"),
+		},
+		{
+			name:    "cursor project scope",
+			hostID:  "cursor",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "codex project scope",
+			hostID:  "codex",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "gemini project scope",
+			hostID:  "gemini",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
+			name:    "antigravity project scope",
+			hostID:  "antigravity",
+			scope:   ScopeProject,
+			gitRoot: "/tmp/monalisa-repo",
+			homeDir: "/home/monalisa",
+			wantDir: filepath.Join("/tmp/monalisa-repo", ".agents", "skills"),
+		},
+		{
 			name:    "project scope without git root",
+			hostID:  "github-copilot",
 			scope:   ScopeProject,
 			gitRoot: "",
 			homeDir: "/home/monalisa",
@@ -72,6 +113,7 @@ func TestInstallDir(t *testing.T) {
 		},
 		{
 			name:    "user scope without home dir",
+			hostID:  "github-copilot",
 			scope:   ScopeUser,
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "",
@@ -79,6 +121,7 @@ func TestInstallDir(t *testing.T) {
 		},
 		{
 			name:    "invalid scope",
+			hostID:  "github-copilot",
 			scope:   "bogus",
 			gitRoot: "/tmp/monalisa-repo",
 			homeDir: "/home/monalisa",
@@ -87,6 +130,9 @@ func TestInstallDir(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			host, err := FindByID(tt.hostID)
+			require.NoError(t, err)
+
 			dir, err := host.InstallDir(tt.scope, tt.gitRoot, tt.homeDir)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -121,16 +167,7 @@ func TestRepoNameFromRemote(t *testing.T) {
 
 func TestUniqueProjectDirs(t *testing.T) {
 	dirs := UniqueProjectDirs()
-	require.NotEmpty(t, dirs)
-
-	// Should deduplicate — e.g. gemini and antigravity share .agent/skills
-	seen := map[string]int{}
-	for _, d := range dirs {
-		seen[d]++
-	}
-	for dir, count := range seen {
-		assert.Equalf(t, 1, count, "directory %q appears %d times, expected 1", dir, count)
-	}
+	assert.Equal(t, []string{".agents/skills", ".claude/skills"}, dirs)
 }
 
 func TestScopeLabels(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/skills/registry"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -243,6 +244,48 @@ func TestPromptForSkillOrigin(t *testing.T) {
 	}
 }
 
+func TestScanAllAgentsDeduplicatesSharedProjectDirs(t *testing.T) {
+	repoDir := t.TempDir()
+	homeDir := t.TempDir()
+
+	sharedSkillDir := filepath.Join(repoDir, ".agents", "skills", "git-commit")
+	require.NoError(t, os.MkdirAll(sharedSkillDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(sharedSkillDir, "SKILL.md"), []byte(heredoc.Doc(`
+		---
+		name: git-commit
+		metadata:
+		  github-owner: monalisa
+		  github-repo: octocat-skills
+		  github-tree-sha: abc123
+		---
+		Body
+	`)), 0o644))
+
+	claudeSkillDir := filepath.Join(repoDir, ".claude", "skills", "code-review")
+	require.NoError(t, os.MkdirAll(claudeSkillDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(claudeSkillDir, "SKILL.md"), []byte(heredoc.Doc(`
+		---
+		name: code-review
+		metadata:
+		  github-owner: monalisa
+		  github-repo: octocat-skills
+		  github-tree-sha: def456
+		---
+		Body
+	`)), 0o644))
+
+	skills := scanAllAgents(repoDir, homeDir)
+	require.Len(t, skills, 2)
+
+	byName := make(map[string]installedSkill)
+	for _, skill := range skills {
+		byName[skill.name] = skill
+	}
+
+	assert.Equal(t, registry.ScopeProject, byName["git-commit"].scope)
+	assert.Equal(t, registry.ScopeProject, byName["code-review"].scope)
+}
+
 func TestUpdateRun(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -260,7 +303,7 @@ func TestUpdateRun(t *testing.T) {
 				t.Helper()
 				t.Setenv("HOME", dir)
 				t.Setenv("USERPROFILE", dir)
-				skillDir := filepath.Join(dir, ".github", "skills", "code-review")
+				skillDir := filepath.Join(dir, ".agents", "skills", "code-review")
 				require.NoError(t, os.MkdirAll(skillDir, 0o755))
 				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
 				---

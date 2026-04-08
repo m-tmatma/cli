@@ -1332,6 +1332,47 @@ func TestInstallProgress(t *testing.T) {
 	assert.NotNil(t, installProgress(ios, 2))
 }
 
+func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	stubResolveVersion(reg, "monalisa", "octocat-skills", "v1.0.0", "abc123")
+	stubDiscoverTree(reg, "monalisa", "octocat-skills", "abc123",
+		singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
+	stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
+
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
+
+	pm := &prompter.PrompterMock{
+		MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
+			return []int{0, 2}, nil // GitHub Copilot + Cursor share .agents/skills
+		},
+		SelectFunc: func(prompt, defaultValue string, options []string) (int, error) {
+			return 0, nil // project scope
+		},
+	}
+
+	err := installRun(&installOptions{
+		IO:          ios,
+		HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		Prompter:    pm,
+		GitClient:   &git.Client{RepoDir: t.TempDir()},
+		SkillSource: "monalisa/octocat-skills",
+		SkillName:   "git-commit",
+		Force:       true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(stdout.String(), "Installed git-commit"))
+	assert.NotContains(t, stderr.String(), "Installing to")
+}
+
 func TestRunLocalInstall(t *testing.T) {
 	tests := []struct {
 		name       string
