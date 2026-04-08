@@ -445,6 +445,90 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 		assert.Equal(t, 2, selectCalls)
 	})
 
+	t.Run("interactive markdown file uses markdown renderer", func(t *testing.T) {
+		readmeContent := "# Usage\n\nUse **carefully**."
+		encodedReadme := base64.StdEncoding.EncodeToString([]byte(readmeContent))
+
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/releases/latest"),
+			httpmock.StringResponse(`{"tag_name": "v1.0.0"}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/ref/tags/v1.0.0"),
+			httpmock.StringResponse(`{"object": {"sha": "abc123", "type": "commit"}}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/abc123"),
+			httpmock.StringResponse(`{
+				"sha": "abc123",
+				"truncated": false,
+				"tree": [
+					{"path": "skills/my-skill", "type": "tree", "sha": "treeSHA"},
+					{"path": "skills/my-skill/SKILL.md", "type": "blob", "sha": "blobSKILL"},
+					{"path": "skills/my-skill/README.md", "type": "blob", "sha": "blobREADME"}
+				]
+			}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA"),
+			httpmock.StringResponse(`{
+				"tree": [
+					{"path": "SKILL.md", "type": "blob", "sha": "blobSKILL", "size": 50},
+					{"path": "README.md", "type": "blob", "sha": "blobREADME", "size": 28}
+				]
+			}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/blobs/blobSKILL"),
+			httpmock.StringResponse(`{"sha": "blobSKILL", "content": "`+encodedContent+`", "encoding": "base64"}`),
+		)
+		reg.Register(
+			httpmock.REST("GET", "repos/owner/repo/git/blobs/blobREADME"),
+			httpmock.StringResponse(`{"sha": "blobREADME", "content": "`+encodedReadme+`", "encoding": "base64"}`),
+		)
+
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		ios.SetColorEnabled(false)
+
+		renderCalls := 0
+
+		selectCalls := 0
+		pm := &prompter.PrompterMock{
+			SelectFunc: func(prompt string, defaultValue string, options []string) (int, error) {
+				selectCalls++
+				if selectCalls == 1 {
+					assert.Equal(t, []string{"SKILL.md", "README.md"}, options)
+					return 1, nil
+				}
+				return 0, fmt.Errorf("user cancelled")
+			},
+		}
+
+		opts := &previewOptions{
+			IO:         ios,
+			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+			Prompter:   pm,
+			repo:       ghrepo.New("owner", "repo"),
+			SkillName:  "my-skill",
+			RenderFile: func(filePath, content string) string {
+				renderCalls++
+				return fmt.Sprintf("rendered:%s", filePath)
+			},
+		}
+
+		err := previewRun(opts)
+		require.NoError(t, err)
+
+		out := stdout.String()
+		assert.Contains(t, out, "rendered:README.md")
+		assert.Equal(t, 2, selectCalls)
+		assert.Equal(t, 2, renderCalls)
+	})
+
 	t.Run("non-interactive dumps all files", func(t *testing.T) {
 		reg := makeReg()
 		defer reg.Verify(t)

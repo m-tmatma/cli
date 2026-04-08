@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ type previewOptions struct {
 	HttpClient func() (*http.Client, error)
 	Prompter   prompter.Prompter
 	Executable func() string
+	RenderFile func(string, string) string
 
 	RepoArg   string
 	SkillName string
@@ -38,6 +40,9 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.
 		HttpClient: f.HttpClient,
 		Prompter:   f.Prompter,
 		Executable: f.Executable,
+	}
+	opts.RenderFile = func(filePath, content string) string {
+		return renderMarkdownPreview(opts.IO, filePath, content)
 	}
 
 	cmd := &cobra.Command{
@@ -139,18 +144,7 @@ func previewRun(opts *previewOptions) error {
 		return err
 	}
 
-	parsed, parseErr := frontmatter.Parse(content)
-	if parseErr == nil {
-		content = parsed.Body
-	}
-
-	rendered, err := markdown.Render(content,
-		markdown.WithTheme(opts.IO.TerminalTheme()),
-		markdown.WithWrap(opts.IO.TerminalWidth()),
-		markdown.WithoutIndentation())
-	if err != nil {
-		rendered = content
-	}
+	rendered := opts.renderFile("SKILL.md", content)
 
 	// Collect extra files (everything that isn't SKILL.md)
 	var extraFiles []discovery.SkillFile
@@ -268,7 +262,7 @@ func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill di
 				fmt.Fprintf(opts.IO.ErrOut, "%s could not fetch %s: %v\n", cs.Red("!"), selectedFile.Path, fetchErr)
 				continue
 			}
-			content = fileContent
+			content = renderSelectedFilePreview(opts, selectedFile.Path, fileContent)
 			if !strings.HasSuffix(content, "\n") {
 				content += "\n"
 			}
@@ -279,6 +273,50 @@ func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill di
 		}
 		fmt.Fprint(opts.IO.Out, content)
 		opts.IO.StopPager()
+	}
+}
+
+func (opts *previewOptions) renderFile(filePath, content string) string {
+	if opts.RenderFile != nil {
+		return opts.RenderFile(filePath, content)
+	}
+
+	return renderMarkdownPreview(opts.IO, filePath, content)
+}
+
+func renderSelectedFilePreview(opts *previewOptions, filePath, content string) string {
+	if !isMarkdownFile(filePath) {
+		return content
+	}
+
+	return opts.renderFile(filePath, content)
+}
+
+func renderMarkdownPreview(io *iostreams.IOStreams, filePath, content string) string {
+	if filePath == "SKILL.md" {
+		parsed, err := frontmatter.Parse(content)
+		if err == nil {
+			content = parsed.Body
+		}
+	}
+
+	rendered, err := markdown.Render(content,
+		markdown.WithTheme(io.TerminalTheme()),
+		markdown.WithWrap(io.TerminalWidth()),
+		markdown.WithoutIndentation())
+	if err != nil {
+		return content
+	}
+
+	return rendered
+}
+
+func isMarkdownFile(filePath string) bool {
+	switch strings.ToLower(path.Ext(filePath)) {
+	case ".md", ".markdown", ".mdown", ".mkd", ".mkdn":
+		return true
+	default:
+		return false
 	}
 }
 
