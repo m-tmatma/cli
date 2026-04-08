@@ -15,6 +15,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSearchRun_UnsupportedHost(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	cfg := config.NewBlankConfig()
+	authCfg := cfg.Authentication()
+	authCfg.SetDefaultHost("acme.ghes.com", "user")
+	cfg.AuthenticationFunc = func() gh.AuthConfig {
+		return authCfg
+	}
+	err := searchRun(&searchOptions{
+		IO:         ios,
+		Query:      "terraform",
+		Page:       1,
+		Limit:      defaultLimit,
+		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
+		Config:     func() (gh.Config, error) { return cfg, nil },
+	})
+	require.ErrorContains(t, err, "supports only github.com")
+}
+
 func TestNewCmdSearch(t *testing.T) {
 	tests := []struct {
 		name     string

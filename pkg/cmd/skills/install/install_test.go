@@ -1049,8 +1049,7 @@ func TestInstallRun(t *testing.T) {
 					name: git-commit
 					description: Writes commits
 					metadata:
-					  github-owner: someowner
-					  github-repo: somerepo
+					  github-repo: https://github.com/someowner/somerepo
 					  github-ref: v0.5.0
 					---
 					# Git Commit
@@ -1076,6 +1075,22 @@ func TestInstallRun(t *testing.T) {
 				}
 			},
 			wantStdout: "Installed git-commit",
+		},
+		{
+			name:  "unsupported host returns error",
+			stubs: func(reg *httpmock.Registry) {},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+				t.Helper()
+				return &installOptions{
+					IO:          ios,
+					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					Prompter:    &prompter.PrompterMock{},
+					GitClient:   &git.Client{RepoDir: t.TempDir()},
+					SkillSource: "acme.ghes.com/monalisa/octocat-skills",
+					SkillName:   "git-commit",
+				}
+			},
+			wantErr: "supports only github.com",
 		},
 		{
 			name:  "select all skills in interactive prompt",

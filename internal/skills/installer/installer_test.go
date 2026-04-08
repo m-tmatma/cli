@@ -248,8 +248,8 @@ func TestInstallSkill(t *testing.T) {
 				t.Helper()
 				content, err := os.ReadFile(filepath.Join(destDir, "pr-summary", "SKILL.md"))
 				require.NoError(t, err)
-				assert.Contains(t, string(content), "github-owner: monalisa")
-				assert.Contains(t, string(content), "github-repo: octocat-skills")
+				assert.NotContains(t, string(content), "github-owner:")
+				assert.Contains(t, string(content), "github-repo: https://github.com/monalisa/octocat-skills")
 			},
 		},
 		{

@@ -91,8 +91,7 @@ func TestScanInstalledSkills(t *testing.T) {
 					name: git-commit
 					description: Git commit helper
 					metadata:
-					  github-owner: monalisa
-					  github-repo: awesome-copilot
+					  github-repo: https://github.com/monalisa/awesome-copilot
 					  github-tree-sha: abc123
 					  github-path: skills/git-commit
 					---
@@ -117,8 +116,7 @@ func TestScanInstalledSkills(t *testing.T) {
 					---
 					name: pinned-skill
 					metadata:
-					  github-owner: octocat
-					  github-repo: hubot-skills
+					  github-repo: https://github.com/octocat/hubot-skills
 					  github-tree-sha: def456
 					  github-pinned: v1.0.0
 					---
@@ -138,6 +136,7 @@ func TestScanInstalledSkills(t *testing.T) {
 				gc := byName["git-commit"]
 				assert.Equal(t, "monalisa", gc.owner)
 				assert.Equal(t, "awesome-copilot", gc.repo)
+				assert.Equal(t, "github.com", gc.repoHost)
 				assert.Equal(t, "abc123", gc.treeSHA)
 				assert.Equal(t, "skills/git-commit", gc.sourcePath)
 				assert.Empty(t, gc.pinned)
@@ -147,7 +146,32 @@ func TestScanInstalledSkills(t *testing.T) {
 				assert.Empty(t, us.repo)
 
 				ps := byName["pinned-skill"]
+				assert.Equal(t, "github.com", ps.repoHost)
 				assert.Equal(t, "v1.0.0", ps.pinned)
+			},
+		},
+		{
+			name: "unsupported host metadata returns error",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "enterprise-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: enterprise-skill
+					metadata:
+					  github-repo: https://acme.ghes.com/monalisa/octocat-skills
+					  github-tree-sha: abc123
+					---
+					body
+				`)), 0o644))
+			},
+			verify: func(t *testing.T, skills []installedSkill, err error) {
+				t.Helper()
+				require.NoError(t, err)
+				require.Len(t, skills, 1)
+				require.Error(t, skills[0].metadataErr)
+				assert.Contains(t, skills[0].metadataErr.Error(), "supports only github.com")
 			},
 		},
 		{
@@ -254,8 +278,7 @@ func TestScanAllAgentsDeduplicatesSharedProjectDirs(t *testing.T) {
 		---
 		name: git-commit
 		metadata:
-		  github-owner: monalisa
-		  github-repo: octocat-skills
+		  github-repo: https://github.com/monalisa/octocat-skills
 		  github-tree-sha: abc123
 		---
 		Body
@@ -267,8 +290,7 @@ func TestScanAllAgentsDeduplicatesSharedProjectDirs(t *testing.T) {
 		---
 		name: code-review
 		metadata:
-		  github-owner: monalisa
-		  github-repo: octocat-skills
+		  github-repo: https://github.com/monalisa/octocat-skills
 		  github-tree-sha: def456
 		---
 		Body
@@ -309,8 +331,7 @@ func TestUpdateRun(t *testing.T) {
 				---
 				name: code-review
 				metadata:
-				  github-owner: monalisa
-				  github-repo: octocat-skills
+				  github-repo: https://github.com/monalisa/octocat-skills
 				  github-tree-sha: currentsha
 				  github-path: skills/code-review
 				---
@@ -368,8 +389,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: octocat-skill
 					metadata:
-					  github-owner: octocat
-					  github-repo: hubot-skills
+					  github-repo: https://github.com/octocat/hubot-skills
 					  github-tree-sha: abc
 					---
 				`)), 0o644))
@@ -400,8 +420,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: pinned-skill
 					metadata:
-					  github-owner: octocat
-					  github-repo: hubot-skills
+					  github-repo: https://github.com/octocat/hubot-skills
 					  github-tree-sha: abc123
 					  github-pinned: v1.0.0
 					---
@@ -463,8 +482,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: monalisa-skill
 					metadata:
-					  github-owner: monalisa
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/monalisa/octocat-skills
 					  github-tree-sha: abc123def456
 					  github-path: skills/monalisa-skill
 					---
@@ -508,8 +526,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: hubot-skill
 					metadata:
-					  github-owner: hubot
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/hubot/octocat-skills
 					  github-tree-sha: oldsha123
 					  github-path: skills/hubot-skill
 					---
@@ -557,8 +574,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: hubot-skill
 					metadata:
-					  github-owner: hubot
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/hubot/octocat-skills
 					  github-tree-sha: oldsha123
 					  github-path: skills/hubot-skill
 					---
@@ -606,8 +622,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: code-review
 					metadata:
-					  github-owner: monalisa
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/monalisa/octocat-skills
 					  github-tree-sha: oldsha000
 					  github-path: skills/code-review
 					---
@@ -650,7 +665,7 @@ func TestUpdateRun(t *testing.T) {
 				t.Helper()
 				content, err := os.ReadFile(filepath.Join(dir, "code-review", "SKILL.md"))
 				require.NoError(t, err)
-				assert.Contains(t, string(content), "github-owner: monalisa")
+				assert.Contains(t, string(content), "github-repo: https://github.com/monalisa/octocat-skills")
 				assert.NotContains(t, string(content), "Old content")
 			},
 			wantStdout: "Updated code-review",
@@ -668,8 +683,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: code-review
 					metadata:
-					  github-owner: monalisa
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/monalisa/octocat-skills
 					  github-tree-sha: oldsha000
 					  github-path: skills/monalisa/code-review
 					---
@@ -712,7 +726,7 @@ func TestUpdateRun(t *testing.T) {
 				t.Helper()
 				content, err := os.ReadFile(filepath.Join(dir, "monalisa", "code-review", "SKILL.md"))
 				require.NoError(t, err)
-				assert.Contains(t, string(content), "github-owner: monalisa")
+				assert.Contains(t, string(content), "github-repo: https://github.com/monalisa/octocat-skills")
 				assert.NotContains(t, string(content), "Old namespaced content")
 			},
 			wantStdout: "Updated monalisa/code-review",
@@ -730,8 +744,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: code-review
 					metadata:
-					  github-owner: monalisa
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/monalisa/octocat-skills
 					  github-tree-sha: oldsha000
 					  github-path: skills/code-review
 					---
@@ -790,8 +803,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: code-review
 					metadata:
-					  github-owner: monalisa
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/monalisa/octocat-skills
 					  github-tree-sha: oldsha000
 					  github-path: skills/code-review
 					---
@@ -853,8 +865,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: code-review
 					metadata:
-					  github-owner: monalisa
-					  github-repo: octocat-skills
+					  github-repo: https://github.com/monalisa/octocat-skills
 					  github-tree-sha: oldsha000
 					  github-path: skills/code-review
 					---
@@ -990,7 +1001,7 @@ func TestUpdateRun(t *testing.T) {
 				content, err := os.ReadFile(filepath.Join(dir, "manual-skill", "SKILL.md"))
 				require.NoError(t, err)
 				assert.NotContains(t, string(content), "Old manual content")
-				assert.Contains(t, string(content), "github-owner: monalisa")
+				assert.Contains(t, string(content), "github-repo: https://github.com/monalisa/octocat-skills")
 			},
 			wantStdout: "Updated manual-skill",
 		},
@@ -1007,8 +1018,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: pinned-skill
 					metadata:
-					  github-owner: octocat
-					  github-repo: hubot-skills
+					  github-repo: https://github.com/octocat/hubot-skills
 					  github-tree-sha: oldsha000
 					  github-pinned: v1.0.0
 					  github-path: skills/pinned-skill
@@ -1067,8 +1077,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: pinned-skill
 					metadata:
-					  github-owner: octocat
-					  github-repo: hubot-skills
+					  github-repo: https://github.com/octocat/hubot-skills
 					  github-tree-sha: abc123
 					  github-pinned: v1.0.0
 					---
@@ -1102,8 +1111,7 @@ func TestUpdateRun(t *testing.T) {
 					---
 					name: pinned-skill
 					metadata:
-					  github-owner: octocat
-					  github-repo: hubot-skills
+					  github-repo: https://github.com/octocat/hubot-skills
 					  github-tree-sha: oldsha000
 					  github-pinned: v1.0.0
 					  github-path: skills/pinned-skill

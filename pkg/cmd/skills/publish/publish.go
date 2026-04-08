@@ -16,12 +16,12 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/gh"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/registry"
+	"github.com/cli/cli/v2/internal/skills/source"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -342,10 +342,27 @@ func publishRun(opts *publishOptions) error {
 	diagnostics = append(diagnostics, installedDirDiags...)
 
 	// Remote repository checks (best-effort)
-	owner, repo := detectGitHubRemote(opts.GitClient)
+	repoInfo, remoteErr := detectGitHubRemote(opts.GitClient)
+	if remoteErr != nil {
+		return remoteErr
+	}
+	owner, repo := "", ""
+	if repoInfo != nil {
+		owner = repoInfo.RepoOwner()
+		repo = repoInfo.RepoName()
+	}
 	hasTopic := false
 	var existingTags []tagEntry
 	if owner != "" && repo != "" {
+		if host == "" && repoInfo != nil {
+			host = repoInfo.RepoHost()
+		}
+		if host != "" {
+			if err := source.ValidateSupportedHost(host); err != nil {
+				return err
+			}
+		}
+
 		// Create API client for remote checks if not already injected
 		if client == nil {
 			httpClient, httpErr := opts.HttpClient()
@@ -354,6 +371,9 @@ func publishRun(opts *publishOptions) error {
 				cfg, cfgErr := opts.Config()
 				if cfgErr == nil {
 					host, _ = cfg.Authentication().DefaultHost()
+					if err := source.ValidateSupportedHost(host); err != nil {
+						return err
+					}
 					client = apiClient
 				}
 			}
@@ -844,53 +864,59 @@ func suggestNextTag(latest string) string {
 }
 
 // detectGitHubRemote attempts to detect the GitHub owner/repo from git remotes.
-func detectGitHubRemote(gitClient *git.Client) (owner, repo string) {
+func detectGitHubRemote(gitClient *git.Client) (ghrepo.Interface, error) {
 	if gitClient == nil {
-		return "", ""
+		return nil, nil
 	}
 
 	// Try origin first
 	if url, err := gitClient.RemoteURL(context.Background(), "origin"); err == nil {
-		if o, r := parseGitHubURL(url); o != "" {
-			return o, r
+		repo, parseErr := parseGitHubURL(url)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		if repo != nil {
+			return repo, nil
 		}
 	}
 
 	// Fall back to any remote that points to GitHub
 	remotes, err := gitClient.Remotes(context.Background())
 	if err != nil {
-		return "", ""
+		return nil, nil
 	}
 	for _, r := range remotes {
 		if r.Name == "origin" {
 			continue
 		}
 		if url, err := gitClient.RemoteURL(context.Background(), r.Name); err == nil {
-			if o, rp := parseGitHubURL(url); o != "" {
-				return o, rp
+			repo, parseErr := parseGitHubURL(url)
+			if parseErr != nil {
+				return nil, parseErr
+			}
+			if repo != nil {
+				return repo, nil
 			}
 		}
 	}
-	return "", ""
+	return nil, nil
 }
 
 // parseGitHubURL extracts owner/repo from a GitHub remote URL.
 // Only GitHub.com URLs are recognized.
-func parseGitHubURL(rawURL string) (owner, repo string) {
+func parseGitHubURL(rawURL string) (ghrepo.Interface, error) {
 	u, err := git.ParseURL(rawURL)
 	if err != nil {
-		return "", ""
+		return nil, nil
 	}
 	r, err := ghrepo.FromURL(u)
 	if err != nil {
-		return "", ""
+		return nil, nil
 	}
-	// Only match github.com — the default GitHub host.
-	host := strings.ToLower(r.RepoHost())
-	if host != ghinstance.Default() {
-		return "", ""
+	if err := source.ValidateSupportedHost(r.RepoHost()); err != nil {
+		return nil, nil
 	}
-	return r.RepoOwner(), r.RepoName()
+	return r, nil
 }
 
 // detectMissingRepoDiagnostic explains why remote checks were skipped.

@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/installer"
 	"github.com/cli/cli/v2/internal/skills/registry"
+	"github.com/cli/cli/v2/internal/skills/source"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -43,15 +44,17 @@ type updateOptions struct {
 
 // installedSkill represents a locally installed skill parsed from its SKILL.md frontmatter.
 type installedSkill struct {
-	name       string
-	owner      string
-	repo       string
-	treeSHA    string // tree SHA at install time
-	pinned     string // explicit pin value (empty = unpinned)
-	sourcePath string // original path in source repo (e.g. "skills/author/name")
-	dir        string // local directory path
-	host       *registry.AgentHost
-	scope      registry.Scope
+	name        string
+	repoHost    string
+	owner       string
+	repo        string
+	treeSHA     string // tree SHA at install time
+	pinned      string // explicit pin value (empty = unpinned)
+	sourcePath  string // original path in source repo (e.g. "skills/author/name")
+	dir         string // local directory path
+	host        *registry.AgentHost
+	scope       registry.Scope
+	metadataErr error
 }
 
 // pendingUpdate describes a single skill that has an available update.
@@ -149,12 +152,6 @@ func updateRun(opts *updateOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-	hostname, _ := cfg.Authentication().DefaultHost()
-
 	gitRoot := installer.ResolveGitRoot(opts.GitClient)
 	homeDir := installer.ResolveHomeDir()
 
@@ -193,6 +190,12 @@ func updateRun(opts *updateOptions) error {
 		installed = filtered
 	}
 
+	for _, s := range installed {
+		if s.metadataErr != nil {
+			return fmt.Errorf("skill %s has invalid repository metadata: %w", s.name, s.metadataErr)
+		}
+	}
+
 	// Prompt for metadata on skills missing it (before starting progress indicator)
 	var noMeta []string
 	// Track skills where the user provided a source repo interactively.
@@ -226,6 +229,7 @@ func updateRun(opts *updateOptions) error {
 		}
 		s.owner = owner
 		s.repo = repo
+		s.repoHost = source.SupportedHost
 		prompted[s.dir] = promptedEntry{name: s.name, source: owner + "/" + repo}
 	}
 
@@ -234,7 +238,7 @@ func updateRun(opts *updateOptions) error {
 	var updates []pendingUpdate
 	var pinned []installedSkill
 
-	type repoKey struct{ owner, repo string }
+	type repoKey struct{ host, owner, repo string }
 	repoSkills := make(map[repoKey][]discovery.Skill)
 	repoRefs := make(map[repoKey]*discovery.ResolvedRef)
 	repoErrors := make(map[repoKey]bool)
@@ -248,7 +252,7 @@ func updateRun(opts *updateOptions) error {
 			continue
 		}
 
-		key := repoKey{s.owner, s.repo}
+		key := repoKey{s.repoHost, s.owner, s.repo}
 
 		if repoErrors[key] {
 			continue
@@ -256,7 +260,7 @@ func updateRun(opts *updateOptions) error {
 
 		// Resolve ref and discover skills once per repo
 		if _, ok := repoRefs[key]; !ok {
-			resolved, resolveErr := discovery.ResolveRef(apiClient, hostname, s.owner, s.repo, "")
+			resolved, resolveErr := discovery.ResolveRef(apiClient, s.repoHost, s.owner, s.repo, "")
 			if resolveErr != nil {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
@@ -266,7 +270,7 @@ func updateRun(opts *updateOptions) error {
 			}
 			repoRefs[key] = resolved
 
-			skills, discoverErr := discovery.DiscoverSkills(apiClient, hostname, s.owner, s.repo, resolved.SHA)
+			skills, discoverErr := discovery.DiscoverSkills(apiClient, s.repoHost, s.owner, s.repo, resolved.SHA)
 			if discoverErr != nil {
 				repoErrors[key] = true
 				opts.IO.StopProgressIndicator()
@@ -302,7 +306,7 @@ func updateRun(opts *updateOptions) error {
 	// Warn about prompted skills that weren't found in the remote repo
 	for _, entry := range prompted {
 		parts := strings.SplitN(entry.source, "/", 2)
-		key := repoKey{parts[0], parts[1]}
+		key := repoKey{source.SupportedHost, parts[0], parts[1]}
 		skills, resolved := repoSkills[key]
 		if !resolved {
 			continue
@@ -371,7 +375,7 @@ func updateRun(opts *updateOptions) error {
 	var failed bool
 	for _, u := range updates {
 		installOpts := &installer.Options{
-			Host:      hostname,
+			Host:      u.local.repoHost,
 			Owner:     u.local.owner,
 			Repo:      u.local.repo,
 			Ref:       u.resolved.Ref,
@@ -507,8 +511,18 @@ func parseInstalledSkill(data []byte, name, dir string, host *registry.AgentHost
 	}
 
 	if result.Metadata.Meta != nil {
-		s.owner, _ = result.Metadata.Meta["github-owner"].(string)
-		s.repo, _ = result.Metadata.Meta["github-repo"].(string)
+		repoInfo, ok, repoErr := source.ParseMetadataRepo(result.Metadata.Meta)
+		if repoErr != nil {
+			s.metadataErr = repoErr
+		} else if ok {
+			if err := source.ValidateSupportedHost(repoInfo.RepoHost()); err != nil {
+				s.metadataErr = err
+			} else {
+				s.repoHost = repoInfo.RepoHost()
+				s.owner = repoInfo.RepoOwner()
+				s.repo = repoInfo.RepoName()
+			}
+		}
 		s.treeSHA, _ = result.Metadata.Meta["github-tree-sha"].(string)
 		s.pinned, _ = result.Metadata.Meta["github-pinned"].(string)
 		s.sourcePath, _ = result.Metadata.Meta["github-path"].(string)

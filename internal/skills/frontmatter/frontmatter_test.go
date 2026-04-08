@@ -67,10 +67,10 @@ func TestInjectGitHubMetadata(t *testing.T) {
 	tests := []struct {
 		name           string
 		content        string
+		host           string
 		owner          string
 		repo           string
 		ref            string
-		sha            string
 		treeSHA        string
 		pinnedRef      string
 		skillPath      string
@@ -86,23 +86,23 @@ func TestInjectGitHubMetadata(t *testing.T) {
 				---
 				# Body
 			`),
+			host:      "github.com",
 			owner:     "monalisa",
 			repo:      "octocat-skills",
 			ref:       "v1.0.0",
-			sha:       "abc123",
 			treeSHA:   "tree456",
 			pinnedRef: "",
 			skillPath: "skills/my-skill",
 			wantContains: []string{
-				"github-owner: monalisa",
-				"github-repo: octocat-skills",
+				"github-repo: https://github.com/monalisa/octocat-skills",
 				"github-ref: v1.0.0",
-				"github-sha: abc123",
 				"github-tree-sha: tree456",
 				"github-path: skills/my-skill",
 				"# Body",
 			},
 			wantNotContain: []string{
+				"github-owner",
+				"github-sha",
 				"github-pinned",
 			},
 		},
@@ -114,10 +114,10 @@ func TestInjectGitHubMetadata(t *testing.T) {
 				---
 				# Body
 			`),
+			host:      "github.com",
 			owner:     "monalisa",
 			repo:      "octocat-skills",
 			ref:       "v1.0.0",
-			sha:       "abc",
 			treeSHA:   "tree",
 			pinnedRef: "v1.0.0",
 			skillPath: "skills/my-skill",
@@ -128,24 +128,24 @@ func TestInjectGitHubMetadata(t *testing.T) {
 		{
 			name:      "injects metadata into content with no frontmatter",
 			content:   "# Body only\n",
+			host:      "github.com",
 			owner:     "monalisa",
 			repo:      "octocat-skills",
 			ref:       "v1.0.0",
-			sha:       "abc123",
 			treeSHA:   "tree456",
 			pinnedRef: "",
 			skillPath: "skills/my-skill",
 			wantContains: []string{
-				"github-owner: monalisa",
-				"github-repo: octocat-skills",
+				"github-repo: https://github.com/monalisa/octocat-skills",
 				"# Body only",
 			},
+			wantNotContain: []string{"github-owner", "github-sha"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := InjectGitHubMetadata(tt.content, tt.owner, tt.repo, tt.ref, tt.sha, tt.treeSHA, tt.pinnedRef, tt.skillPath)
+			got, err := InjectGitHubMetadata(tt.content, tt.host, tt.owner, tt.repo, tt.ref, tt.treeSHA, tt.pinnedRef, tt.skillPath)
 			require.NoError(t, err)
 			for _, s := range tt.wantContains {
 				assert.Contains(t, got, s)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/skills/source"
 	"gopkg.in/yaml.v3"
 )
 
@@ -66,7 +67,7 @@ func Parse(content string) (*ParseResult, error) {
 // collisions with other tools' metadata.
 // pinnedRef is the user's explicit --pin value; empty string means unpinned.
 // skillPath is the skill's source path in the repo (e.g. "skills/author/my-skill").
-func InjectGitHubMetadata(content string, owner, repo, ref, sha, treeSHA, pinnedRef, skillPath string) (string, error) {
+func InjectGitHubMetadata(content string, host, owner, repo, ref, treeSHA, pinnedRef, skillPath string) (string, error) {
 	result, err := Parse(content)
 	if err != nil {
 		return "", err
@@ -80,10 +81,10 @@ func InjectGitHubMetadata(content string, owner, repo, ref, sha, treeSHA, pinned
 	if meta == nil {
 		meta = make(map[string]interface{})
 	}
-	meta["github-owner"] = owner
-	meta["github-repo"] = repo
+	delete(meta, "github-owner")
+	meta["github-repo"] = source.BuildRepoURL(host, owner, repo)
 	meta["github-ref"] = ref
-	meta["github-sha"] = sha
+	delete(meta, "github-sha")
 	meta["github-tree-sha"] = treeSHA
 	meta["github-path"] = skillPath
 	if pinnedRef != "" {

@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/registry"
+	"github.com/cli/cli/v2/internal/skills/source"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -200,6 +201,9 @@ func searchRun(opts *searchOptions) error {
 		return err
 	}
 	host, _ := cfg.Authentication().DefaultHost()
+	if err := source.ValidateSupportedHost(host); err != nil {
+		return err
+	}
 
 	opts.IO.StartProgressIndicatorWithLabel("Searching for skills")
 

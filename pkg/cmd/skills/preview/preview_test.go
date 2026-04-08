@@ -283,6 +283,16 @@ func TestPreviewRun(t *testing.T) {
 	}
 }
 
+func TestPreviewRun_UnsupportedHost(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	err := previewRun(&previewOptions{
+		IO:         ios,
+		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
+		repo:       ghrepo.NewWithHost("github", "awesome-copilot", "acme.ghes.com"),
+	})
+	require.ErrorContains(t, err, "supports only github.com")
+}
+
 func TestPreviewRun_Interactive(t *testing.T) {
 	skillContent := "# Selected Skill\n\nContent here."
 	encodedContent := base64.StdEncoding.EncodeToString([]byte(skillContent))

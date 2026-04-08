@@ -282,7 +282,7 @@ func installSkill(opts *Options, skill discovery.Skill, baseDir string) error {
 		}
 
 		if filepath.Base(relPath) == "SKILL.md" {
-			content, err = frontmatter.InjectGitHubMetadata(content, opts.Owner, opts.Repo, opts.Ref, file.SHA, skill.TreeSHA, opts.PinnedRef, skill.Path)
+			content, err = frontmatter.InjectGitHubMetadata(content, opts.Host, opts.Owner, opts.Repo, opts.Ref, skill.TreeSHA, opts.PinnedRef, skill.Path)
 			if err != nil {
 				return fmt.Errorf("could not inject metadata: %w", err)
 			}

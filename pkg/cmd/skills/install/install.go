@@ -20,6 +20,7 @@ import (
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
 	"github.com/cli/cli/v2/internal/skills/installer"
 	"github.com/cli/cli/v2/internal/skills/registry"
+	"github.com/cli/cli/v2/internal/skills/source"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -126,10 +127,11 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			name or use the %[1]s--pin%[1]s flag. The version is resolved as a git tag or commit SHA.
 
 			Installed skills have GitHub tracking metadata injected into their
-			frontmatter (%[1]sgithub-owner%[1]s, %[1]sgithub-repo%[1]s, %[1]sgithub-ref%[1]s,
-			%[1]sgithub-sha%[1]s, %[1]sgithub-tree-sha%[1]s, %[1]sgithub-path%[1]s). This
+			frontmatter (%[1]sgithub-repo%[1]s, %[1]sgithub-ref%[1]s,
+			%[1]sgithub-tree-sha%[1]s, %[1]sgithub-path%[1]s). This
 			metadata identifies the source repository and enables %[1]sgh skills update%[1]s
 			to detect changes — the tree SHA serves as an ETag for staleness checks.
+			The %[1]sgithub-repo%[1]s value is stored as a full repository URL.
 
 			When run interactively, the command prompts for any missing arguments.
 			When run non-interactively, %[1]srepository%[1]s is required, and either a
@@ -226,12 +228,12 @@ func installRun(opts *installOptions) error {
 		return runLocalInstall(opts)
 	}
 
-	repo, source, err := resolveRepoArg(opts.SkillSource, canPrompt, opts.Prompter)
+	repo, repoSource, err := resolveRepoArg(opts.SkillSource, canPrompt, opts.Prompter)
 	if err != nil {
 		return err
 	}
 	opts.repo = repo
-	opts.SkillSource = source
+	opts.SkillSource = repoSource
 
 	parseSkillFromOpts(opts)
 
@@ -242,6 +244,9 @@ func installRun(opts *installOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	hostname := opts.repo.RepoHost()
+	if err := source.ValidateSupportedHost(hostname); err != nil {
+		return err
+	}
 
 	resolved, err := resolveVersion(opts, apiClient, hostname)
 	if err != nil {
@@ -290,7 +295,7 @@ func installRun(opts *installOptions) error {
 
 	gitRoot := installer.ResolveGitRoot(opts.GitClient)
 	homeDir := installer.ResolveHomeDir()
-	source = ghrepo.FullName(opts.repo)
+	repoSource = ghrepo.FullName(opts.repo)
 
 	plans, err := buildInstallPlans(opts, selectedSkills, selectedHosts, scope, gitRoot, homeDir, canPrompt)
 	if err != nil {
@@ -322,11 +327,11 @@ func installRun(opts *installOptions) error {
 
 			for _, name := range result.Installed {
 				fmt.Fprintf(opts.IO.Out, "%s Installed %s (from %s@%s) in %s\n",
-					cs.SuccessIcon(), name, source, resolved.Ref, friendlyDir(result.Dir))
+					cs.SuccessIcon(), name, repoSource, resolved.Ref, friendlyDir(result.Dir))
 			}
 
 			printFileTree(opts.IO.Out, cs, result.Dir, result.Installed)
-			printReviewHint(opts.IO.ErrOut, cs, source, result.Installed)
+			printReviewHint(opts.IO.ErrOut, cs, repoSource, result.Installed)
 		}
 
 		if err != nil {
@@ -914,16 +919,18 @@ func existingSkillPrompt(targetDir string, incoming discovery.Skill) string {
 		return fmt.Sprintf("Skill %q already exists. Overwrite?", incoming.DisplayName())
 	}
 
-	owner, _ := result.Metadata.Meta["github-owner"].(string)
-	repo, _ := result.Metadata.Meta["github-repo"].(string)
+	repoInfo, _, err := source.ParseMetadataRepo(result.Metadata.Meta)
 	ref, _ := result.Metadata.Meta["github-ref"].(string)
+	if err != nil {
+		return fmt.Sprintf("Skill %q already exists. Overwrite?", incoming.DisplayName())
+	}
 
-	if owner != "" && repo != "" {
-		source := owner + "/" + repo
+	if repoInfo != nil {
+		sourceName := ghrepo.FullName(repoInfo)
 		if ref != "" {
-			source += "@" + ref
+			sourceName += "@" + ref
 		}
-		return fmt.Sprintf("Skill %q already installed from %s. Overwrite?", incoming.DisplayName(), source)
+		return fmt.Sprintf("Skill %q already installed from %s. Overwrite?", incoming.DisplayName(), sourceName)
 	}
 
 	return fmt.Sprintf("Skill %q already exists. Overwrite?", incoming.DisplayName())

@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/internal/skills/frontmatter"
+	"github.com/cli/cli/v2/internal/skills/source"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
@@ -99,6 +100,9 @@ func previewRun(opts *previewOptions) error {
 	owner := repo.RepoOwner()
 	repoName := repo.RepoName()
 	hostname := repo.RepoHost()
+	if err := source.ValidateSupportedHost(hostname); err != nil {
+		return err
+	}
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {

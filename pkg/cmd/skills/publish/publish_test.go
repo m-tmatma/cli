@@ -140,6 +140,27 @@ func TestNewCmdPublish(t *testing.T) {
 	}
 }
 
+func TestPublishRun_UnsupportedHost(t *testing.T) {
+	dir := t.TempDir()
+	writeSkill(t, dir, "test-skill", heredoc.Doc(`
+		---
+		name: test-skill
+		description: A test skill
+		---
+		Body.
+	`))
+
+	ios, _, _, _ := iostreams.Test()
+	err := publishRun(&publishOptions{
+		IO:        ios,
+		Dir:       dir,
+		GitClient: newTestGitClient(t, map[string]string{"origin": "https://github.com/monalisa/skills-repo.git"}),
+		client:    api.NewClientFromHTTP(&http.Client{}),
+		host:      "acme.ghes.com",
+	})
+	require.ErrorContains(t, err, "supports only github.com")
+}
+
 func TestPublishRun(t *testing.T) {
 	tests := []struct {
 		name       string
