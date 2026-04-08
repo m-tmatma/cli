@@ -1,11 +1,11 @@
 # Install with --force should overwrite an existing skill without error
-exec gh skills install github/awesome-copilot git-commit --force --dir $WORK/force-test
+exec gh skill install github/awesome-copilot git-commit --force --dir $WORK/force-test
 stdout 'Installed git-commit'
 
 # Install again with --force — should succeed (overwrite)
-exec gh skills install github/awesome-copilot git-commit --force --dir $WORK/force-test
+exec gh skill install github/awesome-copilot git-commit --force --dir $WORK/force-test
 stdout 'Installed git-commit'
 
 # Without --force, non-interactive should fail when skill exists
-! exec gh skills install github/awesome-copilot git-commit --dir $WORK/force-test
+! exec gh skill install github/awesome-copilot git-commit --dir $WORK/force-test
 stderr 'already installed'

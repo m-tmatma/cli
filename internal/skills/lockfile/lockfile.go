@@ -2,10 +2,14 @@ package lockfile
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cli/cli/v2/internal/flock"
 )
 
 const (
@@ -43,61 +47,68 @@ func lockfilePath() (string, error) {
 	return filepath.Join(home, agentsDir, lockFile), nil
 }
 
-// read loads the lock file, returning an empty file if it doesn't exist
-// or if it's an incompatible version.
-func read() (*file, error) {
-	lockPath, err := lockfilePath()
-	if err != nil {
-		return newFile(), nil //nolint:nilerr // graceful: no home dir means fresh state
+// readFrom loads the lock file from an open file handle.
+// Returns an empty file if the content is empty, corrupt, or incompatible.
+func readFrom(f *os.File) (*file, error) {
+	if _, err := f.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("could not seek lock file: %w", err)
 	}
-
-	data, err := os.ReadFile(lockPath)
+	data, err := io.ReadAll(f)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return newFile(), nil
-		}
 		return nil, fmt.Errorf("could not read lock file: %w", err)
 	}
-
-	var f file
-	if err := json.Unmarshal(data, &f); err != nil {
-		return newFile(), nil //nolint:nilerr // graceful: corrupt file means fresh state
-	}
-
-	if f.Version != lockVersion || f.Skills == nil {
+	if len(data) == 0 {
 		return newFile(), nil
 	}
 
-	return &f, nil
+	var lf file
+	if err := json.Unmarshal(data, &lf); err != nil {
+		return newFile(), nil //nolint:nilerr // graceful: corrupt file means fresh state
+	}
+
+	if lf.Version != lockVersion || lf.Skills == nil {
+		return newFile(), nil
+	}
+
+	return &lf, nil
 }
 
-// write persists the lock file to disk.
-func write(f *file) error {
-	lockPath, err := lockfilePath()
+// writeTo persists the lock file through an open file handle.
+func writeTo(f *os.File, lf *file) error {
+	data, err := json.MarshalIndent(lf, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+	if _, err := f.Seek(0, 0); err != nil {
 		return err
 	}
-
-	data, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
+	if err := f.Truncate(0); err != nil {
 		return err
 	}
-
-	return os.WriteFile(lockPath, data, 0o644)
+	_, err = f.Write(data)
+	return err
 }
 
 // RecordInstall adds or updates a skill entry in the lock file.
 // It uses a file-based lock to prevent concurrent read-modify-write races
 // when multiple install processes run simultaneously.
 func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string) error {
-	unlock := acquireLock()
+	lockPath, err := lockfilePath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+		return fmt.Errorf("could not create lock directory: %w", err)
+	}
+
+	lockedFile, unlock, err := acquireFLock()
+	if err != nil {
+		return err
+	}
 	defer unlock()
 
-	f, err := read()
+	f, err := readFrom(lockedFile)
 	if err != nil {
 		return err
 	}
@@ -121,7 +132,7 @@ func RecordInstall(skillName, owner, repo, skillPath, treeSHA, pinnedRef string)
 		PinnedRef:       pinnedRef,
 	}
 
-	return write(f)
+	return writeTo(lockedFile, f)
 }
 
 func newFile() *file {
@@ -132,44 +143,35 @@ func newFile() *file {
 }
 
 var (
-	lockRetries       = 30
-	lockRetryInterval = 100 * time.Millisecond
+	lockAttempts     = 30
+	lockAttemptDelay = 100 * time.Millisecond
 )
 
-// acquireLock creates an exclusive lock file to serialize concurrent access.
-// Returns an unlock function. If locking fails after retries, it proceeds
-// unlocked rather than blocking the user indefinitely.
-func acquireLock() (unlock func()) {
-	lockPath, pathErr := lockfilePath()
-	if pathErr != nil {
-		return func() {}
-	}
-	lkPath := lockPath + ".lk"
-
-	// Ensure the parent directory exists (fresh machine may lack ~/.agents).
-	if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
-		return func() {}
+// acquireFLock attempts to acquire an exclusive file lock to serialize concurrent access.
+// Returns the locked file handle and an unlock function, or an error if the lock
+// cannot be acquired. The caller should read/write through the returned file to
+// avoid Windows mandatory lock conflicts.
+func acquireFLock() (f *os.File, unlock func(), err error) {
+	lockPath, err := lockfilePath()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not determine lock path: %w", err)
 	}
 
-	for range lockRetries {
-		f, createErr := os.OpenFile(lkPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-		if createErr == nil {
-			f.Close()
-			return func() { os.Remove(lkPath) }
+	var lastErr error
+	for attempt := range lockAttempts {
+		f, unlock, err := flock.TryLock(lockPath)
+		if err == nil {
+			return f, unlock, nil
 		}
-		// Only retry when the lock file already exists (concurrent process).
-		// For other errors (permission denied, invalid path, etc.) give up immediately.
-		if !os.IsExist(createErr) {
-			return func() {}
+		lastErr = err
+
+		if !errors.Is(err, flock.ErrLocked) {
+			return nil, nil, err
 		}
-		// Break stale locks older than 30s (e.g. from a crashed process).
-		if info, statErr := os.Stat(lkPath); statErr == nil && time.Since(info.ModTime()) > 30*time.Second {
-			os.Remove(lkPath)
-			continue
+		if attempt < lockAttempts-1 {
+			time.Sleep(lockAttemptDelay)
 		}
-		time.Sleep(lockRetryInterval)
 	}
 
-	// Best-effort: proceed without lock.
-	return func() {}
+	return nil, nil, fmt.Errorf("could not acquire lock after %d attempts: %w", lockAttempts, lastErr)
 }

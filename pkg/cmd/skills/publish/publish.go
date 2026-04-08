@@ -27,25 +27,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// publishOptions holds all dependencies and user-provided flags for the publish command.
-type publishOptions struct {
+// PublishOptions holds all dependencies and user-provided flags for the publish command.
+type PublishOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Config     func() (gh.Config, error)
 	Prompter   prompter.Prompter
 	GitClient  *git.Client
 
-	// Arguments
-	Dir string // directory to validate (default: cwd)
+	Dir    string
+	Fix    bool
+	DryRun bool
+	Tag    string
 
-	// Flags
-	Fix    bool   // --fix flag: auto-fix issues where possible
-	DryRun bool   // --dry-run flag: validate only, don't publish
-	Tag    string // --tag flag: release tag to create
-
-	// Testing overrides
-	client *api.Client // injectable for tests; nil means use factory HttpClient
-	host   string      // API host (e.g. "github.com"); resolved from config in production
+	client *api.Client // injectable for tests; nil means use factory
+	host   string      // resolved from config in production
 }
 
 // publishDiagnostic is a single validation finding.
@@ -90,8 +86,8 @@ type repoSecurityResponse struct {
 }
 
 // NewCmdPublish creates the "skills publish" command.
-func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.Command {
-	opts := &publishOptions{
+func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.Command {
+	opts := &PublishOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
@@ -100,8 +96,8 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "publish [<directory>]",
-		Short: "Validate and publish skills to a GitHub repository",
+		Use:   "publish [<directory>] [flags]",
+		Short: "Validate and publish skills to a GitHub repository (preview)",
 		Long: heredoc.Doc(`
 			Validate a local repository's skills against the Agent Skills specification
 			and publish them by creating a GitHub release.
@@ -158,7 +154,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*publishOptions) error) *cobra.
 	return cmd
 }
 
-func publishRun(opts *publishOptions) error {
+func publishRun(opts *PublishOptions) error {
 	dir := opts.Dir
 	if dir == "" {
 		var err error
@@ -478,7 +474,7 @@ func fetchTags(client *api.Client, host, owner, repo string) []tagEntry {
 }
 
 // runPublishRelease handles the interactive publish flow: topic, tag, release, immutability.
-func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, repo, dir string, hasTopic bool, existingTags []tagEntry) error {
+func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, repo, dir string, hasTopic bool, existingTags []tagEntry) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
@@ -515,7 +511,7 @@ func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, re
 
 		if canPrompt {
 			strategies := []string{
-				fmt.Sprintf("Semver (recommended) — %s", suggested),
+				fmt.Sprintf("Semver (recommended): %s", suggested),
 				"Custom tag",
 			}
 			idx, err := opts.Prompter.Select("Tagging strategy:", "", strategies)
@@ -550,7 +546,7 @@ func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, re
 	// Validate tag doesn't already exist
 	for _, t := range existingTags {
 		if t.Name == tag {
-			return fmt.Errorf("tag %s already exists — choose a different version", tag)
+			return fmt.Errorf("tag %s already exists; choose a different version", tag)
 		}
 	}
 
@@ -565,7 +561,7 @@ func runPublishRelease(opts *publishOptions, client *api.Client, host, owner, re
 		if enableImmutable {
 			if err := enableImmutableReleases(client, host, owner, repo); err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s Could not enable immutable releases: %v\n", cs.WarningIcon(), err)
-				fmt.Fprintf(opts.IO.ErrOut, "  Enable manually in Settings → General → Releases\n")
+				fmt.Fprintf(opts.IO.ErrOut, "  Enable manually in Settings > General > Releases\n")
 			} else {
 				fmt.Fprintf(opts.IO.Out, "%s Enabled immutable releases\n", cs.SuccessIcon())
 			}
@@ -707,7 +703,7 @@ func checkTagProtection(client *api.Client, host, owner, repo string) []publishD
 
 	return []publishDiagnostic{{
 		severity: "warning",
-		message:  "no active tag protection rulesets found — consider protecting tags to ensure immutable releases (Settings → Rules → Rulesets)",
+		message:  "no active tag protection rulesets found. Consider protecting tags to ensure immutable releases (Settings > Rules > Rulesets)",
 	}}
 }
 
@@ -732,14 +728,14 @@ func checkSecuritySettings(client *api.Client, host, owner, repo, skillsDir stri
 	if sa.SecretScanning == nil || sa.SecretScanning.Status != "enabled" {
 		diagnostics = append(diagnostics, publishDiagnostic{
 			severity: "warning",
-			message:  "secret scanning is not enabled — recommended to prevent accidental credential exposure (gh repo edit --enable-secret-scanning)",
+			message:  "secret scanning is not enabled. Recommended to prevent accidental credential exposure (gh repo edit --enable-secret-scanning)",
 		})
 	}
 
 	if sa.SecretScanningPushProtection == nil || sa.SecretScanningPushProtection.Status != "enabled" {
 		diagnostics = append(diagnostics, publishDiagnostic{
 			severity: "warning",
-			message:  "secret scanning push protection is not enabled — blocks pushes containing secrets (gh repo edit --enable-secret-scanning-push-protection)",
+			message:  "secret scanning push protection is not enabled. Blocks pushes containing secrets (gh repo edit --enable-secret-scanning-push-protection)",
 		})
 	}
 
@@ -750,7 +746,7 @@ func checkSecuritySettings(client *api.Client, host, owner, repo, skillsDir stri
 		if err := client.REST(host, "GET", alertsPath, nil, new([]interface{})); err != nil {
 			diagnostics = append(diagnostics, publishDiagnostic{
 				severity: "info",
-				message:  "skills include code files but code scanning does not appear to be configured (Settings → Code security → Code scanning)",
+				message:  "skills include code files but code scanning does not appear to be configured (Settings > Code security > Code scanning)",
 			})
 		}
 	}
@@ -760,7 +756,7 @@ func checkSecuritySettings(client *api.Client, host, owner, repo, skillsDir stri
 		if err := client.REST(host, "GET", dependabotPath, nil, nil); err != nil {
 			diagnostics = append(diagnostics, publishDiagnostic{
 				severity: "info",
-				message:  "skills include dependency manifests but Dependabot alerts do not appear to be enabled (Settings → Code security → Dependabot)",
+				message:  "skills include dependency manifests but Dependabot alerts do not appear to be enabled (Settings > Code security > Dependabot)",
 			})
 		}
 	}
@@ -825,7 +821,15 @@ func checkInstalledSkillDirs(gitClient *git.Client, repoDir string) []publishDia
 		if gitClient != nil {
 			ignoreGitClient := gitClient.Copy()
 			ignoreGitClient.RepoDir = repoDir
-			if ignoreGitClient.IsIgnored(context.Background(), relPath) {
+			ignored, err := ignoreGitClient.IsIgnored(context.Background(), relPath)
+			if ignored {
+				continue
+			}
+			if err != nil {
+				diagnostics = append(diagnostics, publishDiagnostic{
+					severity: "warning",
+					message:  fmt.Sprintf("%s/ may contain installed skills that are not gitignored (could not verify: %v)", relPath, err),
+				})
 				continue
 			}
 		}
@@ -883,7 +887,7 @@ func detectGitHubRemote(gitClient *git.Client) (ghrepo.Interface, error) {
 	// Fall back to any remote that points to GitHub
 	remotes, err := gitClient.Remotes(context.Background())
 	if err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // failing to list remotes is not an error; it just means no repo detected
 	}
 	for _, r := range remotes {
 		if r.Name == "origin" {
@@ -907,14 +911,14 @@ func detectGitHubRemote(gitClient *git.Client) (ghrepo.Interface, error) {
 func parseGitHubURL(rawURL string) (ghrepo.Interface, error) {
 	u, err := git.ParseURL(rawURL)
 	if err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // unparseable URL means it's not a GitHub remote
 	}
 	r, err := ghrepo.FromURL(u)
 	if err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // URL didn't match GitHub repo format
 	}
 	if err := source.ValidateSupportedHost(r.RepoHost()); err != nil {
-		return nil, nil
+		return nil, nil //nolint:nilerr // non-GitHub host is silently ignored
 	}
 	return r, nil
 }
@@ -930,7 +934,7 @@ func detectMissingRepoDiagnostic(gitClient *git.Client, dir string) []publishDia
 	if _, err := dirGitClient.GitDir(context.Background()); err != nil {
 		return []publishDiagnostic{{
 			severity: "warning",
-			message:  "not a git repository — initialize with: git init && gh repo create",
+			message:  "not a git repository. Initialize with: git init && gh repo create",
 		}}
 	}
 
@@ -938,7 +942,7 @@ func detectMissingRepoDiagnostic(gitClient *git.Client, dir string) []publishDia
 	if err != nil || len(remotes) == 0 {
 		return []publishDiagnostic{{
 			severity: "warning",
-			message:  "no git remote found — create a GitHub repository with: gh repo create",
+			message:  "no git remote found. Create a GitHub repository with: gh repo create",
 		}}
 	}
 
@@ -950,11 +954,11 @@ func detectMissingRepoDiagnostic(gitClient *git.Client, dir string) []publishDia
 	}
 	return []publishDiagnostic{{
 		severity: "warning",
-		message:  fmt.Sprintf("remote %q is not a GitHub repository — skills must be hosted on GitHub for discovery", strings.Join(urls, ", ")),
+		message:  fmt.Sprintf("remote %q is not a GitHub repository. Skills must be hosted on GitHub for discovery", strings.Join(urls, ", ")),
 	}}
 }
 
-func renderDiagnosticsTTY(opts *publishOptions, skillDirs []string, diagnostics []publishDiagnostic, errors, warnings, fixes int, owner, repo string) {
+func renderDiagnosticsTTY(opts *PublishOptions, skillDirs []string, diagnostics []publishDiagnostic, errors, warnings, fixes int, owner, repo string) {
 	cs := opts.IO.ColorScheme()
 
 	// Separate info messages from errors/warnings for cleaner output
@@ -1016,7 +1020,7 @@ func renderDiagnosticsTTY(opts *publishOptions, skillDirs []string, diagnostics 
 	}
 }
 
-func renderDiagnosticsPlain(opts *publishOptions, diagnostics []publishDiagnostic, errors, warnings int) {
+func renderDiagnosticsPlain(opts *PublishOptions, diagnostics []publishDiagnostic, errors, warnings int) {
 	for _, d := range diagnostics {
 		if d.severity == "info" {
 			continue

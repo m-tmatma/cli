@@ -23,23 +23,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// updateOptions holds all dependencies and user-provided flags for the update command.
-type updateOptions struct {
+// UpdateOptions holds all dependencies and user-provided flags for the update command.
+type UpdateOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Config     func() (gh.Config, error)
 	Prompter   prompter.Prompter
 	GitClient  *git.Client
 
-	// Arguments
-	Skills []string // optional: specific skills to update
-
-	// Flags
-	All    bool   // --all flag (update without prompting)
-	Force  bool   // --force flag (re-download even if SHAs match)
-	DryRun bool   // --dry-run flag (report only, no changes)
-	Unpin  bool   // --unpin flag (clear pinned ref and include in update)
-	Dir    string // --dir flag (scan a custom directory)
+	Skills []string
+	All    bool
+	Force  bool
+	DryRun bool
+	Unpin  bool
+	Dir    string
 }
 
 // installedSkill represents a locally installed skill parsed from its SKILL.md frontmatter.
@@ -66,8 +63,8 @@ type pendingUpdate struct {
 }
 
 // NewCmdUpdate creates the "skills update" command.
-func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Command {
-	opts := &updateOptions{
+func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Command {
+	opts := &UpdateOptions{
 		IO:         f.IOStreams,
 		Prompter:   f.Prompter,
 		Config:     f.Config,
@@ -76,8 +73,8 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "update [<skill>...]",
-		Short: "Update installed skills to their latest versions",
+		Use:   "update [<skill>...] [flags]",
+		Short: "Update installed skills to their latest versions (preview)",
 		Long: heredoc.Doc(`
 			Checks installed skills for available updates by comparing the local
 			tree SHA (from SKILL.md frontmatter) against the remote repository.
@@ -142,7 +139,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*updateOptions) error) *cobra.Co
 	return cmd
 }
 
-func updateRun(opts *updateOptions) error {
+func updateRun(opts *UpdateOptions) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
@@ -190,10 +187,23 @@ func updateRun(opts *updateOptions) error {
 		installed = filtered
 	}
 
-	for _, s := range installed {
-		if s.metadataErr != nil {
-			return fmt.Errorf("skill %s has invalid repository metadata: %w", s.name, s.metadataErr)
+	// Skip skills with invalid metadata rather than aborting the entire
+	// update run. One corrupt skill should not prevent updating others.
+	{
+		var valid []installedSkill
+		for _, s := range installed {
+			if s.metadataErr != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipping %s: invalid repository metadata: %s\n", cs.WarningIcon(), s.name, s.metadataErr)
+				continue
+			}
+			valid = append(valid, s)
 		}
+		installed = valid
+	}
+
+	if len(installed) == 0 {
+		fmt.Fprintf(opts.IO.ErrOut, "No updatable skills found.\n")
+		return nil
 	}
 
 	// Prompt for metadata on skills missing it (before starting progress indicator)
@@ -205,7 +215,7 @@ func updateRun(opts *updateOptions) error {
 		name   string
 		source string // "owner/repo"
 	}
-	prompted := make(map[string]promptedEntry) // dir → entry
+	prompted := make(map[string]promptedEntry) // dir > entry
 	for i := range installed {
 		s := &installed[i]
 		if s.owner != "" && s.repo != "" {
@@ -327,7 +337,7 @@ func updateRun(opts *updateOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s %s is pinned to %s (skipped)\n", cs.Muted("⊘"), s.name, s.pinned)
 	}
 	for _, name := range noMeta {
-		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no GitHub metadata — reinstall to enable updates\n", cs.WarningIcon(), name)
+		fmt.Fprintf(opts.IO.ErrOut, "%s %s has no GitHub metadata. Reinstall to enable updates\n", cs.WarningIcon(), name)
 	}
 
 	if len(updates) == 0 {
@@ -346,7 +356,7 @@ func updateRun(opts *updateOptions) error {
 				cs.Cyan("•"), u.local.name, u.local.owner, u.local.repo,
 				git.ShortSHA(u.newSHA), discovery.ShortRef(u.resolved.Ref))
 		} else {
-			fmt.Fprintf(opts.IO.Out, "  %s %s (%s/%s) %s → %s [%s]\n",
+			fmt.Fprintf(opts.IO.Out, "  %s %s (%s/%s) %s > %s [%s]\n",
 				cs.Cyan("•"), u.local.name, u.local.owner, u.local.repo,
 				cs.Muted(git.ShortSHA(u.local.treeSHA)), git.ShortSHA(u.newSHA),
 				discovery.ShortRef(u.resolved.Ref))

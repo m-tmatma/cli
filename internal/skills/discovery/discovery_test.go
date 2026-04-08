@@ -438,7 +438,7 @@ func TestResolveRef(t *testing.T) {
 			wantSHA: "fallback-sha",
 		},
 		{
-			name: "empty default_branch falls back to main",
+			name: "empty default_branch returns error",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/releases/latest"),
@@ -446,14 +446,41 @@ func TestResolveRef(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills"),
 					httpmock.JSONResponse(map[string]interface{}{"default_branch": ""}))
+			},
+			wantErr: "could not determine default branch",
+		},
+		{
+			name:    "short name with server error on branch lookup does not fall through",
+			version: "main",
+			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/main"),
-					httpmock.JSONResponse(map[string]interface{}{
-						"object": map[string]interface{}{"sha": "main-sha"},
-					}))
+					httpmock.StatusStringResponse(500, "server error"))
 			},
-			wantRef: "refs/heads/main",
-			wantSHA: "main-sha",
+			wantErr: `branch "main" not found in monalisa/octocat-skills`,
+		},
+		{
+			name:    "short name with forbidden error on branch lookup does not fall through",
+			version: "develop",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/develop"),
+					httpmock.StatusStringResponse(403, "forbidden"))
+			},
+			wantErr: `branch "develop" not found in monalisa/octocat-skills`,
+		},
+		{
+			name:    "short name with server error on tag lookup does not fall through",
+			version: "v5.0",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/heads/v5.0"),
+					httpmock.StatusStringResponse(404, "not found"))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/ref/tags/v5.0"),
+					httpmock.StatusStringResponse(500, "server error"))
+			},
+			wantErr: `tag "v5.0" not found in monalisa/octocat-skills`,
 		},
 	}
 	for _, tt := range tests {

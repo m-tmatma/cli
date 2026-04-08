@@ -715,7 +715,7 @@ func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
 
 // RemoteURL returns the fetch URL configured for the named remote.
 func (c *Client) RemoteURL(ctx context.Context, name string) (string, error) {
-	cmd, err := c.Command(ctx, "remote", "get-url", name)
+	cmd, err := c.Command(ctx, "remote", "get-url", "--", name)
 	if err != nil {
 		return "", err
 	}
@@ -727,13 +727,23 @@ func (c *Client) RemoteURL(ctx context.Context, name string) (string, error) {
 }
 
 // IsIgnored reports whether the given path is ignored by .gitignore rules.
-func (c *Client) IsIgnored(ctx context.Context, path string) bool {
-	cmd, err := c.Command(ctx, "check-ignore", "-q", path)
+// Returns an error for fatal git failures (e.g. path outside repository).
+func (c *Client) IsIgnored(ctx context.Context, path string) (bool, error) {
+	cmd, err := c.Command(ctx, "check-ignore", "-q", "--", path)
 	if err != nil {
-		return false
+		return false, err
 	}
 	_, err = cmd.Output()
-	return err == nil
+	if err == nil {
+		return true, nil
+	}
+	// Exit 1 here means we can confirm the path is not ignored.
+	// Any other error is a real git error.
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, err
 }
 
 // ShortSHA returns the first 8 characters of a SHA hash for display purposes.

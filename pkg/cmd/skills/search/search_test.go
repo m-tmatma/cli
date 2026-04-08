@@ -23,7 +23,7 @@ func TestSearchRun_UnsupportedHost(t *testing.T) {
 	cfg.AuthenticationFunc = func() gh.AuthConfig {
 		return authCfg
 	}
-	err := searchRun(&searchOptions{
+	err := searchRun(&SearchOptions{
 		IO:         ios,
 		Query:      "terraform",
 		Page:       1,
@@ -38,33 +38,33 @@ func TestNewCmdSearch(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     string
-		wantOpts searchOptions
+		wantOpts SearchOptions
 		wantErr  string
 	}{
 		{
 			name:     "query argument",
 			args:     "terraform",
-			wantOpts: searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			wantOpts: SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 		},
 		{
 			name:     "with page flag",
 			args:     "terraform --page 3",
-			wantOpts: searchOptions{Query: "terraform", Page: 3, Limit: defaultLimit},
+			wantOpts: SearchOptions{Query: "terraform", Page: 3, Limit: defaultLimit},
 		},
 		{
 			name:     "with limit flag",
 			args:     "terraform --limit 5",
-			wantOpts: searchOptions{Query: "terraform", Page: 1, Limit: 5},
+			wantOpts: SearchOptions{Query: "terraform", Page: 1, Limit: 5},
 		},
 		{
 			name:     "with limit short flag",
 			args:     "terraform -L 10",
-			wantOpts: searchOptions{Query: "terraform", Page: 1, Limit: 10},
+			wantOpts: SearchOptions{Query: "terraform", Page: 1, Limit: 10},
 		},
 		{
 			name:     "with owner flag",
 			args:     "terraform --owner hashicorp",
-			wantOpts: searchOptions{Query: "terraform", Owner: "hashicorp", Page: 1, Limit: defaultLimit},
+			wantOpts: SearchOptions{Query: "terraform", Owner: "hashicorp", Page: 1, Limit: defaultLimit},
 		},
 		{
 			name:    "no arguments",
@@ -101,8 +101,8 @@ func TestNewCmdSearch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{}
-			var gotOpts *searchOptions
-			cmd := NewCmdSearch(f, func(opts *searchOptions) error {
+			var gotOpts *SearchOptions
+			cmd := NewCmdSearch(f, func(opts *SearchOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -149,7 +149,7 @@ func TestSearchRun(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		opts       *searchOptions
+		opts       *SearchOptions
 		tty        bool
 		httpStubs  func(*httpmock.Registry)
 		wantStdout string
@@ -159,7 +159,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "displays results in non-TTY",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 1, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "github/awesome-skills"}}]}`)
 			},
@@ -168,7 +168,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "deduplicates results",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 3, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "github/awesome-skills"}}, {"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "github/awesome-skills"}}, {"name": "SKILL.md", "path": "skills/terraform-aws/SKILL.md", "repository": {"full_name": "github/awesome-skills"}}]}`)
 			},
@@ -177,7 +177,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "no results",
 			tty:  true,
-			opts: &searchOptions{Query: "nonexistent", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "nonexistent", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, emptyCodeResponse)
 			},
@@ -186,7 +186,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "nested skill path",
 			tty:  false,
-			opts: &searchOptions{Query: "my-skill", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "my-skill", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 1, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/author/my-skill/SKILL.md", "repository": {"full_name": "org/repo"}}]}`)
 			},
@@ -195,7 +195,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "ranks name-matching results first",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 3, "incomplete_results": false, "items": [
 						{"name": "SKILL.md", "path": "skills/terraform-deploy/SKILL.md", "repository": {"full_name": "org/repo1"}},
@@ -209,7 +209,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "caps total pages at 1000-result limit",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 5000, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "org/repo"}}]}`)
 			},
@@ -219,7 +219,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "page beyond available results",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 999, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 999, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 1, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "org/repo"}}]}`)
 			},
@@ -228,10 +228,10 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "json output with selected fields",
 			tty:  false,
-			opts: func() *searchOptions {
+			opts: func() *SearchOptions {
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields([]string{"repo", "skillName", "stars"})
-				return &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit, Exporter: exporter}
+				return &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit, Exporter: exporter}
 			}(),
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 1, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "github/awesome-skills"}}]}`)
@@ -241,10 +241,10 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "json output empty results",
 			tty:  false,
-			opts: func() *searchOptions {
+			opts: func() *SearchOptions {
 				exporter := cmdutil.NewJSONExporter()
 				exporter.SetFields([]string{"repo", "skillName"})
-				return &searchOptions{Query: "nonexistent", Page: 1, Limit: defaultLimit, Exporter: exporter}
+				return &SearchOptions{Query: "nonexistent", Page: 1, Limit: defaultLimit, Exporter: exporter}
 			}(),
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, emptyCodeResponse)
@@ -254,7 +254,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "rate limit error returns friendly message",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				// All search/code calls return 403 with x-ratelimit-remaining: 0
 				for range 3 {
@@ -272,7 +272,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "HTTP 429 returns rate limit error",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				for range 3 {
 					reg.Register(
@@ -286,7 +286,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "HTTP 403 with Retry-After returns rate limit error",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				for range 3 {
 					reg.Register(
@@ -303,7 +303,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "no results with owner scope",
 			tty:  true,
-			opts: &searchOptions{Query: "nonexistent", Owner: "monalisa", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "nonexistent", Owner: "monalisa", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				// With --owner set, only path + primary searches fire (no owner search).
 				for range 2 {
@@ -318,7 +318,7 @@ func TestSearchRun(t *testing.T) {
 		{
 			name: "enriches results with blob descriptions",
 			tty:  false,
-			opts: &searchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
+			opts: &SearchOptions{Query: "terraform", Page: 1, Limit: defaultLimit},
 			httpStubs: func(reg *httpmock.Registry) {
 				codeResponse := `{"total_count": 1, "incomplete_results": false, "items": [
 					{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "sha": "abc123",

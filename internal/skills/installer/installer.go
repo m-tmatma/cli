@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
@@ -86,31 +87,34 @@ func Install(opts *Options) (*Result, error) {
 		opts.OnProgress(0, total)
 	}
 
-	sem := make(chan struct{}, maxConcurrency)
+	type job struct {
+		idx   int
+		skill discovery.Skill
+	}
+	jobs := make(chan job)
+
 	results := make([]skillResult, total)
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	done := 0
+	var done atomic.Int32
 
-	for i, skill := range opts.Skills {
-		wg.Add(1)
-		go func(idx int, s discovery.Skill) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+	workers := min(maxConcurrency, total)
+	for range workers {
+		wg.Go(func() {
+			for j := range jobs {
+				err := installSkill(opts, j.skill, targetDir)
+				results[j.idx] = skillResult{name: j.skill.InstallName(), err: err}
 
-			err := installSkill(opts, s, targetDir)
-			results[idx] = skillResult{name: s.InstallName(), err: err}
-
-			if opts.OnProgress != nil {
-				mu.Lock()
-				done++
-				d := done
-				mu.Unlock()
-				opts.OnProgress(d, total)
+				if opts.OnProgress != nil {
+					opts.OnProgress(int(done.Add(1)), total)
+				}
 			}
-		}(i, skill)
+		})
 	}
+
+	for i, s := range opts.Skills {
+		jobs <- job{idx: i, skill: s}
+	}
+	close(jobs)
 	wg.Wait()
 
 	var installed []string

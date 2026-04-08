@@ -76,12 +76,12 @@ func TestNewCmdPublish(t *testing.T) {
 		name      string
 		cli       string
 		wantsErr  bool
-		wantsOpts publishOptions
+		wantsOpts PublishOptions
 	}{
 		{
 			name: "all flags",
 			cli:  "./monalisa-skills --dry-run --fix --tag v1.0.0",
-			wantsOpts: publishOptions{
+			wantsOpts: PublishOptions{
 				Dir:    "./monalisa-skills",
 				DryRun: true,
 				Fix:    true,
@@ -91,19 +91,19 @@ func TestNewCmdPublish(t *testing.T) {
 		{
 			name: "directory only",
 			cli:  "./octocat-repo",
-			wantsOpts: publishOptions{
+			wantsOpts: PublishOptions{
 				Dir: "./octocat-repo",
 			},
 		},
 		{
 			name:      "no args leaves dir empty",
 			cli:       "",
-			wantsOpts: publishOptions{},
+			wantsOpts: PublishOptions{},
 		},
 		{
 			name: "dry-run flag only",
 			cli:  "--dry-run",
-			wantsOpts: publishOptions{
+			wantsOpts: PublishOptions{
 				DryRun: true,
 			},
 		},
@@ -113,8 +113,8 @@ func TestNewCmdPublish(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
 			f := cmdutil.Factory{IOStreams: ios}
 
-			var gotOpts *publishOptions
-			cmd := NewCmdPublish(&f, func(opts *publishOptions) error {
+			var gotOpts *PublishOptions
+			cmd := NewCmdPublish(&f, func(opts *PublishOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -151,7 +151,7 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 	`))
 
 	ios, _, _, _ := iostreams.Test()
-	err := publishRun(&publishOptions{
+	err := publishRun(&PublishOptions{
 		IO:        ios,
 		Dir:       dir,
 		GitClient: newTestGitClient(t, map[string]string{"origin": "https://github.com/monalisa/skills-repo.git"}),
@@ -167,7 +167,7 @@ func TestPublishRun(t *testing.T) {
 		isTTY      bool
 		setup      func(t *testing.T, dir string)
 		stubs      func(*httpmock.Registry)
-		opts       func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions
+		opts       func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions
 		verify     func(t *testing.T, dir string)
 		wantErr    string
 		wantStdout string
@@ -176,9 +176,9 @@ func TestPublishRun(t *testing.T) {
 		{
 			name:  "no skills directory",
 			setup: func(_ *testing.T, _ string) {},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantErr: "no skills/ directory",
 		},
@@ -188,9 +188,9 @@ func TestPublishRun(t *testing.T) {
 				t.Helper()
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, "skills", "empty-skill"), 0o755))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantErr:    "validation failed",
 			wantStdout: "missing SKILL.md",
@@ -206,9 +206,9 @@ func TestPublishRun(t *testing.T) {
 					Body text.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantErr:    "validation failed",
 			wantStdout: "missing required field: name",
@@ -225,9 +225,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantErr:    "validation failed",
 			wantStdout: "does not match directory name",
@@ -244,9 +244,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantErr:    "validation failed",
 			wantStdout: "naming convention",
@@ -268,9 +268,9 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				stubAllSecureRemote(reg, "monalisa", "skills-repo")
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:     ios,
 					Dir:    dir,
 					DryRun: true,
@@ -320,9 +320,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Tag: "v1.0.1",
@@ -356,9 +356,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir, Fix: true}
+				return &PublishOptions{IO: ios, Dir: dir, Fix: true}
 			},
 			wantStdout: "stripped install metadata",
 			verify: func(t *testing.T, dir string) {
@@ -386,9 +386,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir, Fix: false}
+				return &PublishOptions{IO: ios, Dir: dir, Fix: false}
 			},
 			wantErr:    "validation failed",
 			wantStdout: "--fix",
@@ -405,9 +405,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantStdout: "license",
 		},
@@ -426,9 +426,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{IO: ios, Dir: dir}
+				return &PublishOptions{IO: ios, Dir: dir}
 			},
 			wantErr:    "validation failed",
 			wantStdout: "allowed-tools must be a string",
@@ -473,9 +473,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					GitClient: newTestGitClient(t, map[string]string{
@@ -525,9 +525,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					GitClient: newTestGitClient(t, map[string]string{
@@ -587,9 +587,9 @@ func TestPublishRun(t *testing.T) {
 					httpmock.StatusStringResponse(404, "not found"),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:     ios,
 					Dir:    dir,
 					DryRun: true,
@@ -651,9 +651,9 @@ func TestPublishRun(t *testing.T) {
 					httpmock.StatusStringResponse(404, "not found"),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:     ios,
 					Dir:    dir,
 					DryRun: true,
@@ -680,14 +680,14 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills", "installed"), 0o755))
 				runGitInDir(t, dir, "init", "--initial-branch=main")
 				runGitInDir(t, dir, "config", "user.email", "monalisa@github.com")
 				runGitInDir(t, dir, "config", "user.name", "Monalisa Octocat")
 
-				return &publishOptions{
+				return &PublishOptions{
 					IO:        ios,
 					Dir:       dir,
 					GitClient: &git.Client{RepoDir: dir},
@@ -716,9 +716,9 @@ func TestPublishRun(t *testing.T) {
 				runGitInDir(t, dir, "add", ".gitignore")
 				runGitInDir(t, dir, "commit", "-m", "init")
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:        ios,
 					Dir:       dir,
 					GitClient: &git.Client{RepoDir: dir},
@@ -729,6 +729,31 @@ func TestPublishRun(t *testing.T) {
 				t.Helper()
 				// The key assertion: .gitignored dirs should NOT produce a warning
 			},
+		},
+		{
+			name: "installed skill dirs git error warns about unverified status",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				writeSkill(t, dir, "my-skill", heredoc.Doc(`
+					---
+					name: my-skill
+					description: A skill
+					license: MIT
+					---
+					Body.
+				`))
+				// Create install dir but do NOT init git so check-ignore will fail
+				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".agents", "skills", "installed"), 0o755))
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
+				t.Helper()
+				return &PublishOptions{
+					IO:        ios,
+					Dir:       dir,
+					GitClient: &git.Client{RepoDir: dir},
+				}
+			},
+			wantStdout: "may contain installed skills that are not gitignored",
 		},
 		{
 			name: "no GitHub remote warns",
@@ -747,9 +772,9 @@ func TestPublishRun(t *testing.T) {
 				runGitInDir(t, dir, "config", "user.name", "Monalisa Octocat")
 				runGitInDir(t, dir, "remote", "add", "origin", "https://gitlab.com/hubot/bar.git")
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:        ios,
 					Dir:       dir,
 					GitClient: &git.Client{RepoDir: dir},
@@ -774,9 +799,9 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				stubAllSecureRemote(reg, "octocat", "repo")
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:     ios,
 					Dir:    dir,
 					DryRun: true,
@@ -860,9 +885,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Tag: "v1.0.0",
@@ -937,9 +962,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Tag: "v2.3.5",
@@ -968,9 +993,9 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				stubAllSecureRemote(reg, "monalisa", "skills-repo")
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Tag: "v1.0.0", // same as stubAllSecureRemote's existing tag
@@ -1000,9 +1025,9 @@ func TestPublishRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				stubAllSecureRemote(reg, "monalisa", "skills-repo")
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					GitClient: newTestGitClient(t, map[string]string{
@@ -1027,9 +1052,9 @@ func TestPublishRun(t *testing.T) {
 					Body.
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 				}
@@ -1051,7 +1076,7 @@ func TestPublishRun(t *testing.T) {
 				`))
 			},
 			stubs: func(reg *httpmock.Registry) {
-				// No topic yet — first GET for diagnostic check
+				// No topic yet, first GET for diagnostic check
 				reg.Register(
 					httpmock.REST("GET", "repos/monalisa/skills-repo/topics"),
 					httpmock.JSONResponse(map[string]interface{}{"names": []string{}}),
@@ -1097,10 +1122,10 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
 				confirmCall := 0
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Prompter: &prompter.PrompterMock{
@@ -1155,9 +1180,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Prompter: &prompter.PrompterMock{
@@ -1205,10 +1230,10 @@ func TestPublishRun(t *testing.T) {
 					httpmock.JSONResponse(map[string]interface{}{"default_branch": "main"}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
 				confirmCall := 0
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Prompter: &prompter.PrompterMock{
@@ -1273,9 +1298,9 @@ func TestPublishRun(t *testing.T) {
 					}),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *publishOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
 				t.Helper()
-				return &publishOptions{
+				return &PublishOptions{
 					IO:  ios,
 					Dir: dir,
 					Prompter: &prompter.PrompterMock{

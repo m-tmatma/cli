@@ -73,8 +73,8 @@ func TestNewCmdPreview(t *testing.T) {
 				Prompter:  &prompter.PrompterMock{},
 			}
 
-			var gotOpts *previewOptions
-			cmd := NewCmdPreview(f, func(opts *previewOptions) error {
+			var gotOpts *PreviewOptions
+			cmd := NewCmdPreview(f, func(opts *PreviewOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -112,7 +112,7 @@ func TestPreviewRun(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		opts       *previewOptions
+		opts       *PreviewOptions
 		tty        bool
 		httpStubs  func(*httpmock.Registry)
 		wantStdout string
@@ -121,7 +121,7 @@ func TestPreviewRun(t *testing.T) {
 		{
 			name: "preview specific skill",
 			tty:  true,
-			opts: &previewOptions{
+			opts: &PreviewOptions{
 				repo:      ghrepo.New("github", "awesome-copilot"),
 				SkillName: "my-skill",
 			},
@@ -164,7 +164,7 @@ func TestPreviewRun(t *testing.T) {
 		{
 			name: "preview with display name match",
 			tty:  true,
-			opts: &previewOptions{
+			opts: &PreviewOptions{
 				repo:      ghrepo.New("owner", "repo"),
 				SkillName: "ns/my-skill",
 			},
@@ -208,7 +208,7 @@ func TestPreviewRun(t *testing.T) {
 		{
 			name: "skill not found",
 			tty:  true,
-			opts: &previewOptions{
+			opts: &PreviewOptions{
 				repo:      ghrepo.New("owner", "repo"),
 				SkillName: "nonexistent",
 			},
@@ -238,7 +238,7 @@ func TestPreviewRun(t *testing.T) {
 		{
 			name: "no skill name non-interactive errors",
 			tty:  false,
-			opts: &previewOptions{
+			opts: &PreviewOptions{
 				repo: ghrepo.New("owner", "repo"),
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -267,7 +267,7 @@ func TestPreviewRun(t *testing.T) {
 		{
 			name: "preview with explicit version",
 			tty:  true,
-			opts: &previewOptions{
+			opts: &PreviewOptions{
 				repo:      ghrepo.New("github", "awesome-copilot"),
 				SkillName: "my-skill",
 				Version:   "abc123def456",
@@ -350,7 +350,7 @@ func TestPreviewRun(t *testing.T) {
 
 func TestPreviewRun_UnsupportedHost(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
-	err := previewRun(&previewOptions{
+	err := previewRun(&PreviewOptions{
 		IO:         ios,
 		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
 		repo:       ghrepo.NewWithHost("github", "awesome-copilot", "acme.ghes.com"),
@@ -410,7 +410,7 @@ func TestPreviewRun_Interactive(t *testing.T) {
 		},
 	}
 
-	opts := &previewOptions{
+	opts := &PreviewOptions{
 		IO:         ios,
 		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 		Prompter:   pm,
@@ -504,7 +504,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			},
 		}
 
-		opts := &previewOptions{
+		opts := &PreviewOptions{
 			IO:         ios,
 			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 			Prompter:   pm,
@@ -583,7 +583,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 			},
 		}
 
-		opts := &previewOptions{
+		opts := &PreviewOptions{
 			IO:         ios,
 			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 			Prompter:   pm,
@@ -612,7 +612,7 @@ func TestPreviewRun_ShowsFileTree(t *testing.T) {
 		ios.SetStdinTTY(false)
 		ios.SetColorEnabled(false)
 
-		opts := &previewOptions{
+		opts := &PreviewOptions{
 			IO:         ios,
 			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 			Prompter:   &prompter.PrompterMock{},
@@ -718,7 +718,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 		ios.SetStdoutTTY(false)
 		ios.SetStdinTTY(false)
 
-		opts := &previewOptions{
+		opts := &PreviewOptions{
 			IO:         ios,
 			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 			Prompter:   &prompter.PrompterMock{},
@@ -749,13 +749,13 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 			httpmock.REST("GET", "repos/monalisa/skills-repo/git/blobs/blob000"),
 			httpmock.StringResponse(fmt.Sprintf(`{"sha": "blob000", "content": "%s", "encoding": "base64"}`, bigContent)),
 		)
-		// blob001 should NOT be fetched — size limit reached
+		// blob001 should NOT be fetched (size limit reached)
 
 		ios, _, stdout, _ := iostreams.Test()
 		ios.SetStdoutTTY(false)
 		ios.SetStdinTTY(false)
 
-		opts := &previewOptions{
+		opts := &PreviewOptions{
 			IO:         ios,
 			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 			Prompter:   &prompter.PrompterMock{},
@@ -787,7 +787,7 @@ func TestPreviewRun_RenderLimits(t *testing.T) {
 		ios.SetStdoutTTY(false)
 		ios.SetStdinTTY(false)
 
-		opts := &previewOptions{
+		opts := &PreviewOptions{
 			IO:         ios,
 			HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 			Prompter:   &prompter.PrompterMock{},

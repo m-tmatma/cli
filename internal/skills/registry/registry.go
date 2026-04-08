@@ -28,6 +28,8 @@ const (
 	ScopeProject Scope = "project"
 	ScopeUser    Scope = "user"
 
+	DefaultAgentID = "github-copilot"
+
 	sharedProjectSkillsDir = ".agents/skills"
 )
 
@@ -144,13 +146,13 @@ func (h *AgentHost) InstallDir(scope Scope, gitRoot, homeDir string) (string, er
 // If repoName is non-empty, it is included in the project-scope label
 // for additional context.
 func ScopeLabels(repoName string) []string {
-	projectLabel := "Project — install in current repository (recommended)"
+	projectLabel := "Project: install in current repository (recommended)"
 	if repoName != "" {
-		projectLabel = fmt.Sprintf("Project — %s (recommended)", repoName)
+		projectLabel = fmt.Sprintf("Project: %s (recommended)", repoName)
 	}
 	return []string{
 		projectLabel,
-		"Global  — install in home directory (available everywhere)",
+		"Global: install in home directory (available everywhere)",
 	}
 }
 

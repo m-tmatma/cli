@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type previewOptions struct {
+type PreviewOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Prompter   prompter.Prompter
@@ -36,8 +36,8 @@ type previewOptions struct {
 }
 
 // NewCmdPreview creates the "skills preview" command.
-func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.Command {
-	opts := &previewOptions{
+func NewCmdPreview(f *cmdutil.Factory, runF func(*PreviewOptions) error) *cobra.Command {
+	opts := &PreviewOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Prompter:   f.Prompter,
@@ -49,7 +49,7 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.
 
 	cmd := &cobra.Command{
 		Use:   "preview <repository> [<skill>]",
-		Short: "Preview a skill from a GitHub repository",
+		Short: "Preview a skill from a GitHub repository (preview)",
 		Long: heredoc.Doc(`
 			Render a skill's SKILL.md content in the terminal. This fetches the
 			skill file from the repository and displays it using the configured
@@ -109,7 +109,7 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*previewOptions) error) *cobra.
 	return cmd
 }
 
-func previewRun(opts *previewOptions) error {
+func previewRun(opts *PreviewOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	repo := opts.repo
@@ -186,7 +186,7 @@ func previewRun(opts *previewOptions) error {
 }
 
 // renderAllFiles dumps the tree, SKILL.md, and all extra files through the pager.
-func renderAllFiles(opts *previewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
+func renderAllFiles(opts *PreviewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
 	files []discovery.SkillFile, rendered string, extraFiles []discovery.SkillFile,
 	apiClient *api.Client, hostname, owner, repo string) error {
 
@@ -213,11 +213,11 @@ func renderAllFiles(opts *previewOptions, cs *iostreams.ColorScheme, skill disco
 	totalBytes := 0
 	for _, f := range extraFiles {
 		if fetched >= maxFiles {
-			fmt.Fprintf(out, "\n%s\n", cs.Muted(fmt.Sprintf("(skipped remaining files — showing first %d)", maxFiles)))
+			fmt.Fprintf(out, "\n%s\n", cs.Muted(fmt.Sprintf("(skipped remaining files, showing first %d)", maxFiles)))
 			break
 		}
 		if totalBytes+f.Size > maxTotalBytes && fetched > 0 {
-			fmt.Fprintf(out, "\n%s\n", cs.Muted("(skipped remaining files — size limit reached)"))
+			fmt.Fprintf(out, "\n%s\n", cs.Muted("(skipped remaining files, size limit reached)"))
 			break
 		}
 		fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, f.SHA)
@@ -238,7 +238,7 @@ func renderAllFiles(opts *previewOptions, cs *iostreams.ColorScheme, skill disco
 }
 
 // renderInteractive shows the file tree, then a picker to browse individual files.
-func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
+func renderInteractive(opts *PreviewOptions, cs *iostreams.ColorScheme, skill discovery.Skill,
 	files []discovery.SkillFile, renderedSkillMD string, extraFiles []discovery.SkillFile,
 	apiClient *api.Client, hostname, owner, repo string) error {
 
@@ -254,7 +254,7 @@ func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill di
 		choices = append(choices, f.Path)
 	}
 
-	// Save original stdout — StopPager closes IO.Out, so we need to
+	// Save original stdout. StopPager closes IO.Out, so we need to
 	// restore a working writer before each StartPager call.
 	originalOut := opts.IO.Out
 
@@ -276,7 +276,7 @@ func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill di
 		} else {
 			selectedFile := extraFiles[idx-1]
 
-			// Fetch on demand — don't hold blob data in memory
+			// Fetch on demand; don't hold blob data in memory
 			fileContent, fetchErr := discovery.FetchBlob(apiClient, hostname, owner, repo, selectedFile.SHA)
 			if fetchErr != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s could not fetch %s: %v\n", cs.Red("!"), selectedFile.Path, fetchErr)
@@ -296,7 +296,7 @@ func renderInteractive(opts *previewOptions, cs *iostreams.ColorScheme, skill di
 	}
 }
 
-func (opts *previewOptions) renderFile(filePath, content string) string {
+func (opts *PreviewOptions) renderFile(filePath, content string) string {
 	if opts.RenderFile != nil {
 		return opts.RenderFile(filePath, content)
 	}
@@ -304,7 +304,7 @@ func (opts *previewOptions) renderFile(filePath, content string) string {
 	return renderMarkdownPreview(opts.IO, filePath, content)
 }
 
-func renderSelectedFilePreview(opts *previewOptions, filePath, content string) string {
+func renderSelectedFilePreview(opts *PreviewOptions, filePath, content string) string {
 	if !isMarkdownFile(filePath) {
 		return content
 	}
@@ -340,7 +340,7 @@ func isMarkdownFile(filePath string) bool {
 	}
 }
 
-func selectSkill(opts *previewOptions, skills []discovery.Skill) (discovery.Skill, error) {
+func selectSkill(opts *PreviewOptions, skills []discovery.Skill) (discovery.Skill, error) {
 	if opts.SkillName != "" {
 		for _, s := range skills {
 			if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName {

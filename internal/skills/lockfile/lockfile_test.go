@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
+	"github.com/cli/cli/v2/internal/flock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,13 +23,14 @@ func setupTestHome(t *testing.T) string {
 func TestRecordInstall(t *testing.T) {
 	tests := []struct {
 		name      string
-		setup     func(t *testing.T) // optional pre-existing state
+		setup     func(t *testing.T)
 		skill     string
 		owner     string
 		repo      string
 		skillPath string
 		treeSHA   string
 		pinnedRef string
+		wantErr   bool
 		verify    func(t *testing.T, lockPath string)
 	}{
 		{
@@ -87,63 +88,31 @@ func TestRecordInstall(t *testing.T) {
 			},
 		},
 		{
-			name: "succeeds despite stale lock file",
+			name: "returns error when lock cannot be acquired",
 			setup: func(t *testing.T) {
 				t.Helper()
-				lockPath, err := lockfilePath()
-				require.NoError(t, err)
-				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
-				lkPath := lockPath + ".lk"
-				f, err := os.Create(lkPath)
-				require.NoError(t, err)
-				f.Close()
-				staleTime := time.Now().Add(-60 * time.Second)
-				require.NoError(t, os.Chtimes(lkPath, staleTime, staleTime))
-			},
-			skill:     "code-review",
-			owner:     "monalisa",
-			repo:      "octocat-skills",
-			skillPath: "skills/code-review/SKILL.md",
-			treeSHA:   "abc123",
-			verify: func(t *testing.T, lockPath string) {
-				t.Helper()
-				f := readTestLockfile(t, lockPath)
-				require.Contains(t, f.Skills, "code-review")
-				_, err := os.Stat(lockPath + ".lk")
-				assert.True(t, os.IsNotExist(err), "stale lock should be removed after RecordInstall")
-			},
-		},
-		{
-			name: "proceeds without lock after retries exhausted",
-			setup: func(t *testing.T) {
-				t.Helper()
-				// Reduce retries to avoid 3s wait in tests.
-				origRetries := lockRetries
-				origInterval := lockRetryInterval
-				lockRetries = 1
-				lockRetryInterval = 0
+				origAttempts := lockAttempts
+				origDelay := lockAttemptDelay
+				lockAttempts = 1
+				lockAttemptDelay = 0
 				t.Cleanup(func() {
-					lockRetries = origRetries
-					lockRetryInterval = origInterval
+					lockAttempts = origAttempts
+					lockAttemptDelay = origDelay
 				})
-				// Create a fresh (non-stale) lock file that won't be broken.
+				// Hold a real flock so acquireFLock fails.
 				lockPath, err := lockfilePath()
 				require.NoError(t, err)
 				require.NoError(t, os.MkdirAll(filepath.Dir(lockPath), 0o755))
-				f, err := os.Create(lockPath + ".lk")
+				_, unlock, err := flock.TryLock(lockPath)
 				require.NoError(t, err)
-				f.Close()
+				t.Cleanup(unlock)
 			},
 			skill:     "code-review",
 			owner:     "monalisa",
 			repo:      "octocat-skills",
 			skillPath: "skills/code-review/SKILL.md",
 			treeSHA:   "abc123",
-			verify: func(t *testing.T, lockPath string) {
-				t.Helper()
-				f := readTestLockfile(t, lockPath)
-				require.Contains(t, f.Skills, "code-review", "should succeed best-effort without lock")
-			},
+			wantErr:   true,
 		},
 		{
 			name: "recovers from corrupt lockfile",
@@ -198,6 +167,10 @@ func TestRecordInstall(t *testing.T) {
 			}
 
 			err := RecordInstall(tt.skill, tt.owner, tt.repo, tt.skillPath, tt.treeSHA, tt.pinnedRef)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			tt.verify(t, lockPath)
 		})

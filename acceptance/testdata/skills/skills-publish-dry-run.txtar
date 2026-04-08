@@ -1,21 +1,21 @@
 # Publish dry-run from a directory with no skills/ should fail gracefully
-! exec gh skills publish --dry-run $WORK
+! exec gh skill publish --dry-run $WORK
 stderr 'no skills/ directory found'
 
 # Publish dry-run against a valid skill directory should succeed
-exec gh skills publish --dry-run $WORK/test-repo
+exec gh skill publish --dry-run $WORK/test-repo
 stdout 'hello-world'
 
 # Validate alias should work identically
-exec gh skills validate --dry-run $WORK/test-repo
+exec gh skill validate --dry-run $WORK/test-repo
 stdout 'hello-world'
 
 # Publish dry-run with --tag
-exec gh skills publish --dry-run --tag v1.0.0 $WORK/test-repo
+exec gh skill publish --dry-run --tag v1.0.0 $WORK/test-repo
 stdout 'hello-world'
 
 # Publish dry-run with --fix
-exec gh skills publish --dry-run --fix $WORK/test-repo
+exec gh skill publish --dry-run --fix $WORK/test-repo
 stdout 'hello-world'
 
 -- test-repo/skills/hello-world/SKILL.md --

@@ -45,7 +45,7 @@ var SkillSearchFields = []string{
 	"path",
 }
 
-type searchOptions struct {
+type SearchOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Config     func() (gh.Config, error)
@@ -61,8 +61,8 @@ type searchOptions struct {
 }
 
 // NewCmdSearch creates the "skills search" command.
-func NewCmdSearch(f *cmdutil.Factory, runF func(*searchOptions) error) *cobra.Command {
-	opts := &searchOptions{
+func NewCmdSearch(f *cmdutil.Factory, runF func(*SearchOptions) error) *cobra.Command {
+	opts := &SearchOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
@@ -71,8 +71,8 @@ func NewCmdSearch(f *cmdutil.Factory, runF func(*searchOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "search <query>",
-		Short: "Search for skills across GitHub",
+		Use:   "search <query> [flags]",
+		Short: "Search for skills across GitHub (preview)",
 		Long: heredoc.Doc(`
 			Search across all public GitHub repositories for skills matching a keyword.
 
@@ -188,7 +188,7 @@ func (s skillResult) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-func searchRun(opts *searchOptions) error {
+func searchRun(opts *SearchOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -252,7 +252,7 @@ func searchRun(opts *searchOptions) error {
 }
 
 // noResultsMessage returns an appropriate "no results" message.
-func noResultsMessage(opts *searchOptions) string {
+func noResultsMessage(opts *SearchOptions) string {
 	if opts.Owner != "" {
 		return fmt.Sprintf("no skills found matching %q from owner %q", opts.Query, opts.Owner)
 	}
@@ -328,7 +328,7 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 		return nil, primaryErr
 	}
 
-	// Merge: path-matched → hyphen-matched → owner-matched → primary content.
+	// Merge: path-matched > hyphen-matched > owner-matched > primary content.
 	var merged []codeSearchItem
 
 	if pathErr == nil && pathResult != nil {
@@ -346,7 +346,7 @@ func searchByKeyword(client *api.Client, host, queryTerm, owner string, page, li
 }
 
 // noResults returns an empty JSON array for exporters or a no-results error.
-func noResults(opts *searchOptions, msg string) error {
+func noResults(opts *SearchOptions, msg string) error {
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, []skillResult{})
 	}
@@ -433,7 +433,7 @@ func deduplicateByName(skills []skillResult) []skillResult {
 }
 
 // renderResults handles all output modes: JSON, interactive picker, or table.
-func renderResults(opts *searchOptions, skills []skillResult, totalPages int) error {
+func renderResults(opts *SearchOptions, skills []skillResult, totalPages int) error {
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, skills)
 	}
@@ -499,7 +499,7 @@ func renderTable(io *iostreams.IOStreams, skills []skillResult) error {
 
 // promptInstall shows a multi-select picker for the user to choose skills
 // to install from the search results, then runs the install command for each.
-func promptInstall(opts *searchOptions, skills []skillResult) error {
+func promptInstall(opts *SearchOptions, skills []skillResult) error {
 	fmt.Fprintln(opts.IO.ErrOut)
 
 	cs := opts.IO.ColorScheme()
@@ -589,7 +589,7 @@ func relevanceScore(s skillResult, query string) int {
 	score := 0
 
 	// Name match. Normalize spaces to hyphens since skill directory names
-	// use hyphens as word separators (e.g. query "mcp apps" → "mcp-apps").
+	// use hyphens as word separators (e.g. query "mcp apps" > "mcp-apps").
 	skillLower := strings.ToLower(s.SkillName)
 	if skillLower == term || skillLower == termHyphen {
 		score += 3_000
@@ -825,7 +825,7 @@ func extractSkillName(filePath string) string {
 	return discovery.MatchesSkillPath(filePath)
 }
 
-// formatStars formats a star count for display (e.g. 1700 → "1.7k").
+// formatStars formats a star count for display (e.g. 1700 > "1.7k").
 // TODO kw: Could be swaped for go-humanize.
 func formatStars(n int) string {
 	if n >= 1000 {

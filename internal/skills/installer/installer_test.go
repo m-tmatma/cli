@@ -134,7 +134,7 @@ func TestInstallLocal(t *testing.T) {
 			},
 			verify: func(t *testing.T, destDir string) {
 				t.Helper()
-				_, err := os.Stat(filepath.Join(destDir, ".github", "skills", "code-review", "SKILL.md"))
+				_, err := os.Stat(filepath.Join(destDir, ".agents", "skills", "code-review", "SKILL.md"))
 				assert.NoError(t, err)
 			},
 		},

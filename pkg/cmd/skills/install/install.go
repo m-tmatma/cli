@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -36,35 +35,32 @@ const (
 	maxSearchResults = 30
 )
 
-// installOptions holds all dependencies and user-provided flags for the install command.
-type installOptions struct {
+// InstallOptions holds all dependencies and user-provided flags for the install command.
+type InstallOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	Prompter   prompter.Prompter
 	GitClient  *git.Client
 	Remotes    func() (ghContext.Remotes, error)
 
-	// Arguments
-	SkillSource string // owner/repo or local path
-	SkillName   string // skill name, possibly with @version
+	SkillSource  string // owner/repo or local path (when --from-local is set)
+	SkillName    string // possibly with @version suffix
+	Agent        string
+	Scope        string
+	ScopeChanged bool // true when --scope was explicitly set
+	Pin          string
+	Dir          string // overrides --agent and --scope
+	Force        bool
+	FromLocal    bool // treat SkillSource as a local directory path
 
-	// Flags
-	Agent        string // --agent flag
-	Scope        string // --scope flag
-	ScopeChanged bool   // true when --scope was explicitly set
-	Pin          string // --pin flag
-	Dir          string // --dir flag (overrides host+scope)
-	Force        bool   // --force flag
-
-	// Resolved at runtime
 	repo      ghrepo.Interface // set when SkillSource is a GitHub repository
-	localPath string           // set when SkillSource is a local directory
-	version   string
+	localPath string           // set when FromLocal is true
+	version   string           // parsed from SkillName@version
 }
 
 // NewCmdInstall creates the "skills install" command.
-func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.Command {
-	opts := &installOptions{
+func NewCmdInstall(f *cmdutil.Factory, runF func(*InstallOptions) error) *cobra.Command {
+	opts := &InstallOptions{
 		IO:         f.IOStreams,
 		Prompter:   f.Prompter,
 		GitClient:  f.GitClient,
@@ -73,21 +69,21 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "install <repository> [<skill[@version]>]",
-		Short: "Install agent skills from a GitHub repository",
+		Use:   "install <repository> [<skill[@version]>] [flags]",
+		Short: "Install agent skills from a GitHub repository (preview)",
 		Long: heredoc.Docf(`
 			Install agent skills from a GitHub repository or local directory into
 			your local environment. Skills are placed in a host-specific directory
 			at either project scope (inside the current git repository) or user
-			scope (in your home directory, available everywhere):
+			scope (in your home directory, available everywhere). Supported hosts
+			and their storage directories are (project, user):
 
-			  Host             Project                 User
-			  GitHub Copilot   .agents/skills          ~/.copilot/skills
-			  Claude Code      .claude/skills          ~/.claude/skills
-			  Cursor           .agents/skills          ~/.cursor/skills
-			  Codex            .agents/skills          ~/.codex/skills
-			  Gemini CLI       .agents/skills          ~/.gemini/skills
-			  Antigravity      .agents/skills          ~/.gemini/antigravity/skills
+			- GitHub Copilot (%[1]s.agents/skills%[1]s, %[1]s~/.copilot/skills%[1]s)
+			- Claude Code    (%[1]s.claude/skills%[1]s, %[1]s~/.claude/skills%[1]s)
+			- Cursor         (%[1]s.agents/skills%[1]s, %[1]s~/.cursor/skills%[1]s)
+			- Codex          (%[1]s.agents/skills%[1]s, %[1]s~/.codex/skills%[1]s)
+			- Gemini CLI     (%[1]s.agents/skills%[1]s, %[1]s~/.gemini/skills%[1]s)
+			- Antigravity    (%[1]s.agents/skills%[1]s, %[1]s~/.gemini/antigravity/skills%[1]s)
 
 			Use %[1]s--agent%[1]s and %[1]s--scope%[1]s to control placement, or %[1]s--dir%[1]s for a
 			custom directory. The default scope is %[1]sproject%[1]s, and the default
@@ -98,11 +94,11 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			select multiple hosts that resolve to the same destination, each skill is
 			installed there only once.
 
-			The first argument can be a GitHub repository in %[1]sOWNER/REPO%[1]s format
-			or a local directory path (e.g. %[1]s.%[1]s, %[1]s./my-skills%[1]s, %[1]s~/skills%[1]s).
-			For local directories, skills are auto-discovered using the same
-			conventions as remote repositories, and files are copied (not symlinked)
-			with local-path tracking metadata injected into frontmatter.
+			The first argument is a GitHub repository in %[1]sOWNER/REPO%[1]s format.
+			Use %[1]s--from-local%[1]s to install from a local directory instead.
+			Local skills are auto-discovered using the same conventions as remote
+			repositories, and files are copied (not symlinked) with local-path
+			tracking metadata injected into frontmatter.
 
 			Skills are discovered automatically using the %[1]sskills/*/SKILL.md%[1]s convention
 			defined by the Agent Skills specification. For more information on the specification, 
@@ -125,12 +121,9 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			To pin to a specific version, either append %[1]s@VERSION%[1]s to the skill
 			name or use the %[1]s--pin%[1]s flag. The version is resolved as a git tag or commit SHA.
 
-			Installed skills have GitHub tracking metadata injected into their
-			frontmatter (%[1]sgithub-repo%[1]s, %[1]sgithub-ref%[1]s,
-			%[1]sgithub-tree-sha%[1]s, %[1]sgithub-path%[1]s). This
-			metadata identifies the source repository and enables %[1]sgh skill update%[1]s
-			to detect changes — the tree SHA serves as an ETag for staleness checks.
-			The %[1]sgithub-repo%[1]s value is stored as a full repository URL.
+			Installed skills have source tracking metadata injected into their
+			frontmatter. This metadata identifies the source repository and
+			enables %[1]sgh skill update%[1]s to detect changes.
 
 			When run interactively, the command prompts for any missing arguments.
 			When run non-interactively, %[1]srepository%[1]s and a skill name are
@@ -152,14 +145,11 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			# Install from a large namespaced repo by path (efficient, skips full discovery)
 			$ gh skill install github/awesome-copilot skills/monalisa/code-review
 
-			# Install from a local directory (auto-discovers skills)
-			$ gh skill install ./my-skills-repo
+			# Install from a local directory
+			$ gh skill install ./my-skills-repo --from-local
 
-			# Install from current directory
-			$ gh skill install .
-
-			# Install a single local skill directory
-			$ gh skill install ./skills/git-commit
+			# Install a specific local skill
+			$ gh skill install ./my-skills-repo git-commit --from-local
 
 			# Install for Claude Code at user scope
 			$ gh skill install github/awesome-copilot git-commit --agent claude-code --scope user
@@ -170,9 +160,6 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 		Aliases: []string{"add"},
 		Args:    cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("must specify a repository to install from")
-			}
 			if len(args) >= 1 {
 				opts.SkillSource = args[0]
 			}
@@ -182,14 +169,17 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 			opts.ScopeChanged = cmd.Flags().Changed("scope")
 
 			// Resolve the source type early so installRun can branch directly.
-			if isLocalPath(opts.SkillSource) {
+			if opts.FromLocal {
+				if opts.SkillSource == "" {
+					return cmdutil.FlagErrorf("--from-local requires a directory path argument")
+				}
 				opts.localPath = opts.SkillSource
+			} else if len(args) == 0 && !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("must specify a repository to install from")
 			}
 
-			if opts.Agent != "" {
-				if _, err := registry.FindByID(opts.Agent); err != nil {
-					return cmdutil.FlagErrorf("invalid value for --agent: %s", err)
-				}
+			if err := cmdutil.MutuallyExclusive("--from-local and --pin cannot be used together", opts.FromLocal, opts.Pin != ""); err != nil {
+				return err
 			}
 
 			if opts.Pin != "" && opts.SkillName != "" && strings.Contains(opts.SkillName, "@") {
@@ -203,19 +193,17 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*installOptions) error) *cobra.
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.Agent, "agent", "", fmt.Sprintf("target agent (%s)", registry.ValidAgentIDs()))
-	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return registry.AgentIDs(), cobra.ShellCompDirectiveNoFileComp
-	})
+	cmdutil.StringEnumFlag(cmd, &opts.Agent, "agent", "", "", registry.AgentIDs(), "Target agent")
 	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "project", []string{"project", "user"}, "Installation scope")
-	cmd.Flags().StringVar(&opts.Pin, "pin", "", "pin to a specific git tag or commit SHA")
-	cmd.Flags().StringVar(&opts.Dir, "dir", "", "install to a custom directory (overrides --agent and --scope)")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "overwrite existing skills without prompting")
+	cmd.Flags().StringVar(&opts.Pin, "pin", "", "Pin to a specific git tag or commit SHA")
+	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
+	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
 
 	return cmd
 }
 
-func installRun(opts *installOptions) error {
+func installRun(opts *InstallOptions) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
@@ -278,6 +266,8 @@ func installRun(opts *installOptions) error {
 		}
 	}
 
+	printPreInstallDisclaimer(opts.IO.ErrOut, cs)
+
 	selectedHosts, err := resolveHosts(opts, canPrompt)
 	if err != nil {
 		return err
@@ -325,7 +315,7 @@ func installRun(opts *installOptions) error {
 					cs.SuccessIcon(), name, repoSource, discovery.ShortRef(resolved.Ref), friendlyDir(result.Dir))
 			}
 
-			printFileTree(opts.IO.Out, cs, result.Dir, result.Installed)
+			printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
 			printReviewHint(opts.IO.ErrOut, cs, repoSource, resolved.SHA, result.Installed)
 		}
 
@@ -337,33 +327,8 @@ func installRun(opts *installOptions) error {
 	return nil
 }
 
-// isLocalPath returns true if the argument looks like a local filesystem path
-// rather than a GitHub owner/repo reference.
-func isLocalPath(arg string) bool {
-	if arg == "" {
-		return false
-	}
-	sep := string(filepath.Separator)
-	if arg == "." || arg == ".." ||
-		strings.HasPrefix(arg, "./") || strings.HasPrefix(arg, "../") ||
-		strings.HasPrefix(arg, "."+sep) || strings.HasPrefix(arg, ".."+sep) {
-		return true
-	}
-	// filepath.IsAbs on Windows requires a drive letter, so "/tmp/foo"
-	// would not be recognized. Check explicitly for a leading "/" so that
-	// Unix-style absolute paths are never mistaken for owner/repo refs.
-	if filepath.IsAbs(arg) || arg[0] == '/' || strings.HasPrefix(arg, "~") {
-		return true
-	}
-	info, err := os.Stat(arg)
-	if err == nil && info.IsDir() {
-		return true
-	}
-	return false
-}
-
 // runLocalInstall handles installation from a local directory path.
-func runLocalInstall(opts *installOptions) error {
+func runLocalInstall(opts *InstallOptions) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 	sourcePath := opts.localPath
@@ -400,6 +365,8 @@ func runLocalInstall(opts *installOptions) error {
 	if err != nil {
 		return err
 	}
+
+	printPreInstallDisclaimer(opts.IO.ErrOut, cs)
 
 	selectedHosts, err := resolveHosts(opts, canPrompt)
 	if err != nil {
@@ -438,7 +405,7 @@ func runLocalInstall(opts *installOptions) error {
 				name, opts.SkillSource, friendlyDir(result.Dir))
 		}
 
-		printFileTree(opts.IO.Out, cs, result.Dir, result.Installed)
+		printFileTree(opts.IO.ErrOut, cs, result.Dir, result.Installed)
 		printReviewHint(opts.IO.ErrOut, cs, "", "", result.Installed)
 	}
 
@@ -481,7 +448,7 @@ func resolveRepoArg(skillSource string, canPrompt bool, p prompter.Prompter) (gh
 	return repo, skillSource, nil
 }
 
-func parseSkillFromOpts(opts *installOptions) {
+func parseSkillFromOpts(opts *InstallOptions) {
 	if opts.SkillName != "" {
 		if name, version, ok := cutLast(opts.SkillName, "@"); ok && name != "" {
 			opts.version = version
@@ -503,7 +470,7 @@ func cutLast(s, sep string) (before, after string, found bool) {
 	return s, "", false
 }
 
-func resolveVersion(opts *installOptions, client *api.Client, hostname string) (*discovery.ResolvedRef, error) {
+func resolveVersion(opts *InstallOptions, client *api.Client, hostname string) (*discovery.ResolvedRef, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Resolving version")
 	resolved, err := discovery.ResolveRef(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), opts.version)
 	opts.IO.StopProgressIndicator()
@@ -514,11 +481,17 @@ func resolveVersion(opts *installOptions, client *api.Client, hostname string) (
 	return resolved, nil
 }
 
-func discoverSkills(opts *installOptions, client *api.Client, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
+func discoverSkills(opts *InstallOptions, client *api.Client, hostname string, resolved *discovery.ResolvedRef) ([]discovery.Skill, error) {
 	opts.IO.StartProgressIndicatorWithLabel("Discovering skills")
 	skills, err := discovery.DiscoverSkills(client, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		var treeTooLarge *discovery.TreeTooLargeError
+		if errors.As(err, &treeTooLarge) {
+			fmt.Fprintf(opts.IO.ErrOut, "%s\n  Use path-based install instead: gh skill install %s/%s skills/<skill-name>\n",
+				err, treeTooLarge.Owner, treeTooLarge.Repo)
+			return nil, err
+		}
 		return nil, err
 	}
 	logConventions(opts.IO, skills)
@@ -527,9 +500,6 @@ func discoverSkills(opts *installOptions, client *api.Client, hostname string, r
 			fmt.Fprintf(opts.IO.ErrOut, "Warning: skill %q does not follow the agentskills.io naming convention\n", s.DisplayName())
 		}
 	}
-	sort.Slice(skills, func(i, j int) bool {
-		return skills[i].DisplayName() < skills[j].DisplayName()
-	})
 	return skills, nil
 }
 
@@ -552,7 +522,7 @@ func logConventions(io *iostreams.IOStreams, skills []discovery.Skill) {
 // skillSelector holds the callbacks that differ between remote and local skill selection.
 type skillSelector struct {
 	// matchByName resolves a skill name to matching skills.
-	matchByName func(opts *installOptions, skills []discovery.Skill) ([]discovery.Skill, error)
+	matchByName func(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error)
 	// sourceHint is shown in collision error guidance (e.g. "owner/repo" or "/path/to/skills").
 	sourceHint string
 	// fetchDescriptions, if non-nil, is called before prompting to pre-populate descriptions.
@@ -565,9 +535,13 @@ type installPlan struct {
 	skills []discovery.Skill
 }
 
-func selectSkillsWithSelector(opts *installOptions, skills []discovery.Skill, canPrompt bool, sel skillSelector) ([]discovery.Skill, error) {
+func selectSkillsWithSelector(opts *InstallOptions, skills []discovery.Skill, canPrompt bool, sel skillSelector) ([]discovery.Skill, error) {
 	checkCollisions := func(ss []discovery.Skill) error {
-		return collisionError(ss, sel.sourceHint)
+		if err := collisionError(ss); err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "Hint: install individually using the full name: gh skill install %s namespace/skill-name\n", sel.sourceHint)
+			return err
+		}
+		return nil
 	}
 
 	if opts.SkillName != "" {
@@ -619,7 +593,7 @@ func selectSkillsWithSelector(opts *installOptions, skills []discovery.Skill, ca
 	return result, checkCollisions(result)
 }
 
-func matchSkillByName(opts *installOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
+func matchSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
 	for _, s := range skills {
 		if s.DisplayName() == opts.SkillName {
 			return []discovery.Skill{s}, nil
@@ -644,13 +618,13 @@ func matchSkillByName(opts *installOptions, skills []discovery.Skill) ([]discove
 			names[i] = m.DisplayName()
 		}
 		return nil, fmt.Errorf(
-			"skill name %q is ambiguous — multiple matches found:\n  %s\n  Specify the full name (e.g. %s) to disambiguate",
+			"skill name %q is ambiguous, multiple matches found:\n  %s\n  Specify the full name (e.g. %s) to disambiguate",
 			opts.SkillName, strings.Join(names, "\n  "), names[0],
 		)
 	}
 }
 
-func matchLocalSkillByName(opts *installOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
+func matchLocalSkillByName(opts *InstallOptions, skills []discovery.Skill) ([]discovery.Skill, error) {
 	for _, s := range skills {
 		if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName {
 			return []discovery.Skill{s}, nil
@@ -687,7 +661,7 @@ func skillSearchFunc(skills []discovery.Skill, descWidth int) func(string) promp
 		for i, s := range matched {
 			keys[i] = s.DisplayName()
 			if s.Description != "" {
-				labels[i] = fmt.Sprintf("%s — %s", s.DisplayName(), truncateDescription(s.Description, descWidth))
+				labels[i] = fmt.Sprintf("%s - %s", s.DisplayName(), truncateDescription(s.Description, descWidth))
 			} else {
 				labels[i] = s.DisplayName()
 			}
@@ -720,22 +694,17 @@ func matchSelectedSkills(skills []discovery.Skill, selected []string) ([]discove
 	return result, nil
 }
 
-// collisionError checks for name collisions and returns an error with
-// guidance on how to install skills individually.
-func collisionError(ss []discovery.Skill, sourceHint string) error {
+// collisionError checks for name collisions among the selected skills.
+func collisionError(ss []discovery.Skill) error {
 	collisions := discovery.FindNameCollisions(ss)
 	if len(collisions) == 0 {
 		return nil
 	}
-	return errors.New(heredoc.Docf(`
-		cannot install skills with conflicting names — they would overwrite each other:
-		  %s
-		Install these skills individually using the full name:
-		  gh skill install %s namespace/skill-name
-	`, discovery.FormatCollisions(collisions), sourceHint))
+	return fmt.Errorf("cannot install skills with conflicting names; they would overwrite each other:\n  %s",
+		discovery.FormatCollisions(collisions))
 }
 
-func resolveHosts(opts *installOptions, canPrompt bool) ([]*registry.AgentHost, error) {
+func resolveHosts(opts *InstallOptions, canPrompt bool) ([]*registry.AgentHost, error) {
 	if opts.Agent != "" {
 		h, err := registry.FindByID(opts.Agent)
 		if err != nil {
@@ -745,7 +714,7 @@ func resolveHosts(opts *installOptions, canPrompt bool) ([]*registry.AgentHost, 
 	}
 
 	if !canPrompt {
-		h, err := registry.FindByID("github-copilot")
+		h, err := registry.FindByID(registry.DefaultAgentID)
 		if err != nil {
 			return nil, err
 		}
@@ -770,7 +739,7 @@ func resolveHosts(opts *installOptions, canPrompt bool) ([]*registry.AgentHost, 
 	return selected, nil
 }
 
-func resolveScope(opts *installOptions, canPrompt bool) (registry.Scope, error) {
+func resolveScope(opts *InstallOptions, canPrompt bool) (registry.Scope, error) {
 	if opts.Dir != "" {
 		return registry.Scope(opts.Scope), nil
 	}
@@ -795,7 +764,7 @@ func resolveScope(opts *installOptions, canPrompt bool) (registry.Scope, error) 
 	return registry.ScopeUser, nil
 }
 
-func buildInstallPlans(opts *installOptions, selectedSkills []discovery.Skill, selectedHosts []*registry.AgentHost, scope registry.Scope, gitRoot, homeDir string, canPrompt bool) ([]installPlan, error) {
+func buildInstallPlans(opts *InstallOptions, selectedSkills []discovery.Skill, selectedHosts []*registry.AgentHost, scope registry.Scope, gitRoot, homeDir string, canPrompt bool) ([]installPlan, error) {
 	byDir := make(map[string]*installPlan)
 	orderedDirs := make([]string, 0, len(selectedHosts))
 
@@ -832,7 +801,7 @@ func buildInstallPlans(opts *installOptions, selectedSkills []discovery.Skill, s
 	return plans, nil
 }
 
-func resolveInstallDir(opts *installOptions, host *registry.AgentHost, scope registry.Scope, gitRoot, homeDir string) (string, error) {
+func resolveInstallDir(opts *InstallOptions, host *registry.AgentHost, scope registry.Scope, gitRoot, homeDir string) (string, error) {
 	if opts.Dir != "" {
 		return opts.Dir, nil
 	}
@@ -851,7 +820,7 @@ func truncateDescription(s string, maxWidth int) string {
 	return text.Truncate(maxWidth, text.RemoveExcessiveWhitespace(s))
 }
 
-func checkOverwrite(opts *installOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
+func checkOverwrite(opts *InstallOptions, skills []discovery.Skill, targetDir string, canPrompt bool) ([]discovery.Skill, error) {
 	var existing, fresh []discovery.Skill
 	for _, s := range skills {
 		dir := filepath.Join(targetDir, filepath.FromSlash(s.InstallName()))
@@ -948,8 +917,10 @@ func friendlyDir(dir string) string {
 			return rel
 		}
 	}
-	if home, err := os.UserHomeDir(); err == nil && (dir == home || strings.HasPrefix(dir, home+string(filepath.Separator))) {
-		return "~" + dir[len(home):]
+	if home, err := os.UserHomeDir(); err == nil {
+		if rel, err := filepath.Rel(home, dir); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return "~/" + rel
+		}
 	}
 	return dir
 }
@@ -989,6 +960,12 @@ func printTreeDir(w io.Writer, cs *iostreams.ColorScheme, dir, indent string) {
 			fmt.Fprintf(w, "%s%s%s\n", indent, cs.Muted(connector), name)
 		}
 	}
+}
+
+// printPreInstallDisclaimer prints a warning that installed skills are unverified
+// and should be inspected before use.
+func printPreInstallDisclaimer(w io.Writer, cs *iostreams.ColorScheme) {
+	fmt.Fprintf(w, "\n%s Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n", cs.WarningIcon())
 }
 
 // printReviewHint warns the user to review installed skills and suggests preview commands.

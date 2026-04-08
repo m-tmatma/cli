@@ -30,11 +30,11 @@ func TestNewCmdUpdate_Help(t *testing.T) {
 		GitClient: &git.Client{},
 	}
 
-	cmd := NewCmdUpdate(f, func(opts *updateOptions) error {
+	cmd := NewCmdUpdate(f, func(opts *UpdateOptions) error {
 		return nil
 	})
 
-	assert.Equal(t, "update [<skill>...]", cmd.Use)
+	assert.Equal(t, "update [<skill>...] [flags]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotEmpty(t, cmd.Example)
@@ -43,7 +43,7 @@ func TestNewCmdUpdate_Help(t *testing.T) {
 func TestNewCmdUpdate_Flags(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
-	cmd := NewCmdUpdate(f, func(_ *updateOptions) error { return nil })
+	cmd := NewCmdUpdate(f, func(_ *UpdateOptions) error { return nil })
 
 	flags := []string{"all", "force", "dry-run", "dir", "unpin"}
 	for _, name := range flags {
@@ -55,8 +55,8 @@ func TestNewCmdUpdate_ArgsPassedToOptions(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 	f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
 
-	var gotOpts *updateOptions
-	cmd := NewCmdUpdate(f, func(opts *updateOptions) error {
+	var gotOpts *UpdateOptions
+	cmd := NewCmdUpdate(f, func(opts *UpdateOptions) error {
 		gotOpts = opts
 		return nil
 	})
@@ -176,7 +176,7 @@ func TestScanInstalledSkills(t *testing.T) {
 		},
 		{
 			name: "non-existent directory returns nil",
-			// no setup — dir does not exist
+			// no setup needed; dir does not exist
 			verify: func(t *testing.T, skills []installedSkill, err error) {
 				t.Helper()
 				require.NoError(t, err)
@@ -313,7 +313,7 @@ func TestUpdateRun(t *testing.T) {
 		name       string
 		setup      func(t *testing.T, dir string)
 		stubs      func(reg *httpmock.Registry)
-		opts       func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions
+		opts       func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions
 		verify     func(t *testing.T, dir string)
 		wantErr    string
 		wantStderr string
@@ -349,9 +349,9 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/commit1"),
 					httpmock.StringResponse(`{"sha": "commit1", "tree": [{"path": "skills/code-review", "type": "tree", "sha": "currentsha"}, {"path": "skills/code-review/SKILL.md", "type": "blob", "sha": "blob1"}, {"path": "skills", "type": "tree", "sha": "treeshaX"}], "truncated": false}`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -365,9 +365,9 @@ func TestUpdateRun(t *testing.T) {
 		{
 			name:  "no installed skills",
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -395,9 +395,9 @@ func TestUpdateRun(t *testing.T) {
 				`)), 0o644))
 			},
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -427,10 +427,10 @@ func TestUpdateRun(t *testing.T) {
 				`)), 0o644))
 			},
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -457,10 +457,10 @@ func TestUpdateRun(t *testing.T) {
 				`)), 0o644))
 			},
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				ios.SetStdinTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -502,9 +502,9 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "commitsha123", "tree": [{"path": "skills/monalisa-skill/SKILL.md", "type": "blob", "sha": "blobsha1"}, {"path": "skills/monalisa-skill", "type": "tree", "sha": "abc123def456"}, {"path": "skills", "type": "tree", "sha": "treeshaX"}], "truncated": false}`)),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -546,10 +546,10 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"sha": "newcommit456", "tree": [{"path": "skills/hubot-skill/SKILL.md", "type": "blob", "sha": "blobsha2"}, {"path": "skills/hubot-skill", "type": "tree", "sha": "newsha456"}, {"path": "skills", "type": "tree", "sha": "treeshaY"}], "truncated": false}`),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -594,10 +594,10 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(`{"sha": "newcommit456", "tree": [{"path": "skills/hubot-skill/SKILL.md", "type": "blob", "sha": "blobsha2"}, {"path": "skills/hubot-skill", "type": "tree", "sha": "newsha456"}, {"path": "skills", "type": "tree", "sha": "treeshaY"}], "truncated": false}`),
 				)
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
 				ios.SetStdinTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -647,9 +647,9 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
 						"IyBDb2RlIFJldmlldyBVcGRhdGVk")))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -708,9 +708,9 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
 						"IyBOYW1lc3BhY2VkIFNraWxsIFVwZGF0ZWQ=")))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -768,9 +768,9 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/newblob1"),
 					httpmock.StatusStringResponse(500, "server error"))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -828,11 +828,11 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
 						"IyBDb2RlIFJldmlldyBVcGRhdGVk")))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -883,11 +883,11 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/newcommit789"),
 					httpmock.StringResponse(`{"sha": "newcommit789", "tree": [{"path": "skills/code-review/SKILL.md", "type": "blob", "sha": "newblob1"}, {"path": "skills/code-review", "type": "tree", "sha": "newsha999"}, {"path": "skills", "type": "tree", "sha": "treeshaZ"}], "truncated": false}`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -919,11 +919,11 @@ func TestUpdateRun(t *testing.T) {
 				`)), 0o644))
 			},
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -974,11 +974,11 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "blob1", "encoding": "base64", "content": "%s"}`,
 						"IyBNYW51YWwgU2tpbGwgVXBkYXRlZA==")))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStdinTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -1044,9 +1044,9 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "newblob1", "encoding": "base64", "content": "%s"}`,
 						"IyBVbnBpbm5lZCBhbmQgVXBkYXRlZA==")))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(false)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -1084,10 +1084,10 @@ func TestUpdateRun(t *testing.T) {
 				`)), 0o644))
 			},
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {
@@ -1130,10 +1130,10 @@ func TestUpdateRun(t *testing.T) {
 					httpmock.REST("GET", "repos/octocat/hubot-skills/git/trees/newcommit789"),
 					httpmock.StringResponse(`{"sha": "newcommit789", "tree": [{"path": "skills/pinned-skill/SKILL.md", "type": "blob", "sha": "newblob1"}, {"path": "skills/pinned-skill", "type": "tree", "sha": "newsha999"}, {"path": "skills", "type": "tree", "sha": "treeshaZ"}], "truncated": false}`))
 			},
-			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *updateOptions {
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *UpdateOptions {
 				ios.SetStdoutTTY(true)
 				ios.SetStderrTTY(true)
-				return &updateOptions{
+				return &UpdateOptions{
 					IO:     ios,
 					Config: func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 					HttpClient: func() (*http.Client, error) {

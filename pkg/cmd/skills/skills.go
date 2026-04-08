@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/skills/install"
 	"github.com/cli/cli/v2/pkg/cmd/skills/preview"
 	"github.com/cli/cli/v2/pkg/cmd/skills/publish"
@@ -13,11 +14,32 @@ import (
 // NewCmdSkills returns the top-level "skill" command.
 func NewCmdSkills(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "skill <command>",
-		Short:   "Install and manage agent skills",
-		Long:    "Install and manage agent skills from GitHub repositories.",
+		Use:   "skill <command>",
+		Short: "Install and manage agent skills (preview)",
+		Long: heredoc.Doc(`
+			Install and manage agent skills from GitHub repositories.
+
+			Working with agent skills in the GitHub CLI is in preview and
+			subject to change without notice.
+		`),
 		Aliases: []string{"skills"},
 		GroupID: "core",
+		Example: heredoc.Doc(`
+			# Search for skills
+			$ gh skill search terraform
+
+			# Install a skill
+			$ gh skill install github/awesome-copilot code-review
+
+			# Preview a skill before installing
+			$ gh skill preview github/awesome-copilot code-review
+
+			# Update all installed skills
+			$ gh skill update --all
+
+			# Validate skills for publishing
+			$ gh skill publish --dry-run
+		`),
 	}
 
 	cmd.AddCommand(install.NewCmdInstall(f, nil))

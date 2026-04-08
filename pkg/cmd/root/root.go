@@ -145,6 +145,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
 	cmd.AddCommand(previewCmd.NewCmdPreview(f))
+	cmd.AddCommand(skillsCmd.NewCmdSkills(f))
 
 	// Root commands with standalone functionality and no subcommands
 	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, nil))
@@ -165,7 +166,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
-	cmd.AddCommand(skillsCmd.NewCmdSkills(f))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))

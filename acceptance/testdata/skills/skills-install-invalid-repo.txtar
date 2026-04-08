@@ -1,3 +1,3 @@
 # Nonexistent repo should error
-! exec gh skills install nonexistent-owner-xyz/nonexistent-repo-abc --force --dir $WORK/tmp
+! exec gh skill install nonexistent-owner-xyz/nonexistent-repo-abc --force --dir $WORK/tmp
 stderr 'Not Found'

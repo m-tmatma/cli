@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/internal/skills/discovery"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -27,24 +28,24 @@ func TestNewCmdInstall(t *testing.T) {
 	tests := []struct {
 		name          string
 		cli           string
-		wantOpts      installOptions
+		wantOpts      InstallOptions
 		wantLocalPath bool
 		wantErr       bool
 	}{
 		{
 			name:     "repo argument only",
 			cli:      "monalisa/skills-repo",
-			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", Scope: "project"},
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", Scope: "project"},
 		},
 		{
 			name:     "repo and skill",
 			cli:      "monalisa/skills-repo git-commit",
-			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Scope: "project"},
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Scope: "project"},
 		},
 		{
 			name: "all flags",
 			cli:  "monalisa/skills-repo git-commit --agent github-copilot --scope user --pin v1.0.0 --force",
-			wantOpts: installOptions{
+			wantOpts: InstallOptions{
 				SkillSource: "monalisa/skills-repo",
 				SkillName:   "git-commit",
 				Agent:       "github-copilot",
@@ -56,7 +57,7 @@ func TestNewCmdInstall(t *testing.T) {
 		{
 			name:     "dir flag",
 			cli:      "monalisa/skills-repo git-commit --dir ./custom-skills",
-			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Dir: "./custom-skills", Scope: "project"},
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Dir: "./custom-skills", Scope: "project"},
 		},
 		{
 			name:    "too many args",
@@ -76,30 +77,45 @@ func TestNewCmdInstall(t *testing.T) {
 		{
 			name:     "alias add works",
 			cli:      "monalisa/skills-repo git-commit",
-			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Scope: "project"},
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", SkillName: "git-commit", Scope: "project"},
 		},
 		{
-			name:          "dot-slash local path sets localPath",
-			cli:           "./local-dir",
-			wantOpts:      installOptions{SkillSource: "./local-dir", Scope: "project"},
+			name:          "from-local flag sets localPath",
+			cli:           "--from-local ./local-dir",
+			wantOpts:      InstallOptions{SkillSource: "./local-dir", Scope: "project", FromLocal: true},
 			wantLocalPath: true,
 		},
 		{
-			name:          "absolute path sets localPath",
-			cli:           "/absolute/path",
-			wantOpts:      installOptions{SkillSource: "/absolute/path", Scope: "project"},
+			name:          "from-local with absolute path",
+			cli:           "--from-local /absolute/path",
+			wantOpts:      InstallOptions{SkillSource: "/absolute/path", Scope: "project", FromLocal: true},
 			wantLocalPath: true,
 		},
 		{
-			name:          "tilde path sets localPath",
-			cli:           "~/skills",
-			wantOpts:      installOptions{SkillSource: "~/skills", Scope: "project"},
+			name:          "from-local with tilde path",
+			cli:           "--from-local ~/skills",
+			wantOpts:      InstallOptions{SkillSource: "~/skills", Scope: "project", FromLocal: true},
 			wantLocalPath: true,
 		},
 		{
 			name:     "owner/repo does not set localPath",
 			cli:      "monalisa/skills-repo",
-			wantOpts: installOptions{SkillSource: "monalisa/skills-repo", Scope: "project"},
+			wantOpts: InstallOptions{SkillSource: "monalisa/skills-repo", Scope: "project"},
+		},
+		{
+			name:     "local-looking path without --from-local treated as repo",
+			cli:      "./local-dir",
+			wantOpts: InstallOptions{SkillSource: "./local-dir", Scope: "project"},
+		},
+		{
+			name:    "from-local without argument errors",
+			cli:     "--from-local",
+			wantErr: true,
+		},
+		{
+			name:    "from-local with --pin is mutually exclusive",
+			cli:     "--from-local ./local-dir --pin v1.0.0",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -111,8 +127,8 @@ func TestNewCmdInstall(t *testing.T) {
 				GitClient: &git.Client{},
 			}
 
-			var gotOpts *installOptions
-			cmd := NewCmdInstall(f, func(opts *installOptions) error {
+			var gotOpts *InstallOptions
+			cmd := NewCmdInstall(f, func(opts *InstallOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -138,6 +154,7 @@ func TestNewCmdInstall(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.Pin, gotOpts.Pin)
 			assert.Equal(t, tt.wantOpts.Dir, gotOpts.Dir)
 			assert.Equal(t, tt.wantOpts.Force, gotOpts.Force)
+			assert.Equal(t, tt.wantOpts.FromLocal, gotOpts.FromLocal)
 			if tt.wantLocalPath {
 				assert.NotEmpty(t, gotOpts.localPath, "expected localPath to be set")
 			} else {
@@ -152,7 +169,7 @@ func TestNewCmdInstall(t *testing.T) {
 		f := &cmdutil.Factory{IOStreams: ios, Prompter: &prompter.PrompterMock{}, GitClient: &git.Client{}}
 		cmd := NewCmdInstall(f, nil)
 
-		assert.Equal(t, "install <repository> [<skill[@version]>]", cmd.Use)
+		assert.Equal(t, "install <repository> [<skill[@version]>] [flags]", cmd.Use)
 		assert.NotEmpty(t, cmd.Short)
 		assert.NotEmpty(t, cmd.Long)
 		assert.NotEmpty(t, cmd.Example)
@@ -243,7 +260,7 @@ func TestInstallRun(t *testing.T) {
 		isTTY      bool
 		setup      func(t *testing.T)
 		stubs      func(*httpmock.Registry)
-		opts       func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions
+		opts       func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions
 		verify     func(t *testing.T)
 		wantErr    string
 		wantStdout string
@@ -252,9 +269,9 @@ func TestInstallRun(t *testing.T) {
 		{
 			name:  "non-interactive without repo errors",
 			isTTY: false,
-			opts: func(ios *iostreams.IOStreams, _ *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, _ *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:        ios,
 					GitClient: &git.Client{RepoDir: t.TempDir()},
 				}
@@ -269,9 +286,9 @@ func TestInstallRun(t *testing.T) {
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -292,9 +309,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -317,9 +334,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -342,9 +359,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -366,9 +383,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -390,9 +407,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
@@ -413,11 +430,11 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				targetDir := t.TempDir()
 				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "git-commit"), 0o755))
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -440,11 +457,11 @@ func TestInstallRun(t *testing.T) {
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				targetDir := t.TempDir()
 				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "git-commit"), 0o755))
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -466,9 +483,9 @@ func TestInstallRun(t *testing.T) {
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -496,9 +513,9 @@ func TestInstallRun(t *testing.T) {
 					`{"path": "skills/bob/xlsx-pro/SKILL.md", "type": "blob", "sha": "blobB"}`
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -527,9 +544,9 @@ func TestInstallRun(t *testing.T) {
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeB", "blobB",
 					"---\nname: xlsx-pro\ndescription: Bob version\n---\n# B\n")
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -546,9 +563,9 @@ func TestInstallRun(t *testing.T) {
 		{
 			name:  "remote install with invalid repo argument errors",
 			isTTY: false,
-			opts: func(ios *iostreams.IOStreams, _ *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, _ *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					GitClient:   &git.Client{RepoDir: t.TempDir()},
 					SkillSource: "invalid",
@@ -572,9 +589,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -591,6 +608,32 @@ func TestInstallRun(t *testing.T) {
 			wantStderr: "v2.0.0",
 		},
 		{
+			name:  "remote install shows pre-install disclaimer",
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "git-commit",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Dir:          t.TempDir(),
+				}
+			},
+			wantStdout: "Installed git-commit",
+			wantStderr: "not verified by GitHub",
+		},
+		{
 			name:  "remote install outputs review hint",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
@@ -599,9 +642,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -625,9 +668,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -639,7 +682,7 @@ func TestInstallRun(t *testing.T) {
 					Dir:          t.TempDir(),
 				}
 			},
-			wantStdout: "SKILL.md",
+			wantStderr: "SKILL.md",
 		},
 		{
 			name:  "remote install with inline version parses name and version",
@@ -656,9 +699,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -684,9 +727,9 @@ func TestInstallRun(t *testing.T) {
 				// installer.Install: tree + blob (again, for writing files)
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -709,9 +752,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -737,14 +780,14 @@ func TestInstallRun(t *testing.T) {
 					`{"path": "xlsx-pro/SKILL.md", "type": "blob", "sha": "blob1"}`
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
 						return []string{allSkillsKey}, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:     pm,
@@ -784,14 +827,14 @@ func TestInstallRun(t *testing.T) {
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeB", "blobB",
 					"---\nname: xlsx-pro\ndescription: Bob\n---\n# B\n")
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
 						return []string{allSkillsKey}, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:     pm,
@@ -814,9 +857,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -864,7 +907,7 @@ func TestInstallRun(t *testing.T) {
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-skill-01", "blob-skill-01",
 					"---\nname: skill-01\ndescription: Does skill-01 things\n---\n# Skill\n")
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectWithSearchFunc: func(prompt, searchPrompt string, defaults, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error) {
@@ -884,7 +927,7 @@ func TestInstallRun(t *testing.T) {
 						return 0, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:    pm,
@@ -905,14 +948,14 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					SelectFunc: func(prompt, defaultValue string, options []string) (int, error) {
 						return 0, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:    pm,
@@ -933,7 +976,7 @@ func TestInstallRun(t *testing.T) {
 				stubDiscoverTree(reg, "monalisa", "octocat-skills", "abc123",
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				destDir := t.TempDir()
 				writeLocalTestSkill(t, destDir, "git-commit", gitCommitContent)
@@ -942,7 +985,7 @@ func TestInstallRun(t *testing.T) {
 						return false, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:     pm,
@@ -966,9 +1009,9 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:         ios,
 					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:  &git.Client{RepoDir: t.TempDir()},
@@ -996,14 +1039,14 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					SelectFunc: func(prompt, defaultValue string, options []string) (int, error) {
 						return 0, nil // project scope
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:         ios,
 					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:   pm,
@@ -1030,7 +1073,7 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				destDir := t.TempDir()
 				existingContent := heredoc.Doc(`
@@ -1050,7 +1093,7 @@ func TestInstallRun(t *testing.T) {
 						return true, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:     pm,
@@ -1068,9 +1111,9 @@ func TestInstallRun(t *testing.T) {
 		{
 			name:  "unsupported host returns error",
 			stubs: func(reg *httpmock.Registry) {},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:    &prompter.PrompterMock{},
@@ -1095,7 +1138,7 @@ func TestInstallRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`{"sha": "blob-gc", "content": %q, "encoding": "base64"}`, encoded)))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectWithSearchFunc: func(prompt, searchPrompt string, defaults, persistentOptions []string, searchFunc func(string) prompter.MultiSelectSearchResult) ([]string, error) {
@@ -1105,7 +1148,7 @@ func TestInstallRun(t *testing.T) {
 						return 0, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:    pm,
@@ -1126,7 +1169,7 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					InputFunc: func(prompt, defaultValue string) (string, error) {
@@ -1136,7 +1179,7 @@ func TestInstallRun(t *testing.T) {
 						return 0, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:         ios,
 					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:   pm,
@@ -1157,14 +1200,14 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					SelectFunc: func(prompt, defaultValue string, options []string) (int, error) {
 						return 1, nil // user scope
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:    pm,
@@ -1186,7 +1229,7 @@ func TestInstallRun(t *testing.T) {
 					singleSkillTreeJSON("git-commit", "tree-gc", "blob-gc"))
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				destDir := t.TempDir()
 				// Existing skill without github metadata in frontmatter
@@ -1204,7 +1247,7 @@ func TestInstallRun(t *testing.T) {
 						return true, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:     pm,
@@ -1232,9 +1275,9 @@ func TestInstallRun(t *testing.T) {
 				stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123", treeJSON)
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeGC", "blobGC", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
@@ -1259,7 +1302,7 @@ func TestInstallRun(t *testing.T) {
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 				stubInstallFiles(reg, "monalisa", "octocat-skills", "tree-gc", "blob-gc", gitCommitContent)
 			},
-			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *installOptions {
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectFunc: func(prompt string, defaults []string, options []string) ([]int, error) {
@@ -1269,7 +1312,7 @@ func TestInstallRun(t *testing.T) {
 						return 0, nil // project scope
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:          ios,
 					HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					Prompter:    pm,
@@ -1363,7 +1406,7 @@ func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
 		},
 	}
 
-	err := installRun(&installOptions{
+	err := installRun(&InstallOptions{
 		IO:          ios,
 		HttpClient:  func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 		Prompter:    pm,
@@ -1382,7 +1425,7 @@ func TestRunLocalInstall(t *testing.T) {
 		name       string
 		isTTY      bool
 		setup      func(t *testing.T, sourceDir, targetDir string)
-		opts       func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions
+		opts       func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions
 		verify     func(t *testing.T, targetDir string)
 		wantErr    string
 		wantStdout string
@@ -1401,9 +1444,9 @@ func TestRunLocalInstall(t *testing.T) {
 					# Git Commit
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1438,9 +1481,9 @@ func TestRunLocalInstall(t *testing.T) {
 				`)
 				require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "SKILL.md"), []byte(content), 0o644))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1465,14 +1508,14 @@ func TestRunLocalInstall(t *testing.T) {
 						fmt.Sprintf("---\nname: xlsx-pro\ndescription: %s xlsx-pro\n---\n# Test\n", ns))
 				}
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
 						return []string{allSkillsKey}, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1505,14 +1548,14 @@ func TestRunLocalInstall(t *testing.T) {
 				}
 				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "alice", "xlsx-pro"), 0o755))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
 				pm := &prompter.PrompterMock{
 					MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
 						return []string{allSkillsKey}, nil
 					},
 				}
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1541,9 +1584,9 @@ func TestRunLocalInstall(t *testing.T) {
 				`))
 				require.NoError(t, os.MkdirAll(filepath.Join(targetDir, "git-commit"), 0o755))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1561,9 +1604,9 @@ func TestRunLocalInstall(t *testing.T) {
 			name:  "local install with no skills found errors",
 			isTTY: false,
 			setup: func(_ *testing.T, _, _ string) {},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1590,9 +1633,9 @@ func TestRunLocalInstall(t *testing.T) {
 					# Git Commit
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1620,9 +1663,9 @@ func TestRunLocalInstall(t *testing.T) {
 					# Git Commit
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1657,9 +1700,9 @@ func TestRunLocalInstall(t *testing.T) {
 					# Code Review
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1686,9 +1729,9 @@ func TestRunLocalInstall(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "run.sh"),
 					[]byte("#!/bin/bash"), 0o644))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1701,7 +1744,7 @@ func TestRunLocalInstall(t *testing.T) {
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 				}
 			},
-			wantStdout: "SKILL.md",
+			wantStderr: "SKILL.md",
 		},
 		{
 			name:  "local path with tilde expansion",
@@ -1716,11 +1759,11 @@ func TestRunLocalInstall(t *testing.T) {
 					# Git Commit
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
 				t.Setenv("HOME", sourceDir)
 				t.Setenv("USERPROFILE", sourceDir)
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  "~/",
 					localPath:    "~/",
@@ -1748,11 +1791,11 @@ func TestRunLocalInstall(t *testing.T) {
 					# Git Commit
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
 				t.Setenv("HOME", sourceDir)
 				t.Setenv("USERPROFILE", sourceDir)
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  "~",
 					localPath:    "~",
@@ -1780,9 +1823,9 @@ func TestRunLocalInstall(t *testing.T) {
 					# Git Commit
 				`))
 			},
-			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *installOptions {
+			opts: func(ios *iostreams.IOStreams, sourceDir, targetDir string) *InstallOptions {
 				t.Helper()
-				return &installOptions{
+				return &InstallOptions{
 					IO:           ios,
 					SkillSource:  sourceDir,
 					localPath:    sourceDir,
@@ -1897,4 +1940,43 @@ func Test_printReviewHint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_printPreInstallDisclaimer(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	cs := ios.ColorScheme()
+	var buf strings.Builder
+	printPreInstallDisclaimer(&buf, cs)
+	output := buf.String()
+	assert.Contains(t, output, "not verified by GitHub")
+	assert.Contains(t, output, "prompt")
+	assert.Contains(t, output, "malicious")
+}
+
+func Test_selectSkillsWithSelector_noDisclaimer(t *testing.T) {
+	ios, _, _, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
+
+	skills := []discovery.Skill{
+		{Name: "git-commit", Convention: "skills", Path: "skills/git-commit/SKILL.md"},
+	}
+
+	pm := &prompter.PrompterMock{
+		MultiSelectWithSearchFunc: func(_, _ string, _, _ []string, _ func(string) prompter.MultiSelectSearchResult) ([]string, error) {
+			return []string{"git-commit"}, nil
+		},
+	}
+
+	opts := &InstallOptions{
+		IO:       ios,
+		Prompter: pm,
+	}
+
+	_, err := selectSkillsWithSelector(opts, skills, true, skillSelector{
+		matchByName: matchSkillByName,
+		sourceHint:  "owner/repo",
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, stderr.String(), "not verified by GitHub")
 }

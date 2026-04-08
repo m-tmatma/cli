@@ -1,20 +1,20 @@
 # Install a single skill from a public repo
-exec gh skills install github/awesome-copilot git-commit --scope user --force --agent github-copilot
+exec gh skill install github/awesome-copilot git-commit --scope user --force --agent github-copilot
 stdout 'Installed git-commit'
 
 # Verify SKILL.md has frontmatter metadata injected
 exists $HOME/.copilot/skills/git-commit/SKILL.md
-grep 'github-owner' $HOME/.copilot/skills/git-commit/SKILL.md
 grep 'github-repo' $HOME/.copilot/skills/git-commit/SKILL.md
+grep 'github-tree-sha' $HOME/.copilot/skills/git-commit/SKILL.md
 
 # Verify lockfile was written
 exists $HOME/.agents/.skill-lock.json
 grep 'git-commit' $HOME/.agents/.skill-lock.json
 
 # Install with --dir to a custom directory
-exec gh skills install github/awesome-copilot git-commit --force --dir $WORK/custom-skills
+exec gh skill install github/awesome-copilot git-commit --force --dir $WORK/custom-skills
 stdout 'Installed git-commit'
 
 # Verify the skill was written to the custom directory
 exists $WORK/custom-skills/git-commit/SKILL.md
-grep 'github-owner' $WORK/custom-skills/git-commit/SKILL.md
+grep 'github-repo' $WORK/custom-skills/git-commit/SKILL.md
