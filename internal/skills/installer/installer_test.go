@@ -447,6 +447,42 @@ func TestInstall(t *testing.T) {
 	}
 }
 
+func TestInstallSingleSkillFailureStillCompletesProgress(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+
+	destDir := t.TempDir()
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-fail"),
+		httpmock.StatusStringResponse(500, "server error"),
+	)
+	client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+
+	var events []struct{ done, total int }
+	result, err := Install(&Options{
+		Host:   "github.com",
+		Owner:  "monalisa",
+		Repo:   "octocat-skills",
+		Ref:    "v1.0",
+		SHA:    "commit123",
+		Client: client,
+		Skills: []discovery.Skill{
+			{Name: "code-review", Path: "skills/code-review", TreeSHA: "tree-fail"},
+		},
+		Dir: destDir,
+		OnProgress: func(done, total int) {
+			events = append(events, struct{ done, total int }{done: done, total: total})
+		},
+	})
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Equal(t, []struct{ done, total int }{{done: 0, total: 1}, {done: 1, total: 1}}, events)
+}
+
 func TestResolveGitRoot(t *testing.T) {
 	tests := []struct {
 		name    string

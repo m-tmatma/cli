@@ -69,6 +69,7 @@ func Install(opts *Options) (*Result, error) {
 		skill := opts.Skills[0]
 		if opts.OnProgress != nil {
 			opts.OnProgress(0, 1)
+			defer opts.OnProgress(1, 1)
 		}
 		if err := installSkill(opts, skill, targetDir); err != nil {
 			return nil, fmt.Errorf("failed to install skill %q: %w", skill.InstallName(), err)
@@ -76,9 +77,6 @@ func Install(opts *Options) (*Result, error) {
 		var warnings []string
 		if err := lockfile.RecordInstall(skill.InstallName(), opts.Owner, opts.Repo, skill.Path+"/SKILL.md", skill.TreeSHA, opts.PinnedRef); err != nil {
 			warnings = append(warnings, fmt.Sprintf("could not record install for %s: %v", skill.InstallName(), err))
-		}
-		if opts.OnProgress != nil {
-			opts.OnProgress(1, 1)
 		}
 		return &Result{Installed: []string{skill.InstallName()}, Dir: targetDir, Warnings: warnings}, nil
 	}

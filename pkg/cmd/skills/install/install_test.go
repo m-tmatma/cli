@@ -1324,6 +1324,14 @@ func TestInstallRun(t *testing.T) {
 	}
 }
 
+func TestInstallProgress(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	assert.Nil(t, installProgress(ios, 0))
+	assert.NotNil(t, installProgress(ios, 1))
+	assert.NotNil(t, installProgress(ios, 2))
+}
+
 func TestRunLocalInstall(t *testing.T) {
 	tests := []struct {
 		name       string

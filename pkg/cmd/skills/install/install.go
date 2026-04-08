@@ -907,13 +907,15 @@ func existingSkillPrompt(targetDir string, incoming discovery.Skill) string {
 	return fmt.Sprintf("Skill %q already exists. Overwrite?", incoming.DisplayName())
 }
 
+const installProgressLabel = "Downloading skill files"
+
 func installProgress(io *iostreams.IOStreams, total int) func(done, total int) {
-	if total <= 1 {
+	if total <= 0 {
 		return nil
 	}
 	return func(done, total int) {
 		if done == 0 {
-			io.StartProgressIndicator()
+			io.StartProgressIndicatorWithLabel(installProgressLabel)
 		} else if done >= total {
 			io.StopProgressIndicator()
 		}
