@@ -41,10 +41,10 @@ sudo apt install gh
 ```
 
 > [!TIP]
-> To verify downloaded PGP keys, you can run this and match the listed fingerprints with those at the top of this document:
+> To verify PGP keys before installing `gh`, you can run this and match the listed fingerprints with those at the top of this document:
 >
 > ```shell
-> gpg --show-keys /etc/apt/keyrings/githubcli-archive-keyring.gpg
+> curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --show-keys
 > ```
 
 ### RPM
@@ -62,6 +62,12 @@ These packages are supported by the GitHub CLI maintainers with updates powered 
 
 > [!TIP]
 > During installation, you may be prompted to confirm the import of PGP keys. You can verify the keys with the list of fingerprints at the top of this document.
+>
+> To verify the PGP keys before installing `gh`, you can run the following command and match the listed fingerprints with those at the top of this document:
+>
+> ```shell
+> curl -fsSL -o - https://cli.github.com/packages/githubcli-archive-keyring.asc | gpg --show-keys
+> ```
 
 #### DNF5
 
