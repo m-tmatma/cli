@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/config/migration"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
+	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
@@ -48,16 +51,57 @@ func Main() exitCode {
 	cmdFactory := factory.New(buildVersion, string(agents.Detect()))
 	stderr := cmdFactory.IOStreams.ErrOut
 
-	ctx := context.Background()
+	cfg, err := cmdFactory.Config()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to load config: %s\n", err)
+		return exitError
+	}
 
-	if cfg, err := cmdFactory.Config(); err == nil {
-		var m migration.MultiAccount
-		if err := cfg.Migrate(m); err != nil {
-			fmt.Fprintln(stderr, err)
+	additionalCommonDimensions := ghtelemetry.Dimensions{
+		"version": strings.TrimPrefix(buildVersion, "v"),
+		"is_tty":  strconv.FormatBool(cmdFactory.IOStreams.IsStdoutTTY()),
+		"agent":   string(agents.Detect()),
+	}
+
+	var telemetryService ghtelemetry.Service
+	if os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" {
+		telemetryService = &telemetry.NoOpService{}
+	} else {
+
+		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
+		switch telemetryState {
+		case telemetry.Disabled:
+			telemetryService = &telemetry.NoOpService{}
+		case telemetry.Logged:
+			telemetryService = telemetry.NewService(
+				telemetry.LogFlusher(cmdFactory.IOStreams.ErrOut, cmdFactory.IOStreams.ColorEnabled()),
+				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
+			)
+		case telemetry.Enabled:
+			sampleRate := 1
+			if v, err := strconv.Atoi(os.Getenv("GH_TELEMETRY_SAMPLE_RATE")); err == nil && v >= 0 && v <= 100 {
+				sampleRate = v
+			}
+			additionalCommonDimensions["sample_rate"] = strconv.Itoa(sampleRate)
+			telemetryService = telemetry.NewService(
+				telemetry.GitHubFlusher(cmdFactory.Executable()),
+				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
+				telemetry.WithSampleRate(sampleRate),
+			)
+		default:
+			fmt.Fprintf(stderr, "invalid telemetry configuration: %q\n", cfg.Telemetry().Value)
 			return exitError
 		}
 	}
+	defer telemetryService.Flush()
 
+	var m migration.MultiAccount
+	if err := cfg.Migrate(m); err != nil {
+		fmt.Fprintln(stderr, err)
+		return exitError
+	}
+
+	ctx := context.Background()
 	updateCtx, updateCancel := context.WithCancel(ctx)
 	defer updateCancel()
 	updateMessageChan := make(chan *update.ReleaseInfo)
@@ -90,7 +134,7 @@ func Main() exitCode {
 		cobra.MousetrapHelpText = ""
 	}
 
-	rootCmd, err := root.NewCmdRoot(cmdFactory, buildVersion, buildDate)
+	rootCmd, err := root.NewCmdRoot(cmdFactory, telemetryService, buildVersion, buildDate)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to create root command: %s\n", err)
 		return exitError
