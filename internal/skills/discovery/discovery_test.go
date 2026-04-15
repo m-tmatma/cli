@@ -699,7 +699,7 @@ func TestDiscoverSkillByPath(t *testing.T) {
 			skillPath: "skills/monalisa/issue-triage",
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/skills/monalisa"),
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/skills%2Fmonalisa"),
 					httpmock.JSONResponse([]map[string]interface{}{
 						{"name": "issue-triage", "path": "skills/monalisa/issue-triage", "sha": "tree-sha", "type": "dir"},
 					}))
@@ -719,6 +719,31 @@ func TestDiscoverSkillByPath(t *testing.T) {
 			},
 			wantName: "issue-triage",
 			wantNS:   "monalisa",
+		},
+		{
+			name:      "parent path with spaces is URL encoded",
+			skillPath: "my skills/code-review",
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/my%20skills"),
+					httpmock.JSONResponse([]map[string]interface{}{
+						{"name": "code-review", "path": "my skills/code-review", "sha": "tree-sha", "type": "dir"},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "tree-sha", "truncated": false,
+						"tree": []map[string]interface{}{
+							{"path": "SKILL.md", "type": "blob", "sha": "blob-sha"},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/monalisa/octocat-skills/git/blobs/blob-sha"),
+					httpmock.JSONResponse(map[string]interface{}{
+						"sha": "blob-sha", "encoding": "base64", "content": "IyBTa2lsbA==",
+					}))
+			},
+			wantName: "code-review",
 		},
 		{
 			name:      "strips trailing SKILL.md from path",

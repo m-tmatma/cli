@@ -491,7 +491,7 @@ func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skill
 	}
 
 	parentPath := path.Dir(skillPath)
-	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s", url.PathEscape(owner), url.PathEscape(repo), parentPath, commitSHA)
+	apiPath := fmt.Sprintf("repos/%s/%s/contents/%s?ref=%s", url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(parentPath), commitSHA)
 
 	var contents []struct {
 		Name string `json:"name"`
