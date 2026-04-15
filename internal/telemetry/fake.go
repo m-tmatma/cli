@@ -10,4 +10,6 @@ func (r *EventRecorderSpy) Record(event ghtelemetry.Event) {
 	r.Events = append(r.Events, event)
 }
 
+func (r *EventRecorderSpy) Disable() {}
+
 func (r *EventRecorderSpy) Flush() {}

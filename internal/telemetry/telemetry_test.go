@@ -598,10 +598,54 @@ func TestWithAdditionalCommonDimensions(t *testing.T) {
 	assert.NotEmpty(t, captured.Events[0].Dimensions["architecture"])
 }
 
+func TestServiceDisable(t *testing.T) {
+	t.Run("prevents flush from sending events", func(t *testing.T) {
+		t.Cleanup(stubDeviceID("test-device"))
+
+		called := false
+		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+
+		svc.Record(ghtelemetry.Event{Type: "test"})
+		svc.Disable()
+		svc.Flush()
+
+		assert.False(t, called, "flusher should not be called after Disable()")
+	})
+
+	t.Run("prevents flush even with multiple recorded events", func(t *testing.T) {
+		t.Cleanup(stubDeviceID("test-device"))
+
+		called := false
+		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+
+		svc.Record(ghtelemetry.Event{Type: "event1"})
+		svc.Record(ghtelemetry.Event{Type: "event2"})
+		svc.Record(ghtelemetry.Event{Type: "event3"})
+		svc.Disable()
+		svc.Flush()
+
+		assert.False(t, called, "flusher should not be called after Disable()")
+	})
+
+	t.Run("can be called before any events are recorded", func(t *testing.T) {
+		t.Cleanup(stubDeviceID("test-device"))
+
+		called := false
+		svc := newService(func(SendTelemetryPayload) { called = true }, nil)
+
+		svc.Disable()
+		svc.Record(ghtelemetry.Event{Type: "test"})
+		svc.Flush()
+
+		assert.False(t, called, "flusher should not be called when disabled before recording")
+	})
+}
+
 func TestNoOpService(t *testing.T) {
 	svc := &NoOpService{}
 	// All methods should be safe to call without panicking
 	svc.Record(ghtelemetry.Event{Type: "test"})
+	svc.Disable()
 	svc.SetSampleRate(50)
 	svc.Flush()
 }

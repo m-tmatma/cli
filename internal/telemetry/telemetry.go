@@ -248,6 +248,15 @@ type service struct {
 	sampleBucket     byte
 
 	events []recordedEvent
+
+	disabled bool
+}
+
+func (s *service) Disable() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.disabled = true
 }
 
 func (s *service) Record(event ghtelemetry.Event) {
@@ -268,6 +277,10 @@ func (s *service) Flush() {
 	// This shouldn't really be required since flush should only be called once, but just in case...
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.disabled {
+		return
+	}
 
 	if s.previouslyCalled {
 		return
@@ -378,6 +391,8 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 type NoOpService struct{}
 
 func (s *NoOpService) Record(event ghtelemetry.Event) {}
+
+func (s *NoOpService) Disable() {}
 
 func (s *NoOpService) SetSampleRate(rate int) {}
 

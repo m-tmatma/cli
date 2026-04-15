@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/config/migration"
+	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	"github.com/cli/cli/v2/internal/telemetry"
 	"github.com/cli/cli/v2/internal/update"
@@ -28,6 +30,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+	xcolor "github.com/cli/go-gh/v2/pkg/x/color"
 	"github.com/cli/safeexec"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
@@ -48,33 +52,34 @@ func Main() exitCode {
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
 
-	cmdFactory := factory.New(buildVersion, string(agents.Detect()))
-	stderr := cmdFactory.IOStreams.ErrOut
-
-	cfg, err := cmdFactory.Config()
+	cfg, err := config.NewConfig()
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to load config: %s\n", err)
+		fmt.Fprintf(os.Stderr, "failed to load config: %s\n", err)
 		return exitError
 	}
 
+	ioStreams := newIOStreams(cfg)
+	stderr := ioStreams.ErrOut
+
+	ghExecutablePath := executablePath("gh")
+
 	additionalCommonDimensions := ghtelemetry.Dimensions{
 		"version": strings.TrimPrefix(buildVersion, "v"),
-		"is_tty":  strconv.FormatBool(cmdFactory.IOStreams.IsStdoutTTY()),
+		"is_tty":  strconv.FormatBool(ioStreams.IsStdoutTTY()),
 		"agent":   string(agents.Detect()),
 	}
 
 	var telemetryService ghtelemetry.Service
-	if os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" {
+	if os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" || mightBeGHESUser(cfg) {
 		telemetryService = &telemetry.NoOpService{}
 	} else {
-
 		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
 		switch telemetryState {
 		case telemetry.Disabled:
 			telemetryService = &telemetry.NoOpService{}
 		case telemetry.Logged:
 			telemetryService = telemetry.NewService(
-				telemetry.LogFlusher(cmdFactory.IOStreams.ErrOut, cmdFactory.IOStreams.ColorEnabled()),
+				telemetry.LogFlusher(ioStreams.ErrOut, ioStreams.ColorEnabled()),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 			)
 		case telemetry.Enabled:
@@ -84,7 +89,7 @@ func Main() exitCode {
 			}
 			additionalCommonDimensions["sample_rate"] = strconv.Itoa(sampleRate)
 			telemetryService = telemetry.NewService(
-				telemetry.GitHubFlusher(cmdFactory.Executable()),
+				telemetry.GitHubFlusher(ghExecutablePath),
 				telemetry.WithAdditionalCommonDimensions(additionalCommonDimensions),
 				telemetry.WithSampleRate(sampleRate),
 			)
@@ -94,6 +99,8 @@ func Main() exitCode {
 		}
 	}
 	defer telemetryService.Flush()
+
+	cmdFactory := factory.New(buildVersion, string(agents.Detect()), cfg, ioStreams, ghExecutablePath, telemetryService)
 
 	var m migration.MultiAccount
 	if err := cfg.Migrate(m); err != nil {
@@ -211,7 +218,7 @@ func Main() exitCode {
 	updateCancel() // if the update checker hasn't completed by now, abort it
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		isHomebrew := isUnderHomebrew(cmdFactory.Executable())
+		isHomebrew := isUnderHomebrew(cmdFactory.ExecutablePath)
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
 			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
 			return exitOK
@@ -288,4 +295,149 @@ func isUnderHomebrew(ghBinary string) bool {
 
 	brewBinPrefix := filepath.Join(strings.TrimSpace(string(brewPrefixBytes)), "bin") + string(filepath.Separator)
 	return strings.HasPrefix(ghBinary, brewBinPrefix)
+}
+
+func newIOStreams(cfg gh.Config) *iostreams.IOStreams {
+	io := iostreams.System()
+
+	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
+		io.SetNeverPrompt(true)
+	} else if prompt := cfg.Prompt(""); prompt.Value == "disabled" {
+		io.SetNeverPrompt(true)
+	}
+
+	falseyValues := []string{"false", "0", "no", ""}
+
+	accessiblePrompterValue, accessiblePrompterIsSet := os.LookupEnv("GH_ACCESSIBLE_PROMPTER")
+	if accessiblePrompterIsSet {
+		if !slices.Contains(falseyValues, accessiblePrompterValue) {
+			io.SetAccessiblePrompterEnabled(true)
+		}
+	} else if prompt := cfg.AccessiblePrompter(""); prompt.Value == "enabled" {
+		io.SetAccessiblePrompterEnabled(true)
+	}
+
+	experimentalPrompterValue, experimentalPrompterIsSet := os.LookupEnv("GH_EXPERIMENTAL_PROMPTER")
+	if experimentalPrompterIsSet {
+		if !slices.Contains(falseyValues, experimentalPrompterValue) {
+			io.SetExperimentalPrompterEnabled(true)
+		}
+	}
+
+	ghSpinnerDisabledValue, ghSpinnerDisabledIsSet := os.LookupEnv("GH_SPINNER_DISABLED")
+	if ghSpinnerDisabledIsSet {
+		if !slices.Contains(falseyValues, ghSpinnerDisabledValue) {
+			io.SetSpinnerDisabled(true)
+		}
+	} else if spinnerDisabled := cfg.Spinner(""); spinnerDisabled.Value == "disabled" {
+		io.SetSpinnerDisabled(true)
+	}
+
+	// Pager precedence
+	// 1. GH_PAGER
+	// 2. pager from config
+	// 3. PAGER
+	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
+		io.SetPager(ghPager)
+	} else if pager := cfg.Pager(""); pager.Value != "" {
+		io.SetPager(pager.Value)
+	}
+
+	if ghColorLabels, ghColorLabelsExists := os.LookupEnv("GH_COLOR_LABELS"); ghColorLabelsExists {
+		switch ghColorLabels {
+		case "", "0", "false", "no":
+			io.SetColorLabels(false)
+		default:
+			io.SetColorLabels(true)
+		}
+	} else if prompt := cfg.ColorLabels(""); prompt.Value == "enabled" {
+		io.SetColorLabels(true)
+	}
+
+	io.SetAccessibleColorsEnabled(xcolor.IsAccessibleColorsEnabled())
+
+	return io
+}
+
+// Executable is the path to the currently invoked binary
+func executablePath(executableName string) string {
+	ghPath := os.Getenv("GH_PATH")
+	if ghPath != "" {
+		return ghPath
+	}
+
+	if strings.ContainsRune(executableName, os.PathSeparator) {
+		return executableName
+	}
+
+	return executable(executableName)
+}
+
+// Finds the location of the executable for the current process as it's found in PATH, respecting symlinks.
+// If the process couldn't determine its location, return fallbackName. If the executable wasn't found in
+// PATH, return the absolute location to the program.
+//
+// The idea is that the result of this function is callable in the future and refers to the same
+// installation of gh, even across upgrades. This is needed primarily for Homebrew, which installs software
+// under a location such as `/usr/local/Cellar/gh/1.13.1/bin/gh` and symlinks it from `/usr/local/bin/gh`.
+// When the version is upgraded, Homebrew will often delete older versions, but keep the symlink. Because of
+// this, we want to refer to the `gh` binary as `/usr/local/bin/gh` and not as its internal Homebrew
+// location.
+//
+// None of this would be needed if we could just refer to GitHub CLI as `gh`, i.e. without using an absolute
+// path. However, for some reason Homebrew does not include `/usr/local/bin` in PATH when it invokes git
+// commands to update its taps. If `gh` (no path) is being used as git credential helper, as set up by `gh
+// auth login`, running `brew update` will print out authentication errors as git is unable to locate
+// Homebrew-installed `gh`
+func executable(fallback string) string {
+	exe, err := os.Executable()
+	if err != nil {
+		return fallback
+	}
+
+	base := filepath.Base(exe)
+	path := os.Getenv("PATH")
+	for _, dir := range filepath.SplitList(path) {
+		p, err := filepath.Abs(filepath.Join(dir, base))
+		if err != nil {
+			continue
+		}
+		f, err := os.Lstat(p)
+		if err != nil {
+			continue
+		}
+
+		if p == exe {
+			return p
+		} else if f.Mode()&os.ModeSymlink != 0 {
+			realP, err := filepath.EvalSymlinks(p)
+			if err != nil {
+				continue
+			}
+			realExe, err := filepath.EvalSymlinks(exe)
+			if err != nil {
+				continue
+			}
+			if realP == realExe {
+				return p
+			}
+		}
+	}
+
+	return exe
+}
+
+func mightBeGHESUser(cfg gh.Config) bool {
+	if os.Getenv("GH_ENTERPRISE_TOKEN") != "" || os.Getenv("GITHUB_ENTERPRISE_TOKEN") != "" {
+		return true
+	}
+
+	if host := os.Getenv("GH_HOST"); host != "" && ghauth.IsEnterprise(host) {
+		return true
+	}
+
+	// If any targeted host is Enterprise, then the user is likely a GHES user.
+	return slices.ContainsFunc(cfg.Authentication().Hosts(), func(host string) bool {
+		return ghauth.IsEnterprise(host)
+	})
 }

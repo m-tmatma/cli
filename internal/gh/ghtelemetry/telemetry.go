@@ -10,8 +10,13 @@ type Event struct {
 	Measures   Measures
 }
 
+type Disabler interface {
+	Disable()
+}
+
 type EventRecorder interface {
 	Record(event Event)
+	Disabler
 }
 
 type CommandRecorder interface {
