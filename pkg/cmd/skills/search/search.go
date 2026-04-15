@@ -163,7 +163,7 @@ type skillResult struct {
 	Owner       string // parsed from Repo
 	RepoName    string // parsed from Repo
 	SkillName   string
-	Namespace   string // author/scope prefix for namespaced skills
+	Namespace   string // namespace prefix: author/scope for skills/{author}/* or plugin name for plugins/{plugin}/skills/*
 	Description string
 	Path        string // original file path (e.g. skills/terraform/SKILL.md)
 	BlobSHA     string
@@ -187,7 +187,7 @@ func (s skillResult) ExportData(fields []string) map[string]interface{} {
 		case "repo":
 			data[f] = s.Repo
 		case "skillName":
-			data[f] = s.qualifiedName()
+			data[f] = s.SkillName
 		case "namespace":
 			data[f] = s.Namespace
 		case "description":
@@ -577,12 +577,12 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 		fmt.Fprintf(opts.IO.ErrOut, "\n%s Installing %s from %s...\n",
 			cs.Blue("::"), displayName, s.Repo)
 
-		// Use the repo-relative path (e.g. "skills/author/name") for
-		// disambiguation when installing namespaced skills, so the
+		// Use the repo-relative directory path (e.g. "skills/author/name")
+		// for disambiguation when installing namespaced skills, so the
 		// install command can resolve the exact skill without ambiguity.
 		installArg := s.SkillName
 		if s.Namespace != "" {
-			installArg = s.Path
+			installArg = strings.TrimSuffix(s.Path, "/SKILL.md")
 		}
 
 		//nolint:gosec // arguments are from user-selected search results, not arbitrary input

@@ -1,5 +1,5 @@
 # Two namespaced skills with the same base name in the same repo should
-# both appear in search results and be independently installable.
+# be independently installable using path-based disambiguation.
 
 # Use gh as a credential helper
 exec gh auth setup-git
