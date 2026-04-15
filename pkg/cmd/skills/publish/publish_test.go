@@ -20,13 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestGitClient(t *testing.T, remoteURLs map[string]string) *git.Client {
-	t.Helper()
-	dir := t.TempDir()
-	initGitRepo(t, dir, remoteURLs)
-	return &git.Client{RepoDir: dir}
-}
-
 // initGitRepo initializes a git repo in the given directory and adds remotes.
 // Use this when the git repo must live in the same directory as the skill files.
 func initGitRepo(t *testing.T, dir string, remoteURLs map[string]string) {
