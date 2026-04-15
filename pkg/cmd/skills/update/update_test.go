@@ -199,7 +199,9 @@ func TestScanInstalledSkills(t *testing.T) {
 			verify: func(t *testing.T, skills []installedSkill, err error) {
 				t.Helper()
 				require.NoError(t, err)
-				assert.Len(t, skills, 0)
+				require.Len(t, skills, 1)
+				assert.Equal(t, "corrupt", skills[0].name)
+				assert.ErrorContains(t, skills[0].metadataErr, "invalid SKILL.md")
 			},
 		},
 	}

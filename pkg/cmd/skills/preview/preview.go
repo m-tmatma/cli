@@ -216,7 +216,7 @@ func renderAllFiles(opts *PreviewOptions, cs *iostreams.ColorScheme, skill disco
 			fmt.Fprintf(out, "\n%s\n", cs.Muted(fmt.Sprintf("(skipped remaining files, showing first %d)", maxFiles)))
 			break
 		}
-		if totalBytes+f.Size > maxTotalBytes && fetched > 0 {
+		if totalBytes+f.Size > maxTotalBytes {
 			fmt.Fprintf(out, "\n%s\n", cs.Muted("(skipped remaining files, size limit reached)"))
 			break
 		}

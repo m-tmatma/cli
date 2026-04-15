@@ -510,7 +510,13 @@ func scanInstalledSkills(skillsDir string, host *registry.AgentHost, scope regis
 func parseInstalledSkill(data []byte, name, dir string, host *registry.AgentHost, scope registry.Scope) (installedSkill, bool) {
 	result, err := frontmatter.Parse(string(data))
 	if err != nil {
-		return installedSkill{}, false
+		return installedSkill{
+			name:        name,
+			dir:         dir,
+			host:        host,
+			scope:       scope,
+			metadataErr: fmt.Errorf("invalid SKILL.md: %w", err),
+		}, true
 	}
 
 	s := installedSkill{

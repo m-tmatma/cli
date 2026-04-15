@@ -253,7 +253,7 @@ func TestInstallSkill(t *testing.T) {
 			},
 		},
 		{
-			name:  "skips path traversal from malicious tree",
+			name:  "fails on path traversal from malicious tree",
 			skill: discovery.Skill{Name: "code-review", Path: "skills/code-review", TreeSHA: "tree123"},
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -280,10 +280,7 @@ func TestInstallSkill(t *testing.T) {
 			},
 			verify: func(t *testing.T, destDir string) {
 				t.Helper()
-				_, err := os.Stat(filepath.Join(destDir, "code-review", "SKILL.md"))
-				assert.NoError(t, err)
-
-				_, err = os.Stat(filepath.Join(destDir, "..", "etc", "passwd"))
+				_, err := os.Stat(filepath.Join(destDir, "..", "etc", "passwd"))
 				assert.True(t, os.IsNotExist(err), "traversal path should not be written")
 			},
 		},
@@ -305,7 +302,12 @@ func TestInstallSkill(t *testing.T) {
 			}
 
 			err := installSkill(opts, tt.skill, destDir)
-			require.NoError(t, err)
+			if tt.name == "fails on path traversal from malicious tree" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "blocked path traversal")
+			} else {
+				require.NoError(t, err)
+			}
 			tt.verify(t, destDir)
 		})
 	}
