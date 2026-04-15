@@ -579,7 +579,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 
 // relevanceScore computes a numeric ranking score for a search result.
 // Higher scores rank first. Signals (in priority order):
-//   - Exact skill name match (10 000 points)
+//   - Exact skill name match (3 000 points)
 //   - Partial skill name match (1 000 points)
 //   - Description contains query (100 points)
 //   - Repository stars (sqrt bonus, ~2 400 for 6k stars)
@@ -826,7 +826,7 @@ func extractSkillName(filePath string) string {
 }
 
 // formatStars formats a star count for display (e.g. 1700 > "1.7k").
-// TODO kw: Could be swaped for go-humanize.
+// TODO kw: Could be swapped for go-humanize.
 func formatStars(n int) string {
 	if n >= 1000 {
 		return fmt.Sprintf("%.1fk", float64(n)/1000)

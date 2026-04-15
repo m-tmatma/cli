@@ -456,7 +456,7 @@ func TestRankByRelevance(t *testing.T) {
 
 	rankByRelevance(skills, "terraform")
 
-	// Exact name match scores highest (10 000), then partial name (1 000),
+	// Exact name match scores highest (3 000), then partial name (1 000),
 	// then description match (100), then body-only (0).
 	assert.Equal(t, "terraform", skills[0].SkillName)
 	assert.Equal(t, "terraform-plan", skills[1].SkillName)
