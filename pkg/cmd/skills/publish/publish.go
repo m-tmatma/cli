@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -343,14 +344,14 @@ func publishRun(opts *PublishOptions) error {
 	}
 	owner, repo := "", ""
 	if repoInfo != nil {
-		owner = repoInfo.RepoOwner()
-		repo = repoInfo.RepoName()
+		owner = repoInfo.Repo.RepoOwner()
+		repo = repoInfo.Repo.RepoName()
 	}
 	hasTopic := false
 	var existingTags []tagEntry
 	if owner != "" && repo != "" {
 		if host == "" && repoInfo != nil {
-			host = repoInfo.RepoHost()
+			host = repoInfo.Repo.RepoHost()
 		}
 		if host != "" {
 			if err := source.ValidateSupportedHost(host); err != nil {
@@ -438,7 +439,7 @@ func publishRun(opts *PublishOptions) error {
 
 	fmt.Fprintf(opts.IO.ErrOut, "\nPublishing to %s/%s...\n\n", owner, repo)
 
-	return runPublishRelease(opts, client, host, owner, repo, dir, hasTopic, existingTags)
+	return runPublishRelease(opts, client, host, owner, repo, dir, repoInfo.RemoteName, hasTopic, existingTags)
 }
 
 // repoHasTopic checks whether the repo has the agent-skills topic.
@@ -473,11 +474,11 @@ func fetchTags(client *api.Client, host, owner, repo string) []tagEntry {
 }
 
 // runPublishRelease handles the interactive publish flow: topic, tag, release, immutability.
-func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, repo, dir string, hasTopic bool, existingTags []tagEntry) error {
+func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, repo, dir, remoteName string, hasTopic bool, existingTags []tagEntry) error {
 	cs := opts.IO.ColorScheme()
 	canPrompt := opts.IO.CanPrompt()
 
-	// 1. Add topic if missing
+	// Add topic if missing
 	if !hasTopic {
 		addTopic := true
 		if canPrompt {
@@ -498,7 +499,12 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 		}
 	}
 
-	// 2. Determine tag
+	// Push unpushed commits (like gh pr create)
+	if err := ensurePushed(opts, dir, remoteName); err != nil {
+		return err
+	}
+
+	// Determine tag
 	tag := opts.Tag
 	if tag == "" {
 		suggested := "v1.0.0"
@@ -549,7 +555,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 		}
 	}
 
-	// 3. Offer to enable immutable releases
+	// Offer to enable immutable releases
 	immutableEnabled := checkImmutableReleases(client, host, owner, repo)
 	if !immutableEnabled && canPrompt {
 		enableImmutable, err := opts.Prompter.Confirm(
@@ -567,7 +573,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 		}
 	}
 
-	// 4. Inform if not on default branch
+	// Inform if not on default branch
 	var currentBranch string
 	if opts.GitClient != nil {
 		branchGitClient := opts.GitClient.Copy()
@@ -581,7 +587,7 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 		fmt.Fprintf(opts.IO.ErrOut, "%s Publishing from branch %q (default is %q)\n", cs.WarningIcon(), currentBranch, defaultBranch)
 	}
 
-	// 5. Confirm and create release
+	// Confirm and create release
 	if canPrompt {
 		confirmed, err := opts.Prompter.Confirm(
 			fmt.Sprintf("Create release %s with auto-generated notes?", tag), true)
@@ -618,6 +624,56 @@ func runPublishRelease(opts *PublishOptions, client *api.Client, host, owner, re
 	fmt.Fprintf(opts.IO.Out, "%s Published %s\n", cs.SuccessIcon(), tag)
 	fmt.Fprintf(opts.IO.Out, "%s Install with: gh skill install %s/%s\n", cs.SuccessIcon(), owner, repo)
 	fmt.Fprintf(opts.IO.Out, "%s Pin with:     gh skill install %s/%s <skill> --pin %s\n", cs.SuccessIcon(), owner, repo, tag)
+
+	return nil
+}
+
+// ensurePushed checks whether the current branch has unpushed commits and
+// pushes them automatically, consistent with how gh pr create behaves.
+func ensurePushed(opts *PublishOptions, dir, remoteName string) error {
+	if opts.GitClient == nil {
+		return nil
+	}
+
+	cs := opts.IO.ColorScheme()
+	gitClient := opts.GitClient.Copy()
+	gitClient.RepoDir = dir
+
+	ctx := context.Background()
+	currentBranch, err := gitClient.CurrentBranch(ctx)
+	if err != nil {
+		return nil //nolint:nilerr // not on a branch (detached HEAD); skip push check
+	}
+
+	// Count commits ahead of the push target (remote tracking branch).
+	// If the branch has no upstream, rev-list will fail; we treat that as
+	// "everything is unpushed" and push the whole branch.
+	unpushed := 0
+	revCmd, err := gitClient.Command(ctx, "rev-list", "--count", "@{push}..HEAD")
+	if err != nil {
+		return fmt.Errorf("could not check unpushed commits: %w", err)
+	}
+	out, revErr := revCmd.Output()
+	if revErr != nil {
+		// @{push} not resolvable; branch has never been pushed
+		unpushed = -1
+	} else {
+		n, parseErr := strconv.Atoi(strings.TrimSpace(string(out)))
+		if parseErr != nil {
+			return fmt.Errorf("could not parse unpushed commit count: %w", parseErr)
+		}
+		unpushed = n
+	}
+
+	if unpushed == 0 {
+		return nil
+	}
+
+	ref := fmt.Sprintf("HEAD:refs/heads/%s", currentBranch)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Pushing %s to %s\n", cs.SuccessIcon(), currentBranch, remoteName)
+	if err := gitClient.Push(ctx, remoteName, ref); err != nil {
+		return fmt.Errorf("failed to push branch %s: %w", currentBranch, err)
+	}
 
 	return nil
 }
@@ -866,9 +922,15 @@ func suggestNextTag(latest string) string {
 	return fmt.Sprintf("%s%s.%s.%d", prefix, major, minor, patch+1)
 }
 
+// gitHubRemote holds a detected GitHub remote and its local name.
+type gitHubRemote struct {
+	Repo       ghrepo.Interface
+	RemoteName string
+}
+
 // detectGitHubRemote attempts to detect the GitHub owner/repo from git remotes
 // in the given directory.
-func detectGitHubRemote(gitClient *git.Client, dir string) (ghrepo.Interface, error) {
+func detectGitHubRemote(gitClient *git.Client, dir string) (*gitHubRemote, error) {
 	if gitClient == nil {
 		return nil, nil
 	}
@@ -883,7 +945,7 @@ func detectGitHubRemote(gitClient *git.Client, dir string) (ghrepo.Interface, er
 			return nil, parseErr
 		}
 		if repo != nil {
-			return repo, nil
+			return &gitHubRemote{Repo: repo, RemoteName: "origin"}, nil
 		}
 	}
 
@@ -902,7 +964,7 @@ func detectGitHubRemote(gitClient *git.Client, dir string) (ghrepo.Interface, er
 				return nil, parseErr
 			}
 			if repo != nil {
-				return repo, nil
+				return &gitHubRemote{Repo: repo, RemoteName: r.Name}, nil
 			}
 		}
 	}
