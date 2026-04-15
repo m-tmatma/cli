@@ -338,7 +338,7 @@ func publishRun(opts *PublishOptions) error {
 	diagnostics = append(diagnostics, installedDirDiags...)
 
 	// Remote repository checks (best-effort)
-	repoInfo, remoteErr := detectGitHubRemote(opts.GitClient)
+	repoInfo, remoteErr := detectGitHubRemote(opts.GitClient, dir)
 	if remoteErr != nil {
 		return remoteErr
 	}
@@ -867,14 +867,18 @@ func suggestNextTag(latest string) string {
 	return fmt.Sprintf("%s%s.%s.%d", prefix, major, minor, patch+1)
 }
 
-// detectGitHubRemote attempts to detect the GitHub owner/repo from git remotes.
-func detectGitHubRemote(gitClient *git.Client) (ghrepo.Interface, error) {
+// detectGitHubRemote attempts to detect the GitHub owner/repo from git remotes
+// in the given directory.
+func detectGitHubRemote(gitClient *git.Client, dir string) (ghrepo.Interface, error) {
 	if gitClient == nil {
 		return nil, nil
 	}
 
+	dirClient := gitClient.Copy()
+	dirClient.RepoDir = dir
+
 	// Try origin first
-	if url, err := gitClient.RemoteURL(context.Background(), "origin"); err == nil {
+	if url, err := dirClient.RemoteURL(context.Background(), "origin"); err == nil {
 		repo, parseErr := parseGitHubURL(url)
 		if parseErr != nil {
 			return nil, parseErr
@@ -885,7 +889,7 @@ func detectGitHubRemote(gitClient *git.Client) (ghrepo.Interface, error) {
 	}
 
 	// Fall back to any remote that points to GitHub
-	remotes, err := gitClient.Remotes(context.Background())
+	remotes, err := dirClient.Remotes(context.Background())
 	if err != nil {
 		return nil, nil //nolint:nilerr // failing to list remotes is not an error; it just means no repo detected
 	}
@@ -893,7 +897,7 @@ func detectGitHubRemote(gitClient *git.Client) (ghrepo.Interface, error) {
 		if r.Name == "origin" {
 			continue
 		}
-		if url, err := gitClient.RemoteURL(context.Background(), r.Name); err == nil {
+		if url, err := dirClient.RemoteURL(context.Background(), r.Name); err == nil {
 			repo, parseErr := parseGitHubURL(url)
 			if parseErr != nil {
 				return nil, parseErr
