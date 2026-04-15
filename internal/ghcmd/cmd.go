@@ -14,15 +14,18 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/agents"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/config/migration"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
@@ -140,6 +143,18 @@ func Main() exitCode {
 			return exitCode(extError.ExitCode())
 		}
 
+		// Check if any of the provided args match a known official extension.
+		// We scan all args rather than just the first because global flags
+		// (e.g. --repo) may precede the unknown command name.
+		if strings.HasPrefix(err.Error(), "unknown command ") {
+			for _, arg := range expandedArgs {
+				if ext := extensions.FindOfficialExtension(arg); ext != nil {
+					handleOfficialExtension(cmdFactory.IOStreams, cmdFactory.Prompter, cmdFactory.ExtensionManager, ext, err)
+					return exitError
+				}
+			}
+		}
+
 		printError(stderr, err, cmd, hasDebug)
 
 		if strings.Contains(err.Error(), "Incorrect function") {
@@ -244,4 +259,42 @@ func isUnderHomebrew(ghBinary string) bool {
 
 	brewBinPrefix := filepath.Join(strings.TrimSpace(string(brewPrefixBytes)), "bin") + string(filepath.Separator)
 	return strings.HasPrefix(ghBinary, brewBinPrefix)
+}
+
+// handleOfficialExtension prints a suggestion for the matched official extension
+// and, in interactive TTY sessions, prompts the user to install it.
+func handleOfficialExtension(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension, err error) {
+	stderr := io.ErrOut
+
+	fmt.Fprintln(stderr, err)
+
+	if !io.CanPrompt() {
+		fmt.Fprint(stderr, heredoc.Docf(`
+			%q is also available as an official extension.
+			To install it, run:
+			  gh extension install github.com/%s/%s
+		`, fmt.Sprintf("gh %s", ext.Name), ext.Owner, ext.Repo))
+		return
+	}
+
+	prompt := heredoc.Docf(`
+		%q is also available as an official extension.
+		Would you like to install it now?
+	`, fmt.Sprintf("gh %s", ext.Name))
+	confirmed, promptErr := p.Confirm(prompt, true)
+	if promptErr != nil || !confirmed {
+		return
+	}
+
+	repo := ext.Repository()
+	io.StartProgressIndicatorWithLabel(fmt.Sprintf("Installing %s/%s...", ext.Owner, ext.Repo))
+	defer io.StopProgressIndicator()
+	installErr := em.Install(repo, "")
+	io.StopProgressIndicator()
+	if installErr != nil {
+		fmt.Fprintf(stderr, "Failed to install extension: %s\n", installErr)
+		return
+	}
+
+	fmt.Fprintf(stderr, "Successfully installed %s/%s\n", ext.Owner, ext.Repo)
 }
