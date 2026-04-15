@@ -199,6 +199,7 @@ func NewCmdInstall(f *cmdutil.Factory, runF func(*InstallOptions) error) *cobra.
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
 	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
+	cmdutil.DisableAuthCheckFlag(cmd.Flags().Lookup("from-local"))
 
 	return cmd
 }
