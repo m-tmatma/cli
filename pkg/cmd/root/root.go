@@ -230,7 +230,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		}
 	}
 
-	// Official extension stubs — hidden commands that suggest installing
+	// Official extension stubs: hidden commands that suggest installing
 	// GitHub-owned extensions when invoked. Registered after real extensions
 	// and aliases so that both take priority over stubs.
 	for i := range extensions.OfficialExtensions {
