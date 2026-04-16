@@ -50,12 +50,12 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*PreviewOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "preview <repository> [<skill>]",
 		Short: "Preview a skill from a GitHub repository (preview)",
-		Long: heredoc.Doc(`
-			Render a skill's SKILL.md content in the terminal. This fetches the
+		Long: heredoc.Docf(`
+			Render a skill's %[1]sSKILL.md%[1]s content in the terminal. This fetches the
 			skill file from the repository and displays it using the configured
 			pager, without installing anything.
 
-			A file tree is shown first, followed by the rendered SKILL.md content.
+			A file tree is shown first, followed by the rendered %[1]sSKILL.md%[1]s content.
 			When running interactively and the skill contains additional files
 			(scripts, references, etc.), a file picker lets you browse them
 			individually.
@@ -63,10 +63,9 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*PreviewOptions) error) *cobra.
 			When run with only a repository argument, lists available skills and
 			prompts for selection.
 
-			To preview a specific version of the skill, append @VERSION to the
-			skill name. The version is resolved as a git tag, branch, or commit
-			SHA.
-		`),
+			To preview a specific version of the skill, append %[1]s@VERSION%[1]s to the
+			skill name. The version is resolved as a git tag, branch, or commit SHA.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Preview a specific skill
 			$ gh skill preview github/awesome-copilot documentation-writer

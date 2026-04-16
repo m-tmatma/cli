@@ -98,29 +98,29 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "publish [<directory>] [flags]",
 		Short: "Validate and publish skills to a GitHub repository (preview)",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Validate a local repository's skills against the Agent Skills specification
 			and publish them by creating a GitHub release.
 
 			Validation checks include:
 
-			  - Skills follow the skills/*/SKILL.md directory convention
+			  - Skills follow the %[1]sskills/*/SKILL.md%[1]s directory convention
 			  - Skill names match the strict agentskills.io naming rules
 			  - Each skill name matches its directory name
 			  - Required frontmatter fields (name, description) are present
 			  - allowed-tools is a string, not an array
-			  - Install metadata (metadata.github-*) is stripped if present
+			  - Install metadata (%[1]smetadata.github-*%[1]s) is stripped if present
 
 			After validation passes, publish will interactively guide you through:
 
-			  - Adding the "agent-skills" topic to the repository
+			  - Adding the %[1]sagent-skills%[1]s topic to the repository
 			  - Choosing a version tag (semver recommended)
 			  - Creating a GitHub release with auto-generated notes
 
-			Use --dry-run to validate without publishing.
-			Use --tag to publish non-interactively with a specific tag.
-			Use --fix to automatically strip install metadata from committed files.
-		`),
+			Use %[1]s--dry-run%[1]s to validate without publishing.
+			Use %[1]s--tag%[1]s to publish non-interactively with a specific tag.
+			Use %[1]s--fix%[1]s to automatically strip install metadata from committed files.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Validate and publish interactively
 			$ gh skill publish
@@ -134,8 +134,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			# Validate and strip install metadata
 			$ gh skills publish --fix
 		`),
-		Aliases: []string{"validate"},
-		Args:    cobra.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
 				opts.Dir = args[0]
