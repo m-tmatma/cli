@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -103,9 +104,15 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			Validate a local repository's skills against the Agent Skills specification
 			and publish them by creating a GitHub release.
 
+			Skills are discovered using the same conventions as install:
+
+			  - %[1]sskills/*/SKILL.md%[1]s
+			  - %[1]sskills/{scope}/*/SKILL.md%[1]s
+			  - %[1]s*/SKILL.md%[1]s (root-level)
+			  - %[1]splugins/{scope}/skills/*/SKILL.md%[1]s
+
 			Validation checks include:
 
-			  - Skills follow the %[1]sskills/*/SKILL.md%[1]s directory convention
 			  - Skill names match the strict agentskills.io naming rules
 			  - Each skill name matches its directory name
 			  - Required frontmatter fields (name, description) are present
@@ -177,36 +184,18 @@ func publishRun(opts *PublishOptions) error {
 
 	var diagnostics []publishDiagnostic
 
-	// Check for skills directory
-	skillsDir := filepath.Join(dir, "skills")
-	info, err := os.Stat(skillsDir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("no skills/ directory found in %s; run this command from a repository root containing a skills/ directory", dir)
-	}
-
-	// Discover skill directories
-	entries, err := os.ReadDir(skillsDir)
+	skills, err := discovery.DiscoverLocalSkills(dir)
 	if err != nil {
-		return fmt.Errorf("could not read skills/ directory: %w", err)
+		return err
 	}
 
-	var skillDirs []string
-	for _, e := range entries {
-		if e.IsDir() {
-			skillDirs = append(skillDirs, e.Name())
-		}
-	}
-
-	if len(skillDirs) == 0 {
-		return fmt.Errorf("no skill directories found in %s/skills/", dir)
-	}
-
-	for _, dirName := range skillDirs {
-		skillPath := filepath.Join(skillsDir, dirName, "SKILL.md")
+	for _, skill := range skills {
+		dirName := path.Base(skill.Path)
+		skillPath := filepath.Join(dir, filepath.FromSlash(skill.Path), "SKILL.md")
 		content, err := os.ReadFile(skillPath)
 		if err != nil {
 			diagnostics = append(diagnostics, publishDiagnostic{
-				skill:    dirName,
+				skill:    skill.DisplayName(),
 				severity: "error",
 				message:  "missing SKILL.md file",
 			})
@@ -216,7 +205,7 @@ func publishRun(opts *PublishOptions) error {
 		result, err := frontmatter.Parse(string(content))
 		if err != nil {
 			diagnostics = append(diagnostics, publishDiagnostic{
-				skill:    dirName,
+				skill:    skill.DisplayName(),
 				severity: "error",
 				message:  fmt.Sprintf("invalid frontmatter YAML: %s", err),
 			})
@@ -226,7 +215,7 @@ func publishRun(opts *PublishOptions) error {
 		// Validate name field exists
 		if result.Metadata.Name == "" {
 			diagnostics = append(diagnostics, publishDiagnostic{
-				skill:    dirName,
+				skill:    skill.DisplayName(),
 				severity: "error",
 				message:  "missing required field: name",
 			})
@@ -234,7 +223,7 @@ func publishRun(opts *PublishOptions) error {
 			// Validate name matches directory
 			if result.Metadata.Name != dirName {
 				diagnostics = append(diagnostics, publishDiagnostic{
-					skill:    dirName,
+					skill:    skill.DisplayName(),
 					severity: "error",
 					message:  fmt.Sprintf("name %q does not match directory name %q", result.Metadata.Name, dirName),
 				})
@@ -243,7 +232,7 @@ func publishRun(opts *PublishOptions) error {
 			// Validate name is spec-compliant
 			if !discovery.IsSpecCompliant(result.Metadata.Name) {
 				diagnostics = append(diagnostics, publishDiagnostic{
-					skill:    dirName,
+					skill:    skill.DisplayName(),
 					severity: "error",
 					message:  fmt.Sprintf("name %q does not follow agentskills.io naming convention (lowercase alphanumeric + hyphens)", result.Metadata.Name),
 				})
@@ -253,13 +242,13 @@ func publishRun(opts *PublishOptions) error {
 		// Validate description field exists
 		if result.Metadata.Description == "" {
 			diagnostics = append(diagnostics, publishDiagnostic{
-				skill:    dirName,
+				skill:    skill.DisplayName(),
 				severity: "error",
 				message:  "missing required field: description",
 			})
 		} else if len(result.Metadata.Description) > 1024 {
 			diagnostics = append(diagnostics, publishDiagnostic{
-				skill:    dirName,
+				skill:    skill.DisplayName(),
 				severity: "warning",
 				message:  fmt.Sprintf("description is %d chars (recommended max: 1024)", len(result.Metadata.Description)),
 			})
@@ -269,7 +258,7 @@ func publishRun(opts *PublishOptions) error {
 		if raw, ok := result.RawYAML["allowed-tools"]; ok {
 			if _, isSlice := raw.([]interface{}); isSlice {
 				diagnostics = append(diagnostics, publishDiagnostic{
-					skill:    dirName,
+					skill:    skill.DisplayName(),
 					severity: "error",
 					message:  "allowed-tools must be a string (space-delimited), not an array",
 				})
@@ -284,26 +273,26 @@ func publishRun(opts *PublishOptions) error {
 					fixed, fixErr := stripGitHubMetadata(string(content))
 					if fixErr != nil {
 						diagnostics = append(diagnostics, publishDiagnostic{
-							skill:    dirName,
+							skill:    skill.DisplayName(),
 							severity: "error",
 							message:  fmt.Sprintf("could not strip install metadata: %s", fixErr),
 						})
 					} else if writeErr := os.WriteFile(skillPath, []byte(fixed), 0o644); writeErr != nil {
 						diagnostics = append(diagnostics, publishDiagnostic{
-							skill:    dirName,
+							skill:    skill.DisplayName(),
 							severity: "error",
 							message:  fmt.Sprintf("could not write fixed SKILL.md: %s", writeErr),
 						})
 					} else {
 						diagnostics = append(diagnostics, publishDiagnostic{
-							skill:    dirName,
+							skill:    skill.DisplayName(),
 							severity: "fixed",
 							message:  fmt.Sprintf("stripped install metadata: %s", strings.Join(githubKeys, ", ")),
 						})
 					}
 				} else {
 					diagnostics = append(diagnostics, publishDiagnostic{
-						skill:    dirName,
+						skill:    skill.DisplayName(),
 						severity: "error",
 						message:  fmt.Sprintf("contains install metadata that must be stripped: %s (use --fix)", strings.Join(githubKeys, ", ")),
 					})
@@ -315,7 +304,7 @@ func publishRun(opts *PublishOptions) error {
 		if result.Metadata.License == "" {
 			if _, ok := result.RawYAML["license"]; !ok {
 				diagnostics = append(diagnostics, publishDiagnostic{
-					skill:    dirName,
+					skill:    skill.DisplayName(),
 					severity: "warning",
 					message:  "recommended field missing: license",
 				})
@@ -326,7 +315,7 @@ func publishRun(opts *PublishOptions) error {
 		bodyLines := strings.Count(result.Body, "\n") + 1
 		if bodyLines > 500 {
 			diagnostics = append(diagnostics, publishDiagnostic{
-				skill:    dirName,
+				skill:    skill.DisplayName(),
 				severity: "warning",
 				message:  fmt.Sprintf("skill body is %d lines (recommended max: 500 for efficient context)", bodyLines),
 			})
@@ -377,7 +366,11 @@ func publishRun(opts *PublishOptions) error {
 
 		if client != nil {
 			// Security and ruleset checks (advisory, always shown)
-			securityDiags := checkSecuritySettings(client, host, owner, repo, skillsDir)
+			var skillAbsDirs []string
+			for _, skill := range skills {
+				skillAbsDirs = append(skillAbsDirs, filepath.Join(dir, filepath.FromSlash(skill.Path)))
+			}
+			securityDiags := checkSecuritySettings(client, host, owner, repo, skillAbsDirs)
 			diagnostics = append(diagnostics, securityDiags...)
 
 			rulesetDiags := checkTagProtection(client, host, owner, repo)
@@ -407,7 +400,7 @@ func publishRun(opts *PublishOptions) error {
 	}
 
 	if canPrompt {
-		renderDiagnosticsTTY(opts, skillDirs, diagnostics, errors, warnings, fixes, owner, repo)
+		renderDiagnosticsTTY(opts, len(skills), diagnostics, errors, warnings, fixes, owner, repo)
 	} else {
 		renderDiagnosticsPlain(opts, diagnostics, errors, warnings)
 	}
@@ -763,7 +756,7 @@ func checkTagProtection(client *api.Client, host, owner, repo string) []publishD
 }
 
 // checkSecuritySettings checks whether recommended security features are enabled.
-func checkSecuritySettings(client *api.Client, host, owner, repo, skillsDir string) []publishDiagnostic {
+func checkSecuritySettings(client *api.Client, host, owner, repo string, skillDirs []string) []publishDiagnostic {
 	if client == nil {
 		return nil
 	}
@@ -794,7 +787,7 @@ func checkSecuritySettings(client *api.Client, host, owner, repo, skillsDir stri
 		})
 	}
 
-	hasCode, hasManifests := detectCodeAndManifests(skillsDir)
+	hasCode, hasManifests := detectCodeAndManifests(skillDirs)
 
 	if hasCode {
 		alertsPath := fmt.Sprintf("repos/%s/%s/code-scanning/alerts?per_page=1&state=open", owner, repo)
@@ -837,28 +830,35 @@ var manifestFiles = map[string]bool{
 	"composer.json": true, "composer.lock": true,
 }
 
-// detectCodeAndManifests walks the skills directory looking for code files
+// detectCodeAndManifests walks the skill directories looking for code files
 // and dependency manifests.
-func detectCodeAndManifests(skillsDir string) (hasCode, hasManifests bool) {
-	_ = filepath.Walk(skillsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
+func detectCodeAndManifests(skillDirs []string) (hasCode, hasManifests bool) {
+	for _, dir := range skillDirs {
+		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			ext := filepath.Ext(info.Name())
+			if codeExtensions[ext] {
+				hasCode = true
+			}
+			if manifestFiles[info.Name()] {
+				hasManifests = true
+			}
+			if hasCode && hasManifests {
+				// Stop walking this skill directory early; the outer loop
+				// continues to process remaining skill directories.
+				return filepath.SkipAll
+			}
 			return nil
-		}
-		ext := filepath.Ext(info.Name())
-		if codeExtensions[ext] {
-			hasCode = true
-		}
-		if manifestFiles[info.Name()] {
-			hasManifests = true
-		}
+		})
 		if hasCode && hasManifests {
-			return filepath.SkipAll
+			return
 		}
-		return nil
-	})
+	}
 	return
 }
 
@@ -1023,7 +1023,7 @@ func detectMissingRepoDiagnostic(gitClient *git.Client, dir string) []publishDia
 	}}
 }
 
-func renderDiagnosticsTTY(opts *PublishOptions, skillDirs []string, diagnostics []publishDiagnostic, errors, warnings, fixes int, owner, repo string) {
+func renderDiagnosticsTTY(opts *PublishOptions, skillCount int, diagnostics []publishDiagnostic, errors, warnings, fixes int, owner, repo string) {
 	cs := opts.IO.ColorScheme()
 
 	// Separate info messages from errors/warnings for cleaner output
@@ -1037,7 +1037,7 @@ func renderDiagnosticsTTY(opts *PublishOptions, skillDirs []string, diagnostics 
 	}
 
 	if len(issues) == 0 && fixes == 0 {
-		fmt.Fprintf(opts.IO.Out, "%s %d skill(s) validated successfully\n", cs.SuccessIcon(), len(skillDirs))
+		fmt.Fprintf(opts.IO.Out, "%s %d skill(s) validated successfully\n", cs.SuccessIcon(), skillCount)
 	} else {
 		for _, d := range issues {
 			var prefix string

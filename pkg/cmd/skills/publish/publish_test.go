@@ -184,16 +184,16 @@ func TestPublishRun(t *testing.T) {
 		wantStderr string
 	}{
 		{
-			name:  "no skills directory",
+			name:  "no skills found",
 			setup: func(_ *testing.T, _ string) {},
 			opts: func(ios *iostreams.IOStreams, dir string, _ *httpmock.Registry) *PublishOptions {
 				t.Helper()
 				return &PublishOptions{IO: ios, Dir: dir}
 			},
-			wantErr: "no skills/ directory",
+			wantErr: "no skills found",
 		},
 		{
-			name: "missing SKILL.md",
+			name: "empty skills directory has no discoverable skills",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, "skills", "empty-skill"), 0o755))
@@ -202,8 +202,7 @@ func TestPublishRun(t *testing.T) {
 				t.Helper()
 				return &PublishOptions{IO: ios, Dir: dir}
 			},
-			wantErr:    "validation failed",
-			wantStdout: "missing SKILL.md",
+			wantErr: "no skills found",
 		},
 		{
 			name: "missing name in frontmatter",
@@ -260,6 +259,80 @@ func TestPublishRun(t *testing.T) {
 			},
 			wantErr:    "validation failed",
 			wantStdout: "naming convention",
+		},
+		{
+			name:  "root-level skill discovered and validated",
+			isTTY: true,
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				// Create a root-level skill (*/SKILL.md convention)
+				skillDir := filepath.Join(dir, "my-root-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: my-root-skill
+					description: A root-level skill
+					license: MIT
+					---
+					Body.
+				`)), 0o644))
+				initGitRepo(t, dir, map[string]string{
+					"origin": "https://github.com/monalisa/skills-repo.git",
+				})
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubAllSecureRemote(reg, "monalisa", "skills-repo")
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
+				t.Helper()
+				return &PublishOptions{
+					IO:        ios,
+					Dir:       dir,
+					DryRun:    true,
+					GitClient: &git.Client{},
+					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					host:      "github.com",
+				}
+			},
+			wantStdout: "1 skill(s) validated successfully",
+			wantStderr: "Dry run complete",
+		},
+		{
+			name:  "namespaced skill discovered and validated",
+			isTTY: true,
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				// Create a namespaced skill (skills/{scope}/*/SKILL.md convention)
+				skillDir := filepath.Join(dir, "skills", "monalisa", "scoped-skill")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(heredoc.Doc(`
+					---
+					name: scoped-skill
+					description: A namespaced skill
+					license: MIT
+					---
+					Body.
+				`)), 0o644))
+				initGitRepo(t, dir, map[string]string{
+					"origin": "https://github.com/monalisa/skills-repo.git",
+				})
+			},
+			stubs: func(reg *httpmock.Registry) {
+				stubAllSecureRemote(reg, "monalisa", "skills-repo")
+			},
+			opts: func(ios *iostreams.IOStreams, dir string, reg *httpmock.Registry) *PublishOptions {
+				t.Helper()
+				return &PublishOptions{
+					IO:        ios,
+					Dir:       dir,
+					DryRun:    true,
+					GitClient: &git.Client{},
+					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					host:      "github.com",
+				}
+			},
+			wantStdout: "1 skill(s) validated successfully",
+			wantStderr: "Dry run complete",
 		},
 		{
 			name:  "valid skill dry-run passes validation",
