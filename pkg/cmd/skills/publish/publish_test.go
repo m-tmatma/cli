@@ -164,7 +164,7 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 		IO:         ios,
 		Dir:        dir,
 		GitClient:  &git.Client{},
-		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
+		HttpClient: func() (*http.Client, error) { return nil, nil },
 		host:       "acme.ghes.com",
 	})
 	require.ErrorContains(t, err, "supports only github.com")

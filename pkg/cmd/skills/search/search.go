@@ -770,17 +770,15 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	return allItems, totalCount, nil
 }
 
-// skillResultKey is a typed map key for deduplicating code search results
-// by (repo, namespace, skill name). All fields are lowercased for
-// case-insensitive comparison.
-type skillResultKey struct {
-	repo      string
-	namespace string
-	skillName string
-}
-
 // deduplicateResults extracts unique (repo, namespace, skill name) triples from code search hits.
 func deduplicateResults(items []codeSearchItem) []skillResult {
+	// skillResultKey is a typed map key that deduplicates by (repo, namespace,
+	// skill name). All fields are lowercased for case-insensitive comparison.
+	type skillResultKey struct {
+		repo      string
+		namespace string
+		skillName string
+	}
 	seen := make(map[skillResultKey]struct{})
 	var results []skillResult
 
