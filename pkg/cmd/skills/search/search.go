@@ -73,20 +73,19 @@ func NewCmdSearch(f *cmdutil.Factory, runF func(*SearchOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "search <query> [flags]",
 		Short: "Search for skills across GitHub (preview)",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Search across all public GitHub repositories for skills matching a keyword.
 
-			Uses the GitHub Code Search API to find SKILL.md files whose name or
+			Uses the GitHub Code Search API to find %[1]sSKILL.md%[1]s files whose name or
 			description matches the query term.
 
 			Results are ranked by relevance: skills whose name contains the query
 			term appear first.
 
-			Use --owner to scope results to a specific GitHub user or organization.
+			Use %[1]s--owner%[1]s to scope results to a specific GitHub user or organization.
 
-			In interactive mode, you can select skills from the results to install
-			directly.
-		`),
+			In interactive mode, you can select skills from the results to install directly.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Search for skills related to terraform
 			$ gh skill search terraform

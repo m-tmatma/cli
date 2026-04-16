@@ -75,9 +75,9 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "update [<skill>...] [flags]",
 		Short: "Update installed skills to their latest versions (preview)",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			Checks installed skills for available updates by comparing the local
-			tree SHA (from SKILL.md frontmatter) against the remote repository.
+			tree SHA (from %[1]sSKILL.md%[1]s frontmatter) against the remote repository.
 
 			Scans all known agent host directories (Copilot, Claude, Cursor, Codex,
 			Gemini, Antigravity) in both project and user scope automatically.
@@ -85,8 +85,8 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			Without arguments, checks all installed skills. With skill names,
 			checks only those specific skills.
 
-			Pinned skills (installed with --pin) are skipped with a notice.
-			Use --unpin to clear the pinned version and include those skills
+			Pinned skills (installed with %[1]s--pin%[1]s) are skipped with a notice.
+			Use %[1]s--unpin%[1]s to clear the pinned version and include those skills
 			in the update.
 
 			Skills without GitHub metadata (e.g. installed manually or by another
@@ -94,14 +94,14 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			The update re-downloads the skill with metadata injected, so future
 			updates work automatically.
 
-			With --force, re-downloads skills even when the remote version matches
+			With %[1]s--force%[1]s, re-downloads skills even when the remote version matches
 			the local tree SHA. This overwrites locally modified skill files with
 			their original content, but does not remove extra files added locally.
 
 			In interactive mode, shows which skills have updates and asks for
-			confirmation before proceeding. With --all, updates without prompting.
-			With --dry-run, reports available updates without modifying any files.
-		`),
+			confirmation before proceeding. With %[1]s--all%[1]s, updates without prompting.
+			With %[1]s--dry-run%[1]s, reports available updates without modifying any files.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# Check and update all skills interactively
 			$ gh skill update
