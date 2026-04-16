@@ -316,6 +316,18 @@ func MatchesSkillPath(filePath string) string {
 	return m.name
 }
 
+// MatchSkillPath checks if a file path matches any known skill convention
+// and returns the skill name and namespace. Returns empty strings if the
+// path doesn't match. The namespace is non-empty for namespaced skills
+// (e.g. skills/author/name/SKILL.md) and plugin skills.
+func MatchSkillPath(filePath string) (name, namespace string) {
+	m := matchSkillConventions(treeEntry{Path: filePath})
+	if m == nil {
+		return "", ""
+	}
+	return m.name, m.namespace
+}
+
 // matchSkillConventions checks if a blob path matches any known skill convention.
 func matchSkillConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {

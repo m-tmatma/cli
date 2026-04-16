@@ -40,6 +40,7 @@ const (
 var SkillSearchFields = []string{
 	"repo",
 	"skillName",
+	"namespace",
 	"description",
 	"stars",
 	"path",
@@ -161,10 +162,20 @@ type skillResult struct {
 	Owner       string // parsed from Repo
 	RepoName    string // parsed from Repo
 	SkillName   string
+	Namespace   string // namespace prefix: author/scope for skills/{author}/* or plugin name for plugins/{plugin}/skills/*
 	Description string
 	Path        string // original file path (e.g. skills/terraform/SKILL.md)
 	BlobSHA     string
 	Stars       int // repository stargazer count
+}
+
+// qualifiedName returns the namespace-qualified skill name (e.g. "author/skill")
+// or just the skill name if there is no namespace.
+func (s skillResult) qualifiedName() string {
+	if s.Namespace != "" {
+		return s.Namespace + "/" + s.SkillName
+	}
+	return s.SkillName
 }
 
 // ExportData implements cmdutil.exportable for --json output.
@@ -176,6 +187,8 @@ func (s skillResult) ExportData(fields []string) map[string]interface{} {
 			data[f] = s.Repo
 		case "skillName":
 			data[f] = s.SkillName
+		case "namespace":
+			data[f] = s.Namespace
 		case "description":
 			data[f] = s.Description
 		case "stars":
@@ -411,17 +424,18 @@ func paginate(skills []skillResult, page, limit int) ([]skillResult, int) {
 	return skills[start:end], totalPages
 }
 
-// deduplicateByName caps the number of results with the same skill name.
-// Since results are pre-sorted by relevance score, the first occurrences
+// deduplicateByName caps the number of results with the same qualified skill
+// name. Since results are pre-sorted by relevance score, the first occurrences
 // are the best instances. This prevents aggregator repos (which copy
 // popular skills verbatim) from flooding results while still showing
-// a few alternative sources.
+// a few alternative sources. Namespaced skills (e.g. "author/skill") are
+// treated as distinct from bare names.
 func deduplicateByName(skills []skillResult) []skillResult {
 	const maxPerName = 3
 	counts := make(map[string]int)
 	var result []skillResult
 	for _, s := range skills {
-		key := strings.ToLower(s.SkillName)
+		key := strings.ToLower(s.qualifiedName())
 		if counts[key] >= maxPerName {
 			continue
 		}
@@ -484,7 +498,7 @@ func renderTable(io *iostreams.IOStreams, skills []skillResult) error {
 	table := tableprinter.New(io, tableprinter.WithHeader("REPOSITORY", "SKILL", "DESCRIPTION", "STARS"))
 	for _, s := range skills {
 		table.AddField(s.Repo)
-		table.AddField(s.SkillName)
+		table.AddField(s.qualifiedName())
 		desc := s.Description
 		if isTTY {
 			desc = text.Truncate(descWidth, desc)
@@ -522,7 +536,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 			desc := strings.Join(strings.Fields(s.Description), " ")
 			descStr = "\n       " + cs.Muted(text.Truncate(descWidth, desc))
 		}
-		options[i] = s.SkillName + "  " + cs.Muted(s.Repo) + starStr + descStr
+		options[i] = s.qualifiedName() + "  " + cs.Muted(s.Repo) + starStr + descStr
 	}
 
 	indices, err := opts.Prompter.MultiSelect(
@@ -558,18 +572,27 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 
 	for _, idx := range indices {
 		s := skills[idx]
+		displayName := s.qualifiedName()
 		fmt.Fprintf(opts.IO.ErrOut, "\n%s Installing %s from %s...\n",
-			cs.Blue("::"), s.SkillName, s.Repo)
+			cs.Blue("::"), displayName, s.Repo)
+
+		// Use the repo-relative directory path (e.g. "skills/author/name")
+		// for disambiguation when installing namespaced skills, so the
+		// install command can resolve the exact skill without ambiguity.
+		installArg := s.SkillName
+		if s.Namespace != "" {
+			installArg = strings.TrimSuffix(s.Path, "/SKILL.md")
+		}
 
 		//nolint:gosec // arguments are from user-selected search results, not arbitrary input
-		cmd := exec.Command(opts.Executable, "skills", "install", s.Repo, s.SkillName,
+		cmd := exec.Command(opts.Executable, "skills", "install", s.Repo, installArg,
 			"--agent", host.ID, "--scope", scope)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = opts.IO.Out
 		cmd.Stderr = opts.IO.ErrOut
 		if err := cmd.Run(); err != nil {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Failed to install %s from %s: %s\n",
-				cs.Red("!"), s.SkillName, s.Repo, err)
+				cs.Red("!"), displayName, s.Repo, err)
 		}
 	}
 
@@ -580,6 +603,7 @@ func promptInstall(opts *SearchOptions, skills []skillResult) error {
 // Higher scores rank first. Signals (in priority order):
 //   - Exact skill name match (3 000 points)
 //   - Partial skill name match (1 000 points)
+//   - Namespace match (500 points)
 //   - Description contains query (100 points)
 //   - Repository stars (sqrt bonus, ~2 400 for 6k stars)
 func relevanceScore(s skillResult, query string) int {
@@ -594,6 +618,11 @@ func relevanceScore(s skillResult, query string) int {
 		score += 3_000
 	} else if strings.Contains(skillLower, term) || strings.Contains(skillLower, termHyphen) {
 		score += 1_000
+	}
+
+	// Namespace match.
+	if s.Namespace != "" && strings.Contains(strings.ToLower(s.Namespace), term) {
+		score += 500
 	}
 
 	// Description match.
@@ -612,7 +641,7 @@ func relevanceScore(s skillResult, query string) int {
 
 // filterByRelevance removes results that are not meaningfully related to
 // the query. A result is kept if the query term appears in the skill name,
-// the YAML description, or the repository owner or name.
+// the namespace, the YAML description, or the repository owner or name.
 func filterByRelevance(skills []skillResult, query string) []skillResult {
 	queryTerm := strings.ToLower(query)
 	termHyphen := strings.ReplaceAll(queryTerm, " ", "-")
@@ -620,12 +649,14 @@ func filterByRelevance(skills []skillResult, query string) []skillResult {
 	filtered := skills[:0] // reuse backing array
 	for _, s := range skills {
 		nameLower := strings.ToLower(s.SkillName)
+		namespaceLower := strings.ToLower(s.Namespace)
 		descLower := strings.ToLower(s.Description)
 		ownerLower := strings.ToLower(s.Owner)
 		repoLower := strings.ToLower(s.RepoName)
 
 		if strings.Contains(nameLower, queryTerm) ||
 			strings.Contains(nameLower, termHyphen) ||
+			strings.Contains(namespaceLower, queryTerm) ||
 			strings.Contains(descLower, queryTerm) ||
 			strings.Contains(ownerLower, queryTerm) ||
 			strings.Contains(repoLower, queryTerm) {
@@ -739,17 +770,17 @@ func fetchPrimaryPages(client *api.Client, host, query string, displayPage, disp
 	return allItems, totalCount, nil
 }
 
-// deduplicateResults extracts unique (repo, skill name) pairs from code search hits.
+// deduplicateResults extracts unique (repo, namespace, skill name) triples from code search hits.
 func deduplicateResults(items []codeSearchItem) []skillResult {
 	seen := make(map[string]struct{})
 	var results []skillResult
 
 	for _, item := range items {
-		skillName := extractSkillName(item.Path)
+		skillName, namespace := extractSkillInfo(item.Path)
 		if skillName == "" {
 			continue
 		}
-		key := item.Repository.FullName + "/" + skillName
+		key := item.Repository.FullName + "/" + namespace + "/" + skillName
 		if _, ok := seen[key]; ok {
 			continue
 		}
@@ -761,6 +792,7 @@ func deduplicateResults(items []codeSearchItem) []skillResult {
 			Owner:     owner,
 			RepoName:  repoName,
 			SkillName: skillName,
+			Namespace: namespace,
 			Path:      item.Path,
 			BlobSHA:   item.SHA,
 		})
@@ -817,11 +849,11 @@ func fetchDescriptions(client *api.Client, host string, skills []skillResult) ma
 	return descs
 }
 
-// extractSkillName derives the skill name from a SKILL.md path, but only if
-// the path matches a known skill convention (skills/*, skills/scope/*, root-level,
-// or plugins/*/skills/*). Returns empty string for non-conforming paths.
-func extractSkillName(filePath string) string {
-	return discovery.MatchesSkillPath(filePath)
+// extractSkillInfo derives the skill name and namespace from a SKILL.md path,
+// but only if the path matches a known skill convention. Returns empty strings
+// for non-conforming paths.
+func extractSkillInfo(filePath string) (name, namespace string) {
+	return discovery.MatchSkillPath(filePath)
 }
 
 // formatStars formats a star count for display (e.g. 1700 > "1.7k").

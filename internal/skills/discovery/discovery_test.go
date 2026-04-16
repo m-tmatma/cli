@@ -923,6 +923,30 @@ func TestMatchesSkillPath(t *testing.T) {
 	}
 }
 
+func TestMatchSkillPath(t *testing.T) {
+	tests := []struct {
+		testName      string
+		path          string
+		wantName      string
+		wantNamespace string
+	}{
+		{testName: "skills convention", path: "skills/code-review/SKILL.md", wantName: "code-review", wantNamespace: ""},
+		{testName: "namespaced convention", path: "skills/monalisa/issue-triage/SKILL.md", wantName: "issue-triage", wantNamespace: "monalisa"},
+		{testName: "plugins convention", path: "plugins/hubot/skills/pr-summary/SKILL.md", wantName: "pr-summary", wantNamespace: "hubot"},
+		{testName: "non-skill file", path: "README.md", wantName: "", wantNamespace: ""},
+		{testName: "same name different namespace 1", path: "skills/kynan/commit/SKILL.md", wantName: "commit", wantNamespace: "kynan"},
+		{testName: "same name different namespace 2", path: "skills/will/commit/SKILL.md", wantName: "commit", wantNamespace: "will"},
+		{testName: "root convention", path: "my-skill/SKILL.md", wantName: "my-skill", wantNamespace: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			name, namespace := MatchSkillPath(tt.path)
+			assert.Equal(t, tt.wantName, name)
+			assert.Equal(t, tt.wantNamespace, namespace)
+		})
+	}
+}
+
 func TestDiscoverSkillFiles(t *testing.T) {
 	tests := []struct {
 		name      string

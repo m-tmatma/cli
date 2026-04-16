@@ -190,7 +190,7 @@ func TestSearchRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				stubKeywordSearch(reg, `{"total_count": 1, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/author/my-skill/SKILL.md", "repository": {"full_name": "org/repo"}}]}`)
 			},
-			wantStdout: "org/repo\tmy-skill\t\t0\n",
+			wantStdout: "org/repo\tauthor/my-skill\t\t0\n",
 		},
 		{
 			name: "ranks name-matching results first",
@@ -224,6 +224,18 @@ func TestSearchRun(t *testing.T) {
 				stubKeywordSearch(reg, `{"total_count": 1, "incomplete_results": false, "items": [{"name": "SKILL.md", "path": "skills/terraform/SKILL.md", "repository": {"full_name": "org/repo"}}]}`)
 			},
 			wantErr: `no skills found on page 999 for query "terraform"`,
+		},
+		{
+			name: "namespaced skills are kept distinct in same repo",
+			tty:  false,
+			opts: &SearchOptions{Query: "commit", Page: 1, Limit: defaultLimit},
+			httpStubs: func(reg *httpmock.Registry) {
+				stubKeywordSearch(reg, `{"total_count": 2, "incomplete_results": false, "items": [
+					{"name": "SKILL.md", "path": "skills/kynan/commit/SKILL.md", "repository": {"full_name": "org/skills-repo"}},
+					{"name": "SKILL.md", "path": "skills/will/commit/SKILL.md", "repository": {"full_name": "org/skills-repo"}}
+				]}`)
+			},
+			wantStdout: "org/skills-repo\tkynan/commit\t\t0\norg/skills-repo\twill/commit\t\t0\n",
 		},
 		{
 			name: "json output with selected fields",
@@ -398,28 +410,52 @@ func TestDeduplicateResults(t *testing.T) {
 	assert.Equal(t, "terraform", results[2].SkillName)
 }
 
-func TestExtractSkillName(t *testing.T) {
+func TestDeduplicateResults_Namespaced(t *testing.T) {
+	items := []codeSearchItem{
+		{Path: "skills/kynan/commit/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}},
+		{Path: "skills/will/commit/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}},
+		{Path: "skills/kynan/commit/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}}, // duplicate
+		{Path: "skills/commit/SKILL.md", Repository: codeSearchRepository{FullName: "org/repo"}},       // non-namespaced
+	}
+
+	results := deduplicateResults(items)
+
+	require.Equal(t, 3, len(results))
+	assert.Equal(t, "commit", results[0].SkillName)
+	assert.Equal(t, "kynan", results[0].Namespace)
+	assert.Equal(t, "commit", results[1].SkillName)
+	assert.Equal(t, "will", results[1].Namespace)
+	assert.Equal(t, "commit", results[2].SkillName)
+	assert.Equal(t, "", results[2].Namespace)
+}
+
+func TestExtractSkillInfo(t *testing.T) {
 	tests := []struct {
-		path string
-		want string
+		path          string
+		wantName      string
+		wantNamespace string
 	}{
-		{"skills/terraform/SKILL.md", "terraform"},
-		{"skills/author/my-skill/SKILL.md", "my-skill"},
-		{"SKILL.md", ""},
-		{"skills/docker/SKILL.md", "docker"},
+		{"skills/terraform/SKILL.md", "terraform", ""},
+		{"skills/author/my-skill/SKILL.md", "my-skill", "author"},
+		{"SKILL.md", "", ""},
+		{"skills/docker/SKILL.md", "docker", ""},
 		// Root-level convention
-		{"my-skill/SKILL.md", "my-skill"},
+		{"my-skill/SKILL.md", "my-skill", ""},
 		// Plugins convention
-		{"plugins/openai/skills/chat/SKILL.md", "chat"},
+		{"plugins/openai/skills/chat/SKILL.md", "chat", "openai"},
 		// Non-matching paths should be filtered out
-		{"random/nested/deep/SKILL.md", ""},
-		{".hidden/SKILL.md", ""},
+		{"random/nested/deep/SKILL.md", "", ""},
+		{".hidden/SKILL.md", "", ""},
+		// Same-name skills with different namespaces
+		{"skills/kynan/commit/SKILL.md", "commit", "kynan"},
+		{"skills/will/commit/SKILL.md", "commit", "will"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			got := extractSkillName(tt.path)
-			assert.Equal(t, tt.want, got)
+			gotName, gotNamespace := extractSkillInfo(tt.path)
+			assert.Equal(t, tt.wantName, gotName)
+			assert.Equal(t, tt.wantNamespace, gotNamespace)
 		})
 	}
 }
@@ -432,18 +468,22 @@ func TestFilterByRelevance(t *testing.T) {
 		{Repo: "acme/terraform-tools", Owner: "acme", RepoName: "terraform-tools", SkillName: "validator"},
 		{Repo: "x/y", Owner: "x", RepoName: "y", SkillName: "unrelated", Description: "terraform integration"},
 		{Repo: "x/z", Owner: "x", RepoName: "z", SkillName: "noise"},
+		{Repo: "org/repo3", Owner: "org", RepoName: "repo3", SkillName: "deploy", Namespace: "terraform"},
 	}
 
 	filtered := filterByRelevance(skills, "terraform")
 
 	// Should keep: name match (terraform), owner match (terraform-corp),
-	// repo name match (terraform-tools), description match (terraform integration).
+	// repo name match (terraform-tools), description match (terraform integration),
+	// namespace match (terraform/deploy).
 	// Should drop: docker, noise.
-	assert.Equal(t, 4, len(filtered))
+	assert.Equal(t, 5, len(filtered))
 	assert.Equal(t, "terraform", filtered[0].SkillName)
 	assert.Equal(t, "linter", filtered[1].SkillName)
 	assert.Equal(t, "validator", filtered[2].SkillName)
 	assert.Equal(t, "unrelated", filtered[3].SkillName)
+	assert.Equal(t, "deploy", filtered[4].SkillName)
+	assert.Equal(t, "terraform", filtered[4].Namespace)
 }
 
 func TestRankByRelevance(t *testing.T) {
@@ -484,4 +524,55 @@ func TestFormatStars(t *testing.T) {
 	assert.Equal(t, "1.0k", formatStars(1000))
 	assert.Equal(t, "1.7k", formatStars(1700))
 	assert.Equal(t, "12.5k", formatStars(12500))
+}
+
+func TestQualifiedName(t *testing.T) {
+	tests := []struct {
+		name  string
+		skill skillResult
+		want  string
+	}{
+		{
+			name:  "no namespace",
+			skill: skillResult{SkillName: "terraform"},
+			want:  "terraform",
+		},
+		{
+			name:  "with namespace",
+			skill: skillResult{SkillName: "commit", Namespace: "kynan"},
+			want:  "kynan/commit",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.skill.qualifiedName())
+		})
+	}
+}
+
+func TestDeduplicateByName_Namespaced(t *testing.T) {
+	// Skills with the same base name but different namespaces should
+	// be treated as distinct and not collapsed against each other.
+	skills := []skillResult{
+		{Repo: "org/repo1", SkillName: "commit", Namespace: "kynan"},
+		{Repo: "org/repo2", SkillName: "commit", Namespace: "will"},
+		{Repo: "org/repo3", SkillName: "commit"},
+		{Repo: "org/repo4", SkillName: "commit", Namespace: "kynan"},
+		{Repo: "org/repo5", SkillName: "commit", Namespace: "kynan"},
+		{Repo: "org/repo6", SkillName: "commit", Namespace: "kynan"}, // should be capped (4th kynan/commit)
+	}
+
+	result := deduplicateByName(skills)
+
+	// kynan/commit capped at 3, will/commit has 1, bare commit has 1 = 5 total
+	require.Equal(t, 5, len(result))
+	assert.Equal(t, "kynan", result[0].Namespace)
+	assert.Equal(t, "will", result[1].Namespace)
+	assert.Equal(t, "", result[2].Namespace)
+	assert.Equal(t, "kynan", result[3].Namespace)
+	assert.Equal(t, "kynan", result[4].Namespace)
+	// repo6 should have been dropped
+	for _, s := range result {
+		assert.NotEqual(t, "org/repo6", s.Repo)
+	}
 }
