@@ -11,12 +11,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCmdOfficialExtension creates a hidden stub command for an official
+// NewCmdOfficialExtensionStub creates a hidden stub command for an official
 // extension that has not yet been installed. When invoked, it suggests
 // installing the extension and, in interactive sessions, offers to do so
 // immediately. After a successful install, the extension is dispatched with
 // the original arguments.
-func NewCmdOfficialExtension(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension) *cobra.Command {
+func NewCmdOfficialExtensionStub(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     ext.Name,
 		Short:   fmt.Sprintf("Install the official %s extension", ext.Name),
@@ -26,7 +26,7 @@ func NewCmdOfficialExtension(io *iostreams.IOStreams, p prompter.Prompter, em ex
 		// cobra validation errors before reaching RunE.
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return officialExtensionRun(io, p, em, ext, args)
+			return officialExtensionStubRun(io, p, em, ext, args)
 		},
 	}
 
@@ -35,7 +35,7 @@ func NewCmdOfficialExtension(io *iostreams.IOStreams, p prompter.Prompter, em ex
 	return cmd
 }
 
-func officialExtensionRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension, args []string) error {
+func officialExtensionStubRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension, args []string) error {
 	stderr := io.ErrOut
 
 	if !io.CanPrompt() {

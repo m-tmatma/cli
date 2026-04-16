@@ -238,7 +238,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		if _, _, err := cmd.Find([]string{ext.Name}); err == nil {
 			continue
 		}
-		cmd.AddCommand(NewCmdOfficialExtension(io, f.Prompter, em, ext))
+		cmd.AddCommand(NewCmdOfficialExtensionStub(io, f.Prompter, em, ext))
 	}
 
 	cmdutil.DisableAuthCheck(cmd)

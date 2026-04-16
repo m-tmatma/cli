@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOfficialExtensionRun(t *testing.T) {
+func TestOfficialExtensionStubRun(t *testing.T) {
 	ext := &extensions.OfficialExtension{Name: "cool", Owner: "github", Repo: "gh-cool"}
 
 	tests := []struct {
@@ -101,7 +101,7 @@ func TestOfficialExtensionRun(t *testing.T) {
 				},
 			}
 
-			err := officialExtensionRun(ios, p, em, ext, tt.args)
+			err := officialExtensionStubRun(ios, p, em, ext, tt.args)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -134,13 +134,13 @@ func TestOfficialExtensionRun(t *testing.T) {
 	}
 }
 
-func TestNewCmdOfficialExtension_Properties(t *testing.T) {
+func TestNewCmdOfficialExtensionStub_Properties(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	ext := &extensions.OfficialExtension{Name: "cool", Owner: "github", Repo: "gh-cool"}
 	em := &extensions.ExtensionManagerMock{}
 	p := &prompter.PrompterMock{}
 
-	cmd := NewCmdOfficialExtension(ios, p, em, ext)
+	cmd := NewCmdOfficialExtensionStub(ios, p, em, ext)
 
 	assert.Equal(t, "cool", cmd.Use)
 	assert.True(t, cmd.Hidden)
