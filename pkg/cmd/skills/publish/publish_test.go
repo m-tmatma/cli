@@ -1620,7 +1620,7 @@ func TestEnsurePushed(t *testing.T) {
 			wantStderr: "Pushing main to origin",
 		},
 		{
-			name: "new branch is not pushed is pushed automatically",
+			name: "new branch that has not been pushed is pushed automatically",
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git( .+)? symbolic-ref --quiet HEAD`, 0, "refs/heads/feature\n")
 				// rev-list fails when branch is not pushed
