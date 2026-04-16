@@ -44,6 +44,7 @@ import (
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
@@ -227,6 +228,17 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 				parentCmd.AddCommand(aliasCmd)
 			}
 		}
+	}
+
+	// Official extension stubs — hidden commands that suggest installing
+	// GitHub-owned extensions when invoked. Registered after real extensions
+	// and aliases so that both take priority over stubs.
+	for i := range extensions.OfficialExtensions {
+		ext := &extensions.OfficialExtensions[i]
+		if _, _, err := cmd.Find([]string{ext.Name}); err == nil {
+			continue
+		}
+		cmd.AddCommand(NewCmdOfficialExtension(io, f.Prompter, em, ext))
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
