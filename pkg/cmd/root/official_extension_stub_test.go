@@ -2,7 +2,6 @@ package root
 
 import (
 	"fmt"
-	"io"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -17,18 +16,14 @@ func TestOfficialExtensionStubRun(t *testing.T) {
 	ext := &extensions.OfficialExtension{Name: "cool", Owner: "github", Repo: "gh-cool"}
 
 	tests := []struct {
-		name           string
-		isTTY          bool
-		confirmResult  bool
-		confirmErr     error
-		installErr     error
-		dispatchErr    error
-		args           []string
-		wantErr        string
-		wantStderr     string
-		wantInstalled  bool
-		wantDispatched bool
-		wantDispArgs   []string
+		name          string
+		isTTY         bool
+		confirmResult bool
+		confirmErr    error
+		installErr    error
+		wantErr       string
+		wantStderr    string
+		wantInstalled bool
 	}{
 		{
 			name:       "non-TTY prints install instructions",
@@ -36,14 +31,11 @@ func TestOfficialExtensionStubRun(t *testing.T) {
 			wantStderr: "gh extension install github/gh-cool",
 		},
 		{
-			name:           "TTY confirmed installs and dispatches",
-			isTTY:          true,
-			confirmResult:  true,
-			args:           []string{"--help"},
-			wantStderr:     "Successfully installed github/gh-cool",
-			wantInstalled:  true,
-			wantDispatched: true,
-			wantDispArgs:   []string{"cool", "--help"},
+			name:          "TTY confirmed installs",
+			isTTY:         true,
+			confirmResult: true,
+			wantStderr:    "Successfully installed github/gh-cool",
+			wantInstalled: true,
 		},
 		{
 			name:          "TTY declined does not install",
@@ -64,15 +56,6 @@ func TestOfficialExtensionStubRun(t *testing.T) {
 			wantErr:       "network error",
 			wantInstalled: true,
 		},
-		{
-			name:           "TTY dispatch error is propagated",
-			isTTY:          true,
-			confirmResult:  true,
-			dispatchErr:    fmt.Errorf("dispatch failed"),
-			wantErr:        "dispatch failed",
-			wantInstalled:  true,
-			wantDispatched: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -88,12 +71,6 @@ func TestOfficialExtensionStubRun(t *testing.T) {
 				InstallFunc: func(_ ghrepo.Interface, _ string) error {
 					return tt.installErr
 				},
-				DispatchFunc: func(_ []string, _ io.Reader, _, _ io.Writer) (bool, error) {
-					if tt.dispatchErr != nil {
-						return false, tt.dispatchErr
-					}
-					return true, nil
-				},
 			}
 			p := &prompter.PrompterMock{
 				ConfirmFunc: func(_ string, _ bool) (bool, error) {
@@ -101,7 +78,7 @@ func TestOfficialExtensionStubRun(t *testing.T) {
 				},
 			}
 
-			err := officialExtensionStubRun(ios, p, em, ext, tt.args)
+			err := officialExtensionStubRun(ios, p, em, ext)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -122,13 +99,6 @@ func TestOfficialExtensionStubRun(t *testing.T) {
 				assert.Equal(t, "github.com", repo.RepoHost())
 			} else if tt.isTTY && !tt.confirmResult && tt.confirmErr == nil {
 				assert.Empty(t, em.InstallCalls())
-			}
-
-			if tt.wantDispatched {
-				require.NotEmpty(t, em.DispatchCalls())
-				if tt.wantDispArgs != nil {
-					assert.Equal(t, tt.wantDispArgs, em.DispatchCalls()[0].Args)
-				}
 			}
 		})
 	}

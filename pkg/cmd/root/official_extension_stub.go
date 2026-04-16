@@ -26,7 +26,7 @@ func NewCmdOfficialExtensionStub(io *iostreams.IOStreams, p prompter.Prompter, e
 		// cobra validation errors before reaching RunE.
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return officialExtensionStubRun(io, p, em, ext, args)
+			return officialExtensionStubRun(io, p, em, ext)
 		},
 	}
 
@@ -35,7 +35,7 @@ func NewCmdOfficialExtensionStub(io *iostreams.IOStreams, p prompter.Prompter, e
 	return cmd
 }
 
-func officialExtensionStubRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension, args []string) error {
+func officialExtensionStubRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension) error {
 	stderr := io.ErrOut
 
 	if !io.CanPrompt() {
@@ -68,11 +68,5 @@ func officialExtensionStubRun(io *iostreams.IOStreams, p prompter.Prompter, em e
 	}
 
 	fmt.Fprintf(stderr, "Successfully installed %s/%s\n", ext.Owner, ext.Repo)
-
-	// Dispatch the newly installed extension with the original arguments.
-	dispatchArgs := append([]string{ext.Name}, args...)
-	if _, dispatchErr := em.Dispatch(dispatchArgs, io.In, io.Out, stderr); dispatchErr != nil {
-		return dispatchErr
-	}
 	return nil
 }
