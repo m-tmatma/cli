@@ -5,6 +5,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -16,14 +17,11 @@ import (
 // immediately. After a successful install, the extension is dispatched with
 // the original arguments.
 func NewCmdOfficialExtension(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     ext.Name,
 		Short:   fmt.Sprintf("Install the official %s extension", ext.Name),
 		Hidden:  true,
 		GroupID: "extension",
-		Annotations: map[string]string{
-			"skipAuthCheck": "true",
-		},
 		// Accept any args/flags the user may have passed so we don't get
 		// cobra validation errors before reaching RunE.
 		DisableFlagParsing: true,
@@ -31,6 +29,10 @@ func NewCmdOfficialExtension(io *iostreams.IOStreams, p prompter.Prompter, em ex
 			return officialExtensionRun(io, p, em, ext, args)
 		},
 	}
+
+	cmdutil.DisableAuthCheck(cmd)
+
+	return cmd
 }
 
 func officialExtensionRun(io *iostreams.IOStreams, p prompter.Prompter, em extensions.ExtensionManager, ext *extensions.OfficialExtension, args []string) error {
