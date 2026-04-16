@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -165,7 +164,7 @@ func TestPublishRun_UnsupportedHost(t *testing.T) {
 		IO:        ios,
 		Dir:       dir,
 		GitClient: &git.Client{},
-		client:    api.NewClientFromHTTP(&http.Client{}),
+		HttpClient: func() (*http.Client, error) { return &http.Client{}, nil },
 		host:      "acme.ghes.com",
 	})
 	require.ErrorContains(t, err, "supports only github.com")
@@ -290,7 +289,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					DryRun:    true,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -327,7 +326,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					DryRun:    true,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -361,7 +360,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					DryRun:    true,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -417,7 +416,7 @@ func TestPublishRun(t *testing.T) {
 						ConfirmFunc: func(msg string, def bool) (bool, error) { return true, nil },
 					},
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -567,7 +566,7 @@ func TestPublishRun(t *testing.T) {
 					IO:        ios,
 					Dir:       dir,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -620,7 +619,7 @@ func TestPublishRun(t *testing.T) {
 					IO:        ios,
 					Dir:       dir,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -684,7 +683,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					DryRun:    true,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -749,7 +748,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					DryRun:    true,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -899,7 +898,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					DryRun:    true,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -988,7 +987,7 @@ func TestPublishRun(t *testing.T) {
 						ConfirmFunc: func(msg string, def bool) (bool, error) { return true, nil },
 					},
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1063,7 +1062,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					Tag:       "v2.3.5",
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1095,7 +1094,7 @@ func TestPublishRun(t *testing.T) {
 					Dir:       dir,
 					Tag:       "v1.0.0", // same as stubAllSecureRemote's existing tag
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1127,7 +1126,7 @@ func TestPublishRun(t *testing.T) {
 					IO:        ios,
 					Dir:       dir,
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1238,7 +1237,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1295,7 +1294,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1351,7 +1350,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1415,7 +1414,7 @@ func TestPublishRun(t *testing.T) {
 						},
 					},
 					GitClient: &git.Client{},
-					client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+					HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					host:      "github.com",
 				}
 			},
@@ -1532,7 +1531,7 @@ func TestPublishRun_DirArgUsesTargetRemote(t *testing.T) {
 		Dir:       targetRepo,
 		DryRun:    true,
 		GitClient: &git.Client{RepoDir: cwdRepo},
-		client:    api.NewClientFromHTTP(&http.Client{Transport: reg}),
+		HttpClient: func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 		host:      "github.com",
 	})
 
