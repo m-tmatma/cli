@@ -69,13 +69,13 @@ func NewCmdPreview(f *cmdutil.Factory, runF func(*PreviewOptions) error) *cobra.
 		`),
 		Example: heredoc.Doc(`
 			# Preview a specific skill
-			$ gh skill preview github/awesome-copilot code-review
+			$ gh skill preview github/awesome-copilot documentation-writer
 
 			# Preview a skill at a specific version
-			$ gh skill preview github/awesome-copilot code-review@v1.2.0
+			$ gh skill preview github/awesome-copilot documentation-writer@v1.2.0
 
 			# Preview a skill at a specific commit SHA
-			$ gh skill preview github/awesome-copilot code-review@abc123def456
+			$ gh skill preview github/awesome-copilot documentation-writer@abc123def456
 
 			# Browse and preview interactively
 			$ gh skill preview github/awesome-copilot

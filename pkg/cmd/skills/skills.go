@@ -29,10 +29,10 @@ func NewCmdSkills(f *cmdutil.Factory) *cobra.Command {
 			$ gh skill search terraform
 
 			# Install a skill
-			$ gh skill install github/awesome-copilot code-review
+			$ gh skill install github/awesome-copilot documentation-writer
 
 			# Preview a skill before installing
-			$ gh skill preview github/awesome-copilot code-review
+			$ gh skill preview github/awesome-copilot documentation-writer
 
 			# Update all installed skills
 			$ gh skill update --all
