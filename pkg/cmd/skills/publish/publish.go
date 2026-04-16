@@ -134,8 +134,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			# Validate and strip install metadata
 			$ gh skills publish --fix
 		`),
-		Aliases: []string{"validate"},
-		Args:    cobra.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
 				opts.Dir = args[0]
