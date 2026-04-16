@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -22,13 +23,28 @@ import (
 
 // initGitRepo initializes a git repo in the given directory and adds remotes.
 // Use this when the git repo must live in the same directory as the skill files.
+// A local bare repo is created as the push target so that ensurePushed can work
+// during publish tests, while the fetch URL remains the GitHub URL so that
+// detectGitHubRemote still resolves the correct owner/repo.
 func initGitRepo(t *testing.T, dir string, remoteURLs map[string]string) {
 	t.Helper()
+
+	bareDir := filepath.Join(t.TempDir(), "upstream.git")
+	require.NoError(t, os.MkdirAll(bareDir, 0o755))
+	runGitInDir(t, bareDir, "init", "--bare", "--initial-branch=main")
+
 	runGitInDir(t, dir, "init", "--initial-branch=main")
 	runGitInDir(t, dir, "config", "user.email", "monalisa@github.com")
 	runGitInDir(t, dir, "config", "user.name", "Monalisa Octocat")
 	for name, url := range remoteURLs {
 		runGitInDir(t, dir, "remote", "add", name, url)
+		runGitInDir(t, dir, "remote", "set-url", "--push", name, bareDir)
+	}
+
+	runGitInDir(t, dir, "add", ".")
+	runGitInDir(t, dir, "commit", "--allow-empty", "-m", "init")
+	if _, ok := remoteURLs["origin"]; ok {
+		runGitInDir(t, dir, "push", "origin", "main")
 	}
 }
 
@@ -1392,8 +1408,8 @@ func TestDetectGitHubRemote_UsesDir(t *testing.T) {
 	repo, err := detectGitHubRemote(gitClient, targetRepo)
 	require.NoError(t, err)
 	require.NotNil(t, repo)
-	assert.Equal(t, "monalisa", repo.RepoOwner())
-	assert.Equal(t, "target-repo", repo.RepoName())
+	assert.Equal(t, "monalisa", repo.Repo.RepoOwner())
+	assert.Equal(t, "target-repo", repo.Repo.RepoName())
 }
 
 func TestPublishRun_DirArgUsesTargetRemote(t *testing.T) {
@@ -1466,4 +1482,138 @@ func runGitInDir(t *testing.T, dir string, args ...string) {
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+dir)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "git %v: %s", args, out)
+}
+
+// newTestGitClientWithUpstream creates a git repo with a local bare "remote"
+// and an initial commit, so we can test push/rev-list behavior realistically.
+// It returns the git client and the working directory path.
+func newTestGitClientWithUpstream(t *testing.T) (*git.Client, string) {
+	t.Helper()
+	parentDir := t.TempDir()
+	bareDir := filepath.Join(parentDir, "upstream.git")
+	workDir := filepath.Join(parentDir, "work")
+
+	gitEnv := append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+parentDir)
+
+	run := func(dir string, args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = gitEnv
+		out, err := c.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, out)
+	}
+
+	// Create bare upstream
+	require.NoError(t, os.MkdirAll(bareDir, 0o755))
+	run(bareDir, "init", "--bare", "--initial-branch=main")
+
+	// Clone into working dir
+	c := exec.Command("git", "clone", bareDir, workDir)
+	c.Env = gitEnv
+	out, err := c.CombinedOutput()
+	require.NoError(t, err, "git clone: %s", out)
+
+	run(workDir, "config", "user.email", "monalisa@github.com")
+	run(workDir, "config", "user.name", "Monalisa Octocat")
+
+	// Create initial commit and push
+	require.NoError(t, os.WriteFile(filepath.Join(workDir, "README.md"), []byte("# Test"), 0o644))
+	run(workDir, "add", ".")
+	run(workDir, "commit", "-m", "initial commit")
+	run(workDir, "push", "origin", "main")
+
+	return &git.Client{
+		RepoDir: workDir,
+		GitPath: "git",
+		Stderr:  &bytes.Buffer{},
+		Stdin:   &bytes.Buffer{},
+		Stdout:  &bytes.Buffer{},
+	}, workDir
+}
+
+func TestEnsurePushed(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(t *testing.T, workDir string)
+		verify     func(t *testing.T, workDir string)
+		wantErr    string
+		wantStderr string
+	}{
+		{
+			name: "no unpushed commits is a no-op",
+			setup: func(_ *testing.T, _ string) {
+				// initial commit already pushed by helper
+			},
+		},
+		{
+			name: "unpushed commits are pushed automatically",
+			setup: func(t *testing.T, workDir string) {
+				t.Helper()
+				require.NoError(t, os.WriteFile(filepath.Join(workDir, "new.txt"), []byte("new"), 0o644))
+				runGitInDir(t, workDir, "add", ".")
+				runGitInDir(t, workDir, "commit", "-m", "unpushed change")
+			},
+			verify: func(t *testing.T, workDir string) {
+				t.Helper()
+				// After push, rev-list should show 0 unpushed commits
+				cmd := exec.Command("git", "-C", workDir, "rev-list", "--count", "@{push}..HEAD")
+				cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+workDir)
+				out, err := cmd.CombinedOutput()
+				require.NoError(t, err, "rev-list: %s", out)
+				assert.Equal(t, "0", strings.TrimSpace(string(out)))
+			},
+			wantStderr: "Pushing main to origin",
+		},
+		{
+			name: "new branch never pushed is pushed automatically",
+			setup: func(t *testing.T, workDir string) {
+				t.Helper()
+				runGitInDir(t, workDir, "checkout", "-b", "feature")
+				require.NoError(t, os.WriteFile(filepath.Join(workDir, "feat.txt"), []byte("feat"), 0o644))
+				runGitInDir(t, workDir, "add", ".")
+				runGitInDir(t, workDir, "commit", "-m", "new branch commit")
+			},
+			verify: func(t *testing.T, workDir string) {
+				t.Helper()
+				// After push, the branch should exist on the remote
+				cmd := exec.Command("git", "-C", workDir, "rev-list", "--count", "@{push}..HEAD")
+				cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+workDir)
+				out, err := cmd.CombinedOutput()
+				require.NoError(t, err, "rev-list: %s", out)
+				assert.Equal(t, "0", strings.TrimSpace(string(out)))
+			},
+			wantStderr: "Pushing feature to origin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitClient, workDir := newTestGitClientWithUpstream(t)
+			tt.setup(t, workDir)
+
+			ios, _, _, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStderrTTY(true)
+
+			opts := &PublishOptions{
+				IO:        ios,
+				GitClient: gitClient,
+			}
+
+			err := ensurePushed(opts, workDir, "origin")
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			if tt.wantStderr != "" {
+				assert.Contains(t, stderr.String(), tt.wantStderr)
+			}
+			if tt.verify != nil {
+				tt.verify(t, workDir)
+			}
+		})
+	}
 }
