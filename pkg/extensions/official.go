@@ -12,29 +12,15 @@ type OfficialExtension struct {
 	Repo  string
 }
 
-// Repository returns a ghrepo.Interface pinned to github.com for use with
-// ExtensionManager.Install.
+// Repository returns a ghrepo.Interface pinned to github.com so that GHES
+// users install from github.com rather than their enterprise host.
 func (e *OfficialExtension) Repository() ghrepo.Interface {
 	return ghrepo.NewWithHost(e.Owner, e.Repo, "github.com")
 }
 
-// officialExtensions is the hard-coded registry of GitHub-owned extensions
-// that gh will suggest installing when the user invokes an unknown command
-// matching one of their names.
-// Install suggestions include the "github.com/" host prefix so that GHES users
-// install from github.com rather than their enterprise host.
-var officialExtensions = []OfficialExtension{
+// OfficialExtensions is the registry of GitHub-owned extensions that gh will
+// offer to install when the user invokes the corresponding command name.
+var OfficialExtensions = []OfficialExtension{
 	{Name: "aw", Owner: "github", Repo: "gh-aw"},
 	{Name: "stack", Owner: "github", Repo: "gh-stack"},
-}
-
-// FindOfficialExtension returns the matching official extension for
-// commandName, or nil if none matches.
-func FindOfficialExtension(commandName string) *OfficialExtension {
-	for _, ext := range officialExtensions {
-		if ext.Name == commandName {
-			return &ext
-		}
-	}
-	return nil
 }
