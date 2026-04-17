@@ -30,7 +30,7 @@ func TestVerifyIntegration(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
-		&config.AuthConfig{},
+		func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 		ios,
 		"test",
 		"",
@@ -150,7 +150,7 @@ func TestVerifyIntegrationCustomIssuer(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
-		&config.AuthConfig{},
+		func() (gh.Config, error) { return config.NewBlankConfig(), nil },
 		ios,
 		"test",
 		"",
@@ -228,7 +228,7 @@ func TestVerifyIntegrationReusableWorkflow(t *testing.T) {
 	cfg := config.NewBlankConfig()
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
-		cfg.Authentication(),
+		func() (gh.Config, error) { return cfg, nil },
 		ios,
 		"test",
 		"",
@@ -325,7 +325,7 @@ func TestVerifyIntegrationReusableWorkflowSignerWorkflow(t *testing.T) {
 	cfg := config.NewBlankConfig()
 	ios, _, _, _ := iostreams.Test()
 	hc, err := factory.HttpClientFunc(
-		cfg.Authentication(),
+		func() (gh.Config, error) { return cfg, nil },
 		ios,
 		"test",
 		"",

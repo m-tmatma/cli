@@ -23,19 +23,16 @@ import (
 var ssoHeader string
 var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
-func New(appVersion string, invokingAgent string, cfg gh.Config, ios *iostreams.IOStreams, executablePath string, telemetryDisabler ghtelemetry.Disabler) *cmdutil.Factory {
+func New(appVersion string, invokingAgent string, cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, executablePath string, telemetryDisabler ghtelemetry.Disabler) *cmdutil.Factory {
 	f := &cmdutil.Factory{
-		AppVersion:    appVersion,
-		InvokingAgent: invokingAgent,
-		Cfg:           cfg,
-		Config: func() (gh.Config, error) {
-			return cfg, nil
-		}, // No factory dependencies
+		AppVersion:     appVersion,
+		InvokingAgent:  invokingAgent,
+		Config:         cfgFunc,
 		ExecutablePath: executablePath,
 	}
 
 	f.IOStreams = ios
-	f.HttpClient = HttpClientFunc(cfg.Authentication(), ios, appVersion, invokingAgent, telemetryDisabler)
+	f.HttpClient = HttpClientFunc(cfgFunc, ios, appVersion, invokingAgent, telemetryDisabler)
 	f.PlainHttpClient = plainHttpClientFunc(ios, appVersion, invokingAgent, telemetryDisabler)
 	f.GitClient = newGitClient(f) // Depends on IOStreams, and Executable
 	f.Remotes = remotesFunc(f)    // Depends on Config, and GitClient
@@ -187,10 +184,14 @@ func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	return rr.Resolver()
 }
 
-func HttpClientFunc(authCfg gh.AuthConfig, ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
+func HttpClientFunc(cfgFunc func() (gh.Config, error), ios *iostreams.IOStreams, appVersion string, invokingAgent string, telemetryDisabler ghtelemetry.Disabler) func() (*http.Client, error) {
 	return func() (*http.Client, error) {
+		cfg, err := cfgFunc()
+		if err != nil {
+			return nil, err
+		}
 		opts := api.HTTPClientOptions{
-			Config:            authCfg,
+			Config:            cfg.Authentication(),
 			Log:               ios.ErrOut,
 			LogColorize:       ios.ColorEnabled(),
 			AppVersion:        appVersion,

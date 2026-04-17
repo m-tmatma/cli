@@ -52,13 +52,18 @@ func Main() exitCode {
 	buildVersion := build.Version
 	hasDebug, _ := utils.IsDebugEnabled()
 
-	cfg, err := config.NewConfig()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load config: %s\n", err)
-		return exitError
+	cfg, cfgErr := config.NewConfig()
+	if cfgErr != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to load config: %s\n", cfgErr)
 	}
+	cfgFunc := func() (gh.Config, error) { return cfg, cfgErr }
 
-	ioStreams := newIOStreams(cfg)
+	var ioStreams *iostreams.IOStreams
+	if cfgErr == nil {
+		ioStreams = newIOStreams(cfg)
+	} else {
+		ioStreams = iostreams.System()
+	}
 	stderr := ioStreams.ErrOut
 
 	ghExecutablePath := executablePath("gh")
@@ -70,9 +75,13 @@ func Main() exitCode {
 	}
 
 	var telemetryService ghtelemetry.Service
-	if os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" || mightBeGHESUser(cfg) {
+	switch {
+	case cfgErr != nil:
+		// Without a valid on-disk config we can't honour user telemetry preferences, so disable it to be safe.
 		telemetryService = &telemetry.NoOpService{}
-	} else {
+	case os.Getenv("GH_PRIVATE_ENABLE_TELEMETRY") == "" || mightBeGHESUser(cfg):
+		telemetryService = &telemetry.NoOpService{}
+	default:
 		telemetryState := telemetry.ParseTelemetryState(cfg.Telemetry().Value)
 		switch telemetryState {
 		case telemetry.Disabled:
@@ -100,12 +109,14 @@ func Main() exitCode {
 	}
 	defer telemetryService.Flush()
 
-	cmdFactory := factory.New(buildVersion, string(agents.Detect()), cfg, ioStreams, ghExecutablePath, telemetryService)
+	cmdFactory := factory.New(buildVersion, string(agents.Detect()), cfgFunc, ioStreams, ghExecutablePath, telemetryService)
 
-	var m migration.MultiAccount
-	if err := cfg.Migrate(m); err != nil {
-		fmt.Fprintln(stderr, err)
-		return exitError
+	if cfgErr == nil {
+		var m migration.MultiAccount
+		if err := cfg.Migrate(m); err != nil {
+			fmt.Fprintln(stderr, err)
+			return exitError
+		}
 	}
 
 	ctx := context.Background()

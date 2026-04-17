@@ -354,6 +354,13 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 		return
 	}
 
+	// Resolve the executable to an absolute path before changing the child's
+	// working directory. Without this, a relative path (e.g. from GH_PATH) would
+	// be resolved against cmd.Dir at Start time and fail to spawn.
+	if abs, err := filepath.Abs(executable); err == nil {
+		executable = abs
+	}
+
 	cmd := exec.Command(executable, "send-telemetry")
 
 	cmd.Stdout = io.Discard
@@ -362,7 +369,10 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 	// Set the working directory to a stable directory elsewhere so that the subprocess doesn't
 	// hold a reference to the parent's current working directory, avoiding any weirdness around
 	// deleting the parent process's current working directory while the child is still running.
-	cmd.Dir = os.TempDir()
+	// Only do this when we have an absolute executable path so that the child can still be found.
+	if filepath.IsAbs(executable) {
+		cmd.Dir = os.TempDir()
+	}
 
 	// Configure the child process to be detached from the parent so that it can continue running
 	// after the parent exits, and so that it doesn't receive any signals sent to the parent.
@@ -381,7 +391,8 @@ func SpawnSendTelemetry(executable string, payload SendTelemetryPayload) {
 
 	// Write the payload synchronously into the kernel pipe buffer, then close
 	// the pipe to signal EOF. The child reads the complete payload from stdin.
-	_, _ = stdin.Write(payloadBytes)
+	// io.Copy loops until all bytes are written, avoiding any risk of a short write.
+	_, _ = io.Copy(stdin, bytes.NewReader(payloadBytes))
 	_ = stdin.Close()
 
 	// Release resources associated with the child process since we will never Wait for it.

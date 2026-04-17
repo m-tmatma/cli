@@ -118,10 +118,10 @@ var HelpTopics = []helpTopic{
 			more compatible with speech synthesis and braille screen readers.
 
 			%[1]sGH_TELEMETRY%[1]s: set to %[1]slog%[1]s to print telemetry data to standard error instead of sending it.
-			Set to %[1]sfalse%[1]s or %[1]s0%[1]s to disable telemetry that would have been printed when set to %[1]slog%[1]s. 
-			
-			%[1]sDO_NOT_TRACK%[1]s: set to %[1]strue%[1]s or %[1]s1%[1]s to disable telemetry that would have been printed 
-			when %[1]sGH_TELEMETRY%[1]s is set to  %[1]slog%[1]s. %[1]sGH_TELEMETRY%[1]s takes precedence if both are set.
+			Set to %[1]sfalse%[1]s or %[1]s0%[1]s to disable telemetry. Takes precedence over %[1]sDO_NOT_TRACK%[1]s.
+
+			%[1]sDO_NOT_TRACK%[1]s: set to %[1]strue%[1]s or %[1]s1%[1]s to disable telemetry. Ignored when
+			%[1]sGH_TELEMETRY%[1]s is set, which takes precedence.
 
 			%[1]sGH_SPINNER_DISABLED%[1]s: set to a truthy value to replace the spinner animation with
 			a textual progress indicator.
