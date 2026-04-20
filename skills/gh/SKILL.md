@@ -21,7 +21,10 @@ Human output from `gh` is column-formatted. If you want structured data:
 - Run a command with `--json` and **no field list** to print the full set of
   available fields, then pick what you need.
 - Use `--jq '<expr>'` for filtering without piping through a separate `jq`.
-- Use `--template '<go-template>'` when you want shaped text output.
+- Use `--template '<go-template>'` (alongside `--json`) when you want shaped
+  text output. Note that `--template`/`-T` collides with a body-template flag
+  on a few commands (e.g. `gh pr create -T`, `gh issue create -T`); always
+  check `--help` before assuming which one you're hitting.
 
 ## Pagination and silent truncation
 
@@ -44,8 +47,10 @@ Pass `--repo OWNER/REPO` (`-R`) to override the resolved CWD repo.
 
 - `gh search issues|prs|code|repos|commits|users` uses GitHub's search
   index and accepts the full search syntax (`is:open`, `author:`,
-  `label:`, `repo:owner/name`, `in:title`, ...). Prefer it for anything
-  cross-repo or filtered by author/label.
+  `label:`, `repo:owner/name`, `in:title`, ...). Pass the entire query as
+  one quoted string, the same way you would for `--search`:
+  `gh search issues "is:open author:foo repo:cli/cli"`. Prefer it for
+  anything cross-repo or filtered by author/label.
 - `gh issue list --search "..."` and `gh pr list --search "..."` accept
   the same syntax but are scoped to one repo.
 
