@@ -140,7 +140,7 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			$ gh skill publish --dry-run
 
 			# Strip install metadata without publishing
-			$ gh skills publish --fix
+			$ gh skill publish --fix
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -413,7 +413,7 @@ func publishRun(opts *PublishOptions) error {
 
 	if opts.Fix {
 		if fixes > 0 {
-			fmt.Fprintf(opts.IO.ErrOut, "\nFixed %d file(s). Review and commit the changes, then run %s to publish.\n", fixes, "gh skills publish")
+			fmt.Fprintf(opts.IO.ErrOut, "\nFixed %d file(s). Review and commit the changes, then run %s to publish.\n", fixes, "gh skill publish")
 		} else {
 			fmt.Fprintf(opts.IO.ErrOut, "\nNo issues to fix.\n")
 		}
