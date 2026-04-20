@@ -536,14 +536,14 @@ func Test_authRecoveryCommand(t *testing.T) {
 			token:      "github_pat_abc123",
 			source:     "oauth_token",
 			requestURL: "https://api.github.com/graphql",
-			want:       "gh auth login",
+			want:       "gh auth login -h github.com",
 		},
 		{
 			name:       "env token",
 			token:      "gho_abc123",
 			source:     "GH_TOKEN",
 			requestURL: "https://api.github.com/graphql",
-			want:       "gh auth login",
+			want:       "gh auth login -h github.com",
 		},
 		{
 			name:   "missing request url",

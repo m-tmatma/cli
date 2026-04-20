@@ -295,7 +295,7 @@ func authRecoveryCommand(cfg gh.Config, httpErr api.HTTPError) string {
 		return fmt.Sprintf("gh auth refresh -h %s", hostname)
 	}
 
-	return "gh auth login"
+	return fmt.Sprintf("gh auth login -h %s", hostname)
 }
 
 func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion string) (*update.ReleaseInfo, error) {
