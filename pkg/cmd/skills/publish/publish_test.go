@@ -86,13 +86,15 @@ func TestNewCmdPublish(t *testing.T) {
 		wantsOpts PublishOptions
 	}{
 		{
-			name: "all flags",
-			cli:  "./monalisa-skills --dry-run --fix --tag v1.0.0",
+			name:     "fix and dry-run are mutually exclusive",
+			cli:      "./monalisa-skills --dry-run --fix --tag v1.0.0",
+			wantsErr: true,
+		},
+		{
+			name: "fix flag only",
+			cli:  "--fix",
 			wantsOpts: PublishOptions{
-				Dir:    "./monalisa-skills",
-				DryRun: true,
-				Fix:    true,
-				Tag:    "v1.0.0",
+				Fix: true,
 			},
 		},
 		{

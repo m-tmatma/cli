@@ -147,6 +147,9 @@ func NewCmdPublish(f *cmdutil.Factory, runF func(*PublishOptions) error) *cobra.
 			if len(args) == 1 {
 				opts.Dir = args[0]
 			}
+			if err := cmdutil.MutuallyExclusive("specify only one of `--fix` or `--dry-run`", opts.Fix, opts.DryRun); err != nil {
+				return err
+			}
 			if runF != nil {
 				return runF(opts)
 			}
@@ -1069,7 +1072,7 @@ func renderDiagnosticsTTY(opts *PublishOptions, skillCount int, diagnostics []pu
 		fmt.Fprintf(opts.IO.ErrOut, "\n%s\n", d.message)
 	}
 
-	if errors == 0 {
+	if errors == 0 && !opts.Fix {
 		if owner != "" && repo != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "\n%s Repository: %s/%s\n", cs.Green("Ready to publish!"), owner, repo)
 		} else {
