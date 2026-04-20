@@ -457,6 +457,7 @@ func TestPublishRun(t *testing.T) {
 				return &PublishOptions{IO: ios, Dir: dir, Fix: true}
 			},
 			wantStdout: "stripped install metadata",
+			wantStderr: "Fixed 1 file(s). Review and commit the changes",
 			verify: func(t *testing.T, dir string) {
 				t.Helper()
 				fixed, err := os.ReadFile(filepath.Join(dir, "skills", "test-skill", "SKILL.md"))
