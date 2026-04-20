@@ -32,8 +32,9 @@ List commands cap results.
 
 - `gh issue list`, `gh pr list`, `gh search ...`: pass `-L N` (`--limit N`).
   The default is usually 30.
-- Use `--json totalCount` to get the total number of items. This helps you know
-  if you need to paginate.
+- `gh issue list` / `gh pr list` do not expose aggregate totals like
+  `totalCount` via `--json`. If you need a true total, use `gh api graphql`
+  to query `totalCount`; otherwise, treat `-L` as the cap for the current call.
 - For raw API calls use `gh api --paginate <path>`. Combine with
   `--jq` and (optionally) `--slurp` to assemble one array.
 
