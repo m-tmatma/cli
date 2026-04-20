@@ -84,7 +84,7 @@ license: MIT                  # optional but recommended
 
 Naming rules (enforced by `publish`):
 
-- Lowercase alphanumeric and hyphens only, 1–64 chars.
+- Lowercase alphanumeric and hyphens only, 1-64 chars.
 - Must start and end with `[a-z0-9]`.
 - No double hyphens (`--`).
 - `allowed-tools`, if present, must be a string (space-delimited), not a
