@@ -109,7 +109,7 @@ Always pass `--tag` so it doesn't fall through to the interactive flow.
 
 A reasonable loop:
 
-1. `gh skill search <topic> --json name,repository`
+1. `gh skill search <topic> --json skillName,repo,namespace`
 2. `gh skill preview <repo> <skill>` to inspect the `SKILL.md`.
 3. `gh skill install <repo> <skill> --agent <host> --pin <ref>` for a
    reproducible install.
