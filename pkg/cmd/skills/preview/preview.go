@@ -391,7 +391,14 @@ func isMarkdownFile(filePath string) bool {
 func selectSkill(opts *PreviewOptions, skills []discovery.Skill) (discovery.Skill, error) {
 	if opts.SkillName != "" {
 		for _, s := range skills {
-			if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName || s.InstallName() == opts.SkillName {
+			if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName {
+				return s, nil
+			}
+		}
+		// Fall back to InstallName so that namespaced identifiers produced
+		// by the post-install hint (e.g. "namespace/skill") are accepted.
+		for _, s := range skills {
+			if s.InstallName() == opts.SkillName {
 				return s, nil
 			}
 		}
