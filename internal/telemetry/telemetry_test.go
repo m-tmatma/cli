@@ -364,6 +364,7 @@ func TestLogFlusherWritesNoneMarkerForEmptyPayload(t *testing.T) {
 		output := buf.String()
 		assert.Contains(t, output, "Telemetry payload:")
 		assert.Contains(t, output, "none")
+		assert.Contains(t, output, "\x1b") // ANSI escape char for color codes
 	})
 }
 
