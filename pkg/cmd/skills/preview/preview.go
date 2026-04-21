@@ -391,7 +391,7 @@ func isMarkdownFile(filePath string) bool {
 func selectSkill(opts *PreviewOptions, skills []discovery.Skill) (discovery.Skill, error) {
 	if opts.SkillName != "" {
 		for _, s := range skills {
-			if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName {
+			if s.DisplayName() == opts.SkillName || s.Name == opts.SkillName || s.InstallName() == opts.SkillName {
 				return s, nil
 			}
 		}
