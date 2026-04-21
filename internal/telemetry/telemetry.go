@@ -3,6 +3,7 @@ package telemetry
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -232,7 +233,7 @@ func NewService(flusher func(SendTelemetryPayload), opts ...telemetryServiceOpti
 	maps.Copy(commonDimensions, telemetryServiceOpts.additionalDimensions)
 
 	hash := uuid.NewSHA1(uuid.Nil, []byte(invocationID))
-	sampleBucket := hash[0] % 100
+	sampleBucket := byte(binary.BigEndian.Uint32(hash[:4]) % 100)
 
 	s := &service{
 		flush:            flusher,
