@@ -5,6 +5,7 @@ package prompter_test
 import (
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ import (
 	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 // The following tests are broadly testing the accessible prompter, and NOT asserting
@@ -33,8 +35,6 @@ import (
 // are sufficient to ensure that the accessible prompter behaves roughly as expected
 // but doesn't mandate that prompts always look exactly the same.
 func TestAccessiblePrompter(t *testing.T) {
-
-	beforePasswordSendTimeout := 100 * time.Millisecond
 
 	t.Run("Select", func(t *testing.T) {
 		console := newTestVirtualTerminal(t)
@@ -505,8 +505,8 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Enter password")
 			require.NoError(t, err)
 
-			// Wait to ensure huh has time to set the echo mode
-			time.Sleep(beforePasswordSendTimeout)
+			// Wait until huh has disabled echo mode on the TTY
+			waitForEchoDisabled(t, console.Tty(), 5*time.Second)
 
 			// Enter a number
 			_, err = console.SendLine(dummyPassword)
@@ -596,8 +596,8 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err := console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
-			// Wait to ensure huh has time to set the echo mode
-			time.Sleep(beforePasswordSendTimeout)
+			// Wait until huh has disabled echo mode on the TTY
+			waitForEchoDisabled(t, console.Tty(), 5*time.Second)
 
 			// Enter some dummy auth token
 			_, err = console.SendLine(dummyAuthToken)
@@ -641,8 +641,8 @@ func TestAccessiblePrompter(t *testing.T) {
 			_, err = console.ExpectString("Paste your authentication token:")
 			require.NoError(t, err)
 
-			// Wait to ensure huh has time to set the echo mode
-			time.Sleep(beforePasswordSendTimeout)
+			// Wait until huh has disabled echo mode on the TTY
+			waitForEchoDisabled(t, console.Tty(), 5*time.Second)
 
 			// Now enter some dummy auth token to return control back to the test
 			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
@@ -955,4 +955,21 @@ func testCloser(t *testing.T, closer io.Closer) {
 	if err := closer.Close(); err != nil {
 		t.Errorf("Close failed: %s", err)
 	}
+}
+
+// waitForEchoDisabled polls the TTY until echo mode is disabled or the
+// timeout is reached. This is used in password and auth token tests to
+// ensure that huh has configured the terminal before we send input.
+func waitForEchoDisabled(t *testing.T, tty *os.File, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		termios, err := unix.IoctlGetTermios(int(tty.Fd()), ioctlGetTermios)
+		require.NoError(t, err)
+		if termios.Lflag&unix.ECHO == 0 {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("timed out waiting for echo mode to be disabled")
 }
