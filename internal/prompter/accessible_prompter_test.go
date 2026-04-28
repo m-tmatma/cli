@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build linux || darwin
 
 package prompter_test
 
@@ -506,7 +506,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Wait until huh has disabled echo mode on the TTY
-			waitForEchoDisabled(t, console.Tty(), 5*time.Second)
+			require.NoError(t, waitForEchoDisabled(console.Tty(), 5*time.Second))
 
 			// Enter a number
 			_, err = console.SendLine(dummyPassword)
@@ -597,7 +597,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Wait until huh has disabled echo mode on the TTY
-			waitForEchoDisabled(t, console.Tty(), 5*time.Second)
+			require.NoError(t, waitForEchoDisabled(console.Tty(), 5*time.Second))
 
 			// Enter some dummy auth token
 			_, err = console.SendLine(dummyAuthToken)
@@ -642,7 +642,7 @@ func TestAccessiblePrompter(t *testing.T) {
 			require.NoError(t, err)
 
 			// Wait until huh has disabled echo mode on the TTY
-			waitForEchoDisabled(t, console.Tty(), 5*time.Second)
+			require.NoError(t, waitForEchoDisabled(console.Tty(), 5*time.Second))
 
 			// Now enter some dummy auth token to return control back to the test
 			_, err = console.SendLine(dummyAuthTokenForAfterFailure)
@@ -960,16 +960,17 @@ func testCloser(t *testing.T, closer io.Closer) {
 // waitForEchoDisabled polls the TTY until echo mode is disabled or the
 // timeout is reached. This is used in password and auth token tests to
 // ensure that huh has configured the terminal before we send input.
-func waitForEchoDisabled(t *testing.T, tty *os.File, timeout time.Duration) {
-	t.Helper()
+func waitForEchoDisabled(tty *os.File, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		termios, err := unix.IoctlGetTermios(int(tty.Fd()), ioctlGetTermios)
-		require.NoError(t, err)
+		if err != nil {
+			return fmt.Errorf("getting terminal attributes: %w", err)
+		}
 		if termios.Lflag&unix.ECHO == 0 {
-			return
+			return nil
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("timed out waiting for echo mode to be disabled")
+	return fmt.Errorf("timed out waiting for echo mode to be disabled")
 }
