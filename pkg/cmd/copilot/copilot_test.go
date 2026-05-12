@@ -613,7 +613,7 @@ func TestRunCopilot_execFailureHint(t *testing.T) {
 	err := runCopilot(opts)
 	require.Error(t, err)
 	require.ErrorIs(t, err, execErr)
-	require.Contains(t, err.Error(), "Try running `copilot` directly without `gh`.")
+	require.Contains(t, err.Error(), "try running `copilot` directly without `gh`.")
 }
 
 func TestCopilotCommandIsSampledAt100(t *testing.T) {
