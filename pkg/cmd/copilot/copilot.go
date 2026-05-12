@@ -183,10 +183,10 @@ func runCopilot(opts *CopilotOptions) error {
 			os.Exit(exitErr.ExitCode())
 		}
 		if foundInPath {
-			// The binary exists in PATH but exec failed, possibly due to
+			// We found a `copilot` binary but exec failed, possibly due to
 			// unusual characters in the path (see https://github.com/cli/cli/issues/13106).
 			// Suggest running copilot directly as a workaround.
-			return fmt.Errorf("%w\nTry running `copilot` directly without `gh`.", err)
+			return fmt.Errorf("%w\nFailed to run '%s', try running `copilot` directly without `gh`.", err, copilotPath)
 		}
 		return err
 	}
