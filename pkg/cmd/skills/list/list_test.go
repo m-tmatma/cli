@@ -293,7 +293,7 @@ func TestListRun(t *testing.T) {
 			require.NoError(t, err)
 			if tt.wantJSON != "" {
 				expected := tt.wantJSON
-				expected = strings.ReplaceAll(expected, "HOME", homeDir)
+				expected = strings.ReplaceAll(expected, "HOME", strings.ReplaceAll(homeDir, `\`, `\\`))
 				assert.JSONEq(t, expected, stdout.String())
 			} else {
 				assert.Equal(t, tt.wantStdout, stdout.String())
