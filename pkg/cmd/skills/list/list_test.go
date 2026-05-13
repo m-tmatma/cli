@@ -1,11 +1,11 @@
 package list
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -293,7 +293,7 @@ func TestListRun(t *testing.T) {
 			require.NoError(t, err)
 			if tt.wantJSON != "" {
 				expected := tt.wantJSON
-				expected = string(bytes.ReplaceAll([]byte(expected), []byte(filepath.Join("HOME")), []byte(homeDir)))
+				expected = strings.ReplaceAll(expected, "HOME", homeDir)
 				assert.JSONEq(t, expected, stdout.String())
 			} else {
 				assert.Equal(t, tt.wantStdout, stdout.String())
