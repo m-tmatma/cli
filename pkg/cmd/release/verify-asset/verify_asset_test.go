@@ -197,6 +197,38 @@ func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
 	require.ErrorContains(t, err, "no attestations found for tag v1")
 }
 
+func Test_verifyAssetRun_FailedNoAttestations_SHA256(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	tagName := "v1"
+
+	fakeHTTP := &httpmock.Registry{}
+	defer fakeHTTP.Verify(t)
+	fakeSHA := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	shared.StubFetchRefSHA(t, fakeHTTP, "owner", "repo", tagName, fakeSHA)
+
+	baseRepo, err := ghrepo.FromFullName("owner/repo")
+	require.NoError(t, err)
+
+	releaseAssetPath := test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip")
+
+	cfg := &VerifyAssetConfig{
+		Opts: &VerifyAssetOptions{
+			AssetFilePath: releaseAssetPath,
+			TagName:       tagName,
+			BaseRepo:      baseRepo,
+			Exporter:      nil,
+		},
+		IO:          ios,
+		HttpClient:  &http.Client{Transport: fakeHTTP},
+		AttClient:   api.NewFailTestClient(),
+		AttVerifier: nil,
+	}
+
+	err = verifyAssetRun(cfg)
+	require.ErrorContains(t, err, "no attestations found for tag v1")
+	require.ErrorContains(t, err, "sha256:"+fakeSHA)
+}
+
 func Test_verifyAssetRun_FailedTagNotInAttestation(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 
