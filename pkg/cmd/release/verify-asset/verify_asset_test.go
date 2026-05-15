@@ -166,7 +166,7 @@ func Test_verifyAssetRun_SuccessNoTagArg(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
+func Test_verifyAssetRun_FailedNoAttestations_SHA1(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	tagName := "v1"
 
@@ -180,6 +180,14 @@ func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
 
 	releaseAssetPath := test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip")
 
+	var capturedParams api.FetchParams
+	attClient := &api.MockClient{
+		OnGetByDigest: func(params api.FetchParams) ([]*api.Attestation, error) {
+			capturedParams = params
+			return api.OnGetByDigestFailure(params)
+		},
+	}
+
 	cfg := &VerifyAssetConfig{
 		Opts: &VerifyAssetOptions{
 			AssetFilePath: releaseAssetPath,
@@ -189,12 +197,14 @@ func Test_verifyAssetRun_FailedNoAttestations(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
-		AttClient:   api.NewFailTestClient(),
+		AttClient:   attClient,
 		AttVerifier: nil,
 	}
 
 	err = verifyAssetRun(cfg)
 	require.ErrorContains(t, err, "no attestations found for tag v1")
+	require.ErrorContains(t, err, "sha1:"+fakeSHA)
+	require.Equal(t, "sha1:"+fakeSHA, capturedParams.Digest)
 }
 
 func Test_verifyAssetRun_FailedNoAttestations_SHA256(t *testing.T) {
@@ -211,6 +221,14 @@ func Test_verifyAssetRun_FailedNoAttestations_SHA256(t *testing.T) {
 
 	releaseAssetPath := test.NormalizeRelativePath("../../attestation/test/data/github_release_artifact.zip")
 
+	var capturedParams api.FetchParams
+	attClient := &api.MockClient{
+		OnGetByDigest: func(params api.FetchParams) ([]*api.Attestation, error) {
+			capturedParams = params
+			return api.OnGetByDigestFailure(params)
+		},
+	}
+
 	cfg := &VerifyAssetConfig{
 		Opts: &VerifyAssetOptions{
 			AssetFilePath: releaseAssetPath,
@@ -220,13 +238,14 @@ func Test_verifyAssetRun_FailedNoAttestations_SHA256(t *testing.T) {
 		},
 		IO:          ios,
 		HttpClient:  &http.Client{Transport: fakeHTTP},
-		AttClient:   api.NewFailTestClient(),
+		AttClient:   attClient,
 		AttVerifier: nil,
 	}
 
 	err = verifyAssetRun(cfg)
 	require.ErrorContains(t, err, "no attestations found for tag v1")
 	require.ErrorContains(t, err, "sha256:"+fakeSHA)
+	require.Equal(t, "sha256:"+fakeSHA, capturedParams.Digest)
 }
 
 func Test_verifyAssetRun_FailedTagNotInAttestation(t *testing.T) {
