@@ -273,6 +273,7 @@ func TestListRun(t *testing.T) {
 			repoDir := t.TempDir()
 			homeDir := t.TempDir()
 			t.Setenv("HOME", homeDir)
+			t.Setenv("USERPROFILE", homeDir)
 
 			if tt.setup != nil {
 				tt.setup(t, repoDir, homeDir)
