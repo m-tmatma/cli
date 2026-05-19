@@ -203,6 +203,19 @@ func TestMatchHiddenDirConventions(t *testing.T) {
 			wantConvention: "hidden-dir-namespaced",
 		},
 		{
+			name:           "nested hidden dir skills directory",
+			path:           "foo/bar/.claude/skills/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantConvention: "hidden-dir",
+		},
+		{
+			name:           "nested hidden dir namespaced skill",
+			path:           "foo/bar/.claude/skills/monalisa/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantNamespace:  "monalisa",
+			wantConvention: "hidden-dir-namespaced",
+		},
+		{
 			name:    "not a SKILL.md file",
 			path:    ".claude/skills/code-review/README.md",
 			wantNil: true,
@@ -228,9 +241,10 @@ func TestMatchHiddenDirConventions(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:    "too deeply nested hidden dir",
-			path:    ".claude/nested/skills/code-review/SKILL.md",
-			wantNil: true,
+			name:           "hidden dir with nested skills directory",
+			path:           ".claude/nested/skills/code-review/SKILL.md",
+			wantName:       "code-review",
+			wantConvention: "hidden-dir",
 		},
 		{
 			name:    "invalid skill name",
@@ -992,6 +1006,14 @@ func TestDiscoverSkillsWithOptions(t *testing.T) {
 		},
 	}
 
+	nestedHiddenTree := map[string]interface{}{
+		"sha": "abc123", "truncated": false,
+		"tree": []map[string]interface{}{
+			{"path": "foo/bar/.claude/skills/hidden-skill", "type": "tree", "sha": "tree-sha-1"},
+			{"path": "foo/bar/.claude/skills/hidden-skill/SKILL.md", "type": "blob", "sha": "blob-1"},
+		},
+	}
+
 	emptyTree := map[string]interface{}{
 		"sha": "abc123", "truncated": false,
 		"tree": []map[string]interface{}{
@@ -1014,6 +1036,11 @@ func TestDiscoverSkillsWithOptions(t *testing.T) {
 			name:       "mixed tree returns all skills",
 			tree:       mixedTree,
 			wantSkills: []string{"hidden-skill", "standard-skill"},
+		},
+		{
+			name:       "nested hidden-dir tree returns hidden skill",
+			tree:       nestedHiddenTree,
+			wantSkills: []string{"hidden-skill"},
 		},
 		{
 			name:    "no skills at all",
@@ -1414,6 +1441,16 @@ func TestDiscoverLocalSkillsWithOptions(t *testing.T) {
 				}
 			},
 			wantSkills: []string{"standard", "hidden"},
+		},
+		{
+			name: "nested hidden dir returns skill",
+			setup: func(t *testing.T, dir string) {
+				t.Helper()
+				skillDir := filepath.Join(dir, "foo", "bar", ".claude", "skills", "hidden")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# hidden"), 0o644))
+			},
+			wantSkills: []string{"hidden"},
 		},
 		{
 			name:    "no skills at all",

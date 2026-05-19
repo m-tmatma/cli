@@ -451,18 +451,21 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 }
 
 // matchHiddenDirConventions checks if a blob path matches a skill convention
-// under a hidden (dot-prefixed) root directory. These patterns mirror the
-// standard skills/ conventions but rooted under .{host}/skills/:
+// under a hidden (dot-prefixed) directory. These patterns mirror the standard
+// skills/ conventions, but only when the path contains a hidden segment:
 //
-//   - .{host}/skills/*/SKILL.md         -> "hidden-dir"
-//   - .{host}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
+//   - {prefix}/.{host}/skills/*/SKILL.md         -> "hidden-dir"
+//   - {prefix}/.{host}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
 func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {
 		return nil
 	}
+	if !hasHiddenSegment(entry.Path) {
+		return nil
+	}
 
-	// .{host}/skills/*
-	// .{host}/skills/{scope}/*
+	// {prefix}/.{host}/skills/*
+	// {prefix}/.{host}/skills/{scope}/*
 	dir := path.Dir(entry.Path)
 	skillName := path.Base(dir)
 
@@ -470,29 +473,23 @@ func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 		return nil
 	}
 
-	// .{host}/skills
-	// .{host}/skills/{scope}
+	// {prefix}/.{host}/skills
+	// {prefix}/.{host}/skills/{scope}
 	parentDir := path.Dir(dir)
 
-	// .{host}/skills/*/SKILL.md
+	// {prefix}/.{host}/skills/*/SKILL.md
 	if path.Base(parentDir) == "skills" {
-		hiddenRoot := path.Dir(parentDir)
-		if path.Dir(hiddenRoot) == "." && strings.HasPrefix(hiddenRoot, ".") {
-			return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "hidden-dir"}
-		}
+		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "hidden-dir"}
 	}
 
-	// .{host}/skills/{scope}/*/SKILL.md
+	// {prefix}/.{host}/skills/{scope}/*/SKILL.md
 	grandparentDir := path.Dir(parentDir)
 	if path.Base(grandparentDir) == "skills" {
-		hiddenRoot := path.Dir(grandparentDir)
-		if path.Dir(hiddenRoot) == "." && strings.HasPrefix(hiddenRoot, ".") {
-			namespace := path.Base(parentDir)
-			if !validateName(namespace) {
-				return nil
-			}
-			return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "hidden-dir-namespaced"}
+		namespace := path.Base(parentDir)
+		if !validateName(namespace) {
+			return nil
 		}
+		return &skillMatch{entry: entry, name: skillName, namespace: namespace, skillDir: dir, convention: "hidden-dir-namespaced"}
 	}
 
 	return nil

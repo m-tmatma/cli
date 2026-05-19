@@ -799,6 +799,34 @@ func TestInstallRun(t *testing.T) {
 			wantStdout: "Installed terraform-style-guide",
 		},
 		{
+			name:  "remote install by arbitrary nested skill path skips full discovery",
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+				stubSkillByPath(reg, "monalisa", "skills-repo", "abc123",
+					"packages/agent-skills/netsuite-ai-connector-instructions", "netsuite-ai-connector-instructions", "treeSHA")
+				// DiscoverSkillByPath: tree + blob (for fetchDescription)
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+				// installer.Install: tree + blob (again, for writing files)
+				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+			},
+			opts: func(ios *iostreams.IOStreams, reg *httpmock.Registry) *InstallOptions {
+				t.Helper()
+				return &InstallOptions{
+					IO:           ios,
+					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+					GitClient:    &git.Client{RepoDir: t.TempDir()},
+					SkillSource:  "monalisa/skills-repo",
+					SkillName:    "packages/agent-skills/netsuite-ai-connector-instructions",
+					Agent:        "github-copilot",
+					Scope:        "project",
+					ScopeChanged: true,
+					Dir:          t.TempDir(),
+				}
+			},
+			wantStdout: "Installed netsuite-ai-connector-instructions",
+		},
+		{
 			name:  "remote install with URL repo argument",
 			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
@@ -2118,7 +2146,10 @@ func Test_isSkillPath(t *testing.T) {
 		{name: "nested skills/ path", path: "terraform/code-generation/skills/terraform-style-guide", want: true},
 		{name: "deeply nested skills/ path", path: "a/b/c/skills/my-skill", want: true},
 		{name: "nested plugins/ path", path: "vendor/plugins/hubot/skills/pr-summary", want: true},
+		{name: "arbitrary nested skill path", path: "packages/agent-skills/netsuite-ai-connector-instructions", want: true},
+		{name: "arbitrary nested skill path with trailing slash", path: "skills-catalog/matlab-core/matlab-debugging/", want: true},
 		{name: "name containing skills substring", path: "myskills", want: false},
+		{name: "namespaced skill name", path: "monalisa/code-review", want: false},
 		{name: "namespaced path", path: "skills/monalisa/issue-triage", want: true},
 	}
 	for _, tt := range tests {

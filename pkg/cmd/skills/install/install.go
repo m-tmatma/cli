@@ -115,8 +115,10 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			see: https://agentskills.io/specification
 
 			The skill argument can be a name, a namespaced name (%[1]sauthor/skill%[1]s),
-			or an exact path within the repository (%[1]sskills/author/skill%[1]s or
-			%[1]sskills/author/skill/SKILL.md%[1]s).
+			or an exact path within the repository (%[1]sskills/author/skill%[1]s,
+			%[1]spackages/agent-skills/code-review%[1]s, or any %[1]s.../SKILL.md%[1]s path).
+			Namespaced names with one slash are matched by name. Use a %[1]sSKILL.md%[1]s
+			suffix to force a one-directory path outside the standard conventions.
 
 			Performance tip: when installing from a large repository with many
 			skills, providing an exact path instead of a skill name avoids a
@@ -154,6 +156,9 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 
 			# Install from a large namespaced repo by path (efficient, skips full discovery)
 			$ gh skill install github/awesome-copilot skills/monalisa/code-review
+
+			# Install from a non-standard nested path (efficient, skips full discovery)
+			$ gh skill install oracle/netsuite-suitecloud-sdk packages/agent-skills/netsuite-ai-connector-instructions
 
 			# Install from a local directory
 			$ gh skill install ./my-skills-repo --from-local
@@ -546,6 +551,7 @@ func runLocalInstall(opts *InstallOptions) error {
 // isSkillPath returns true if the argument looks like a repo-relative path
 // rather than a simple skill name.
 func isSkillPath(name string) bool {
+	name = strings.TrimSuffix(name, "/")
 	if name == "" {
 		return false
 	}
@@ -556,6 +562,9 @@ func isSkillPath(name string) bool {
 		return true
 	}
 	if strings.Contains(name, "/skills/") || strings.Contains(name, "/plugins/") {
+		return true
+	}
+	if strings.Count(name, "/") >= 2 {
 		return true
 	}
 	return false
