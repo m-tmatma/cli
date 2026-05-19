@@ -91,6 +91,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 
 			Skills without GitHub metadata (e.g. installed manually or by another
 			tool) are prompted for their source repository in interactive mode.
+			With %[1]s--all%[1]s or in non-interactive mode, they are skipped with a notice.
 			The update re-downloads the skill with metadata injected, so future
 			updates work automatically.
 
@@ -221,7 +222,7 @@ func updateRun(opts *UpdateOptions) error {
 		if s.owner != "" && s.repo != "" {
 			continue
 		}
-		if !canPrompt {
+		if !canPrompt || opts.All {
 			noMeta = append(noMeta, s.name)
 			continue
 		}
