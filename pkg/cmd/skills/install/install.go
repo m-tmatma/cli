@@ -551,23 +551,7 @@ func runLocalInstall(opts *InstallOptions) error {
 // isSkillPath returns true if the argument looks like a repo-relative path
 // rather than a simple skill name.
 func isSkillPath(name string) bool {
-	name = strings.TrimSuffix(name, "/")
-	if name == "" {
-		return false
-	}
-	if name == "SKILL.md" || strings.HasSuffix(name, "/SKILL.md") {
-		return true
-	}
-	if strings.HasPrefix(name, "skills/") || strings.HasPrefix(name, "plugins/") {
-		return true
-	}
-	if strings.Contains(name, "/skills/") || strings.Contains(name, "/plugins/") {
-		return true
-	}
-	if strings.Count(name, "/") >= 2 {
-		return true
-	}
-	return false
+	return discovery.IsSkillPath(name)
 }
 
 func resolveRepoArg(skillSource string, canPrompt bool, p prompter.Prompter) (ghrepo.Interface, string, error) {

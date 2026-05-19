@@ -390,6 +390,28 @@ func MatchSkillPath(filePath string) (name, namespace string) {
 	return m.name, m.namespace
 }
 
+// IsSkillPath reports whether a skill selector looks like a repo-relative path
+// rather than a simple skill name.
+func IsSkillPath(name string) bool {
+	name = strings.TrimSuffix(name, "/")
+	if name == "" {
+		return false
+	}
+	if name == "SKILL.md" || strings.HasSuffix(name, "/SKILL.md") {
+		return true
+	}
+	if strings.HasPrefix(name, "skills/") || strings.HasPrefix(name, "plugins/") {
+		return true
+	}
+	if strings.Contains(name, "/skills/") || strings.Contains(name, "/plugins/") {
+		return true
+	}
+	if strings.Count(name, "/") >= 2 {
+		return true
+	}
+	return false
+}
+
 // matchSkillConventions checks if a blob path matches any known skill convention.
 func matchSkillConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {

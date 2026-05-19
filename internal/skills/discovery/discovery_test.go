@@ -1526,6 +1526,34 @@ func TestMatchSkillPath(t *testing.T) {
 	}
 }
 
+func TestIsSkillPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{name: "empty string", path: "", want: false},
+		{name: "plain skill name", path: "git-commit", want: false},
+		{name: "SKILL.md at root", path: "SKILL.md", want: true},
+		{name: "SKILL.md suffix", path: "skills/code-review/SKILL.md", want: true},
+		{name: "starts with skills/", path: "skills/code-review", want: true},
+		{name: "starts with plugins/", path: "plugins/hubot/skills/pr-summary", want: true},
+		{name: "nested skills/ path", path: "terraform/code-generation/skills/terraform-style-guide", want: true},
+		{name: "deeply nested skills/ path", path: "a/b/c/skills/my-skill", want: true},
+		{name: "nested plugins/ path", path: "vendor/plugins/hubot/skills/pr-summary", want: true},
+		{name: "arbitrary nested skill path", path: "packages/agent-skills/netsuite-ai-connector-instructions", want: true},
+		{name: "arbitrary nested skill path with trailing slash", path: "skills-catalog/matlab-core/matlab-debugging/", want: true},
+		{name: "name containing skills substring", path: "myskills", want: false},
+		{name: "namespaced skill name", path: "monalisa/code-review", want: false},
+		{name: "namespaced path", path: "skills/monalisa/issue-triage", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsSkillPath(tt.path))
+		})
+	}
+}
+
 func TestDiscoverSkillFiles(t *testing.T) {
 	tests := []struct {
 		name      string
