@@ -52,7 +52,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
-	github.com/theupdateframework/go-tuf/v2 v2.4.1
+	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	github.com/twitchtv/twirp v8.1.3+incompatible
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/yuin/goldmark v1.8.2
@@ -159,13 +159,13 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rodaine/table v1.3.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/secure-systems-lab/go-securesystemslib v0.10.0 // indirect
+	github.com/secure-systems-lab/go-securesystemslib v0.11.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 // indirect
 	github.com/sigstore/rekor v1.5.0 // indirect
 	github.com/sigstore/rekor-tiles/v2 v2.0.1 // indirect
-	github.com/sigstore/sigstore v1.10.5 // indirect
+	github.com/sigstore/sigstore v1.10.6 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.0.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
