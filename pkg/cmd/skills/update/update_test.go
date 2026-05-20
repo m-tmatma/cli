@@ -508,7 +508,7 @@ func TestUpdateRun(t *testing.T) {
 					All:       true,
 				}
 			},
-			wantStderr: "no GitHub metadata",
+			wantStderr: "Run `gh skill update manual-skill` interactively",
 		},
 		{
 			name: "all up to date",
