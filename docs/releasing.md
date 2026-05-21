@@ -61,5 +61,5 @@ Occasionally, it might be necessary to clean up a bad release and re-release.
 
 1. Delete the release and associated tag
 2. Re-release and monitor the workflow run logs
-3. Open pull request updating [`gh` Homebrew formula](https://github.com/williammartin/homebrew-core/blob/master/Formula/g/gh.rb) with new SHA versions, linking the previous PR
+3. Open pull request updating [`gh` Homebrew formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb) with new SHA versions, linking the previous PR
 4. Verify resulting Debian and RPM packages, Homebrew formula
