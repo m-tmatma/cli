@@ -638,9 +638,9 @@ Occasionally, the repository can become unwieldy due to hosting so many large bi
 
 #### Homebrew
 
-Historically, we used [`mislav/bump-homebrew-formula-action`](https://github.com/mislav/bump-homebrew-formula-action), a PR for the `gh` [`homebrew-core` formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb) is created. The fork repository was  owned by `williammartin` as PRs are [not accepted from organizations.](https://github.com/cli/cli/pull/7953)
+Historically, we used [`mislav/bump-homebrew-formula-action`](https://github.com/mislav/bump-homebrew-formula-action). It created a PR for the `gh` [`homebrew-core` formula](https://github.com/Homebrew/homebrew-core/blob/master/Formula/g/gh.rb). The fork repository was owned by `williammartin` because PRs are [not accepted from organizations.](https://github.com/cli/cli/pull/7953)
 
-However, since this required a legacy PAT token to open a PR between this repos, it was deemed too much risk for our security. As such, we now rely on [homebrew's autobump](https://docs.brew.sh/Autobump).
+However, since this required a legacy PAT token to open a PR between these repositories, it was deemed too much risk for our security. As such, we now rely on [Homebrew's autobump](https://docs.brew.sh/Autobump).
 
 ## <a id="deepest-dive">Deepest Dive</a>
 
