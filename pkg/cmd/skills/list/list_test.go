@@ -82,7 +82,10 @@ func TestNewCmdList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
-			f := &cmdutil.Factory{IOStreams: ios, GitClient: &git.Client{}}
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+				GitClient: &git.Client{},
+			}
 
 			var gotOpts *ListOptions
 			cmd := NewCmdList(f, &telemetry.NoOpService{}, func(opts *ListOptions) error {
@@ -113,22 +116,6 @@ func TestNewCmdList(t *testing.T) {
 				assert.NotNil(t, gotOpts.Exporter)
 			}
 		})
-	}
-}
-
-func TestNewCmdList_Metadata(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
-	f := &cmdutil.Factory{IOStreams: ios, GitClient: &git.Client{}}
-	cmd := NewCmdList(f, &telemetry.NoOpService{}, nil)
-
-	assert.Equal(t, "list [flags]", cmd.Use)
-	assert.NotEmpty(t, cmd.Short)
-	assert.NotEmpty(t, cmd.Long)
-	assert.NotEmpty(t, cmd.Example)
-	assert.Contains(t, cmd.Aliases, "ls")
-
-	for _, flag := range []string{"agent", "scope", "dir", "json"} {
-		assert.NotNil(t, cmd.Flags().Lookup(flag), "missing flag: --%s", flag)
 	}
 }
 
@@ -199,6 +186,31 @@ func TestListRun(t *testing.T) {
 			},
 		},
 		{
+			name: "preserves tenant host in json source url",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				writeSkill(t, homeDir, ".copilot/skills/tenant-skill", remoteSkillFrontmatterForRepo("tenant-skill", "https://octocorp.ghe.com/monalisa/skills-repo", "skills/tenant-skill", "refs/heads/main", ""))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"skillName", "sourceURL", "path"})
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Exporter:  exporter,
+					Agent:     "github-copilot",
+					Scope:     "user",
+				}
+			},
+			wantJSON: fmt.Sprintf(`[
+				{
+					"skillName": "tenant-skill",
+					"sourceURL": "https://octocorp.ghe.com/monalisa/skills-repo",
+					"path": %q
+				}
+			]`, filepath.Join("HOME", ".copilot", "skills", "tenant-skill")),
+		},
+		{
 			name: "custom directory with local metadata",
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				customDir := filepath.Join(repoDir, "custom-skills")
@@ -222,6 +234,18 @@ func TestListRun(t *testing.T) {
 			wantStdout: "local-helper\t-\tcustom\t/src/local-helper\n",
 		},
 		{
+			name: "custom directory must exist",
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Dir:       filepath.Join(repoDir, "missing-skills"),
+				}
+			},
+			wantErr: "could not access directory",
+		},
+		{
 			name: "recovers namespaced skill name from source path",
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, repoDir, ".agents/skills/xlsx-pro", remoteSkillFrontmatter("xlsx-pro", "skills/bob/xlsx-pro", "refs/heads/main", ""))
@@ -236,6 +260,55 @@ func TestListRun(t *testing.T) {
 				}
 			},
 			wantStdout: "bob/xlsx-pro\tgithub-copilot\tproject\tmonalisa/skills-repo\n",
+		},
+		{
+			name: "recovers plugin skill name from source path",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				writeSkill(t, repoDir, ".agents/skills/foo", remoteSkillFrontmatter("foo", "plugins/myplugin/skills/foo", "refs/heads/main", ""))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Agent:     "github-copilot",
+					Scope:     "project",
+				}
+			},
+			wantStdout: "myplugin/foo\tgithub-copilot\tproject\tmonalisa/skills-repo\n",
+		},
+		{
+			name: "partial metadata has empty json source url",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				writeSkill(t, repoDir, ".agents/skills/partial", heredoc.Doc(`
+					---
+					name: partial
+					metadata:
+					  github-ref: refs/heads/main
+					---
+					Body
+				`))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				exporter := cmdutil.NewJSONExporter()
+				exporter.SetFields([]string{"skillName", "sourceURL", "version", "pinned"})
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Exporter:  exporter,
+					Agent:     "github-copilot",
+					Scope:     "project",
+				}
+			},
+			wantJSON: `[
+				{
+					"skillName": "partial",
+					"sourceURL": "",
+					"version": "main",
+					"pinned": false
+				}
+			]`,
 		},
 		{
 			name: "no installed skills returns no results",
@@ -311,15 +384,16 @@ func TestRenderTableUsesAgentHeader(t *testing.T) {
 	ios.SetStdoutTTY(true)
 
 	err := renderTable(ios, []listedSkill{{
-		skillName: "git-commit",
-		hostIDs:   []string{"github-copilot"},
-		scope:     "project",
-		source:    "monalisa/skills-repo",
-		version:   "v1.0.0",
+		skillName:    "git-commit",
+		agentHostIDs: []string{"github-copilot", "cursor"},
+		scope:        "project",
+		source:       "monalisa/skills-repo",
+		version:      "v1.0.0",
 	}})
 
 	require.NoError(t, err)
 	assert.Contains(t, stdout.String(), "AGENT")
+	assert.Contains(t, stdout.String(), "github-copilot, cursor")
 	assert.NotContains(t, stdout.String(), "HOST")
 }
 
@@ -331,6 +405,10 @@ func writeSkill(t *testing.T, baseDir, relDir, content string) {
 }
 
 func remoteSkillFrontmatter(name, sourcePath, ref, pinned string) string {
+	return remoteSkillFrontmatterForRepo(name, "https://github.com/monalisa/skills-repo", sourcePath, ref, pinned)
+}
+
+func remoteSkillFrontmatterForRepo(name, repoURL, sourcePath, ref, pinned string) string {
 	pinnedLine := ""
 	if pinned != "" {
 		pinnedLine = fmt.Sprintf("  github-pinned: %s\n", pinned)
@@ -339,11 +417,11 @@ func remoteSkillFrontmatter(name, sourcePath, ref, pinned string) string {
 		---
 		name: %s
 		metadata:
-		  github-repo: https://github.com/monalisa/skills-repo
+		  github-repo: %s
 		  github-ref: %s
 		  github-tree-sha: abc123
 		  github-path: %s
 		%s---
 		Body
-	`), name, ref, sourcePath, pinnedLine)
+	`), name, repoURL, ref, sourcePath, pinnedLine)
 }

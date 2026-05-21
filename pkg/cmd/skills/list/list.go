@@ -32,7 +32,8 @@ var skillListFields = []string{
 	"path",
 }
 
-// ListOptions holds dependencies and user-provided flags for the list command.
+const scopeCustom = "custom"
+
 type ListOptions struct {
 	IO        *iostreams.IOStreams
 	Telemetry ghtelemetry.EventRecorder
@@ -45,25 +46,21 @@ type ListOptions struct {
 	Dir          string
 }
 
-type agentInfo struct {
-	id string
-}
-
 type scanTarget struct {
-	dir   string
-	hosts []agentInfo
-	scope string
+	dir          string
+	agentHostIDs []string
+	scope        string
 }
 
 type listedSkill struct {
-	skillName string
-	hostIDs   []string
-	scope     string
-	source    string
-	sourceURL string
-	version   string
-	pinned    bool
-	path      string
+	skillName    string
+	agentHostIDs []string
+	scope        string
+	source       string
+	sourceURL    string
+	version      string
+	pinned       bool
+	path         string
 }
 
 // ExportData implements cmdutil.exportable for --json output.
@@ -74,7 +71,7 @@ func (s listedSkill) ExportData(fields []string) map[string]interface{} {
 		case "skillName":
 			data[f] = s.skillName
 		case "hosts":
-			data[f] = s.hostIDs
+			data[f] = s.agentHostIDs
 		case "scope":
 			data[f] = s.scope
 		case "sourceURL":
@@ -129,11 +126,11 @@ func NewCmdList(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.ScopeChanged = cmd.Flags().Changed("scope")
 
-			if opts.Dir != "" && opts.Agent != "" {
-				return cmdutil.FlagErrorf("--dir and --agent cannot be used together")
+			if err := cmdutil.MutuallyExclusive("--dir and --agent cannot be used together", opts.Dir != "", opts.Agent != ""); err != nil {
+				return err
 			}
-			if opts.Dir != "" && opts.ScopeChanged {
-				return cmdutil.FlagErrorf("--dir and --scope cannot be used together")
+			if err := cmdutil.MutuallyExclusive("--dir and --scope cannot be used together", opts.Dir != "", opts.ScopeChanged); err != nil {
+				return err
 			}
 
 			if runF != nil {
@@ -178,7 +175,7 @@ func listInstalledSkills(opts *ListOptions) ([]listedSkill, error) {
 
 	var all []listedSkill
 	for _, target := range targets {
-		skills, scanErr := scanInstalledSkills(target.dir, target.hosts, target.scope)
+		skills, scanErr := scanInstalledSkills(target.dir, target.agentHostIDs, target.scope)
 		if scanErr != nil {
 			if opts.Dir != "" {
 				return nil, fmt.Errorf("could not scan directory: %w", scanErr)
@@ -197,13 +194,16 @@ func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not resolve path: %w", err)
 		}
-		return []scanTarget{{dir: dir, scope: "custom"}}, nil
+		if _, err := os.Stat(dir); err != nil {
+			return nil, fmt.Errorf("could not access directory: %w", err)
+		}
+		return []scanTarget{{dir: dir, scope: scopeCustom}}, nil
 	}
 
 	gitRoot := installer.ResolveGitRoot(opts.GitClient)
 	homeDir := installer.ResolveHomeDir()
 
-	hosts, err := selectedHosts(opts.Agent)
+	agentHosts, err := selectedHosts(opts.Agent)
 	if err != nil {
 		return nil, err
 	}
@@ -211,23 +211,23 @@ func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
 
 	byDir := map[string]int{}
 	var targets []scanTarget
-	for _, host := range hosts {
+	for _, agentHost := range agentHosts {
 		for _, scope := range scopes {
-			dir, installErr := host.InstallDir(scope, gitRoot, homeDir)
+			dir, installErr := agentHost.InstallDir(scope, gitRoot, homeDir)
 			if installErr != nil {
 				continue
 			}
 
 			if idx, ok := byDir[dir]; ok {
-				targets[idx].hosts = appendHost(targets[idx].hosts, host)
+				targets[idx].agentHostIDs = appendAgentHostID(targets[idx].agentHostIDs, agentHost.ID)
 				continue
 			}
 
 			byDir[dir] = len(targets)
 			targets = append(targets, scanTarget{
-				dir:   dir,
-				hosts: []agentInfo{{id: host.ID}},
-				scope: string(scope),
+				dir:          dir,
+				agentHostIDs: []string{agentHost.ID},
+				scope:        string(scope),
 			})
 		}
 	}
@@ -258,16 +258,16 @@ func selectedScopes(scope string) []registry.Scope {
 	return []registry.Scope{registry.ScopeProject, registry.ScopeUser}
 }
 
-func appendHost(hosts []agentInfo, host *registry.AgentHost) []agentInfo {
-	for _, existing := range hosts {
-		if existing.id == host.ID {
-			return hosts
+func appendAgentHostID(agentHostIDs []string, agentHostID string) []string {
+	for _, existing := range agentHostIDs {
+		if existing == agentHostID {
+			return agentHostIDs
 		}
 	}
-	return append(hosts, agentInfo{id: host.ID})
+	return append(agentHostIDs, agentHostID)
 }
 
-func scanInstalledSkills(skillsDir string, hosts []agentInfo, scope string) ([]listedSkill, error) {
+func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string) ([]listedSkill, error) {
 	entries, err := os.ReadDir(skillsDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -286,7 +286,7 @@ func scanInstalledSkills(skillsDir string, hosts []agentInfo, scope string) ([]l
 		skillDir := filepath.Join(skillsDir, e.Name())
 		skillFile := filepath.Join(skillDir, "SKILL.md")
 		if data, readErr := os.ReadFile(skillFile); readErr == nil {
-			skills = append(skills, parseInstalledSkill(data, e.Name(), skillDir, hosts, scope))
+			skills = append(skills, parseInstalledSkill(data, e.Name(), skillDir, agentHostIDs, scope))
 			continue
 		}
 
@@ -303,7 +303,7 @@ func scanInstalledSkills(skillsDir string, hosts []agentInfo, scope string) ([]l
 			subSkillFile := filepath.Join(subSkillDir, "SKILL.md")
 			if data, readErr := os.ReadFile(subSkillFile); readErr == nil {
 				installName := e.Name() + "/" + sub.Name()
-				skills = append(skills, parseInstalledSkill(data, installName, subSkillDir, hosts, scope))
+				skills = append(skills, parseInstalledSkill(data, installName, subSkillDir, agentHostIDs, scope))
 			}
 		}
 	}
@@ -311,12 +311,12 @@ func scanInstalledSkills(skillsDir string, hosts []agentInfo, scope string) ([]l
 	return skills, nil
 }
 
-func parseInstalledSkill(data []byte, name, dir string, hosts []agentInfo, scope string) listedSkill {
+func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, scope string) listedSkill {
 	s := listedSkill{
-		skillName: name,
-		hostIDs:   hostIDs(hosts),
-		scope:     scope,
-		path:      dir,
+		skillName:    name,
+		agentHostIDs: agentHostIDs,
+		scope:        scope,
+		path:         dir,
 	}
 
 	result, err := frontmatter.Parse(string(data))
@@ -391,14 +391,6 @@ func skillNameFromSourcePath(sourcePath string) string {
 	return parts[len(parts)-1]
 }
 
-func hostIDs(hosts []agentInfo) []string {
-	ids := make([]string, len(hosts))
-	for i, host := range hosts {
-		ids[i] = host.id
-	}
-	return ids
-}
-
 func sortListedSkills(skills []listedSkill) {
 	sort.Slice(skills, func(i, j int) bool {
 		if skills[i].skillName != skills[j].skillName {
@@ -407,8 +399,8 @@ func sortListedSkills(skills []listedSkill) {
 		if skills[i].scope != skills[j].scope {
 			return skills[i].scope < skills[j].scope
 		}
-		if formatHosts(skills[i].hostIDs) != formatHosts(skills[j].hostIDs) {
-			return formatHosts(skills[i].hostIDs) < formatHosts(skills[j].hostIDs)
+		if formatHosts(skills[i].agentHostIDs) != formatHosts(skills[j].agentHostIDs) {
+			return formatHosts(skills[i].agentHostIDs) < formatHosts(skills[j].agentHostIDs)
 		}
 		return skills[i].path < skills[j].path
 	})
@@ -419,7 +411,7 @@ func renderTable(io *iostreams.IOStreams, skills []listedSkill) error {
 
 	for _, skill := range skills {
 		table.AddField(skill.skillName)
-		table.AddField(formatHosts(skill.hostIDs))
+		table.AddField(formatHosts(skill.agentHostIDs))
 		table.AddField(displayOrDash(skill.scope))
 		table.AddField(displayOrDash(skill.source))
 		table.EndRow()
@@ -439,7 +431,7 @@ func formatHosts(hosts []string) string {
 	if len(hosts) == 0 {
 		return "-"
 	}
-	return strings.Join(hosts, ",")
+	return strings.Join(hosts, ", ")
 }
 
 func recordListTelemetry(opts *ListOptions, skillCount int) {
@@ -458,7 +450,7 @@ func recordListTelemetry(opts *ListOptions, skillCount int) {
 	customDir := "false"
 	if opts.Dir != "" {
 		customDir = "true"
-		scope = "custom"
+		scope = scopeCustom
 	}
 	format := "table"
 	if opts.Exporter != nil {
