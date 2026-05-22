@@ -246,6 +246,50 @@ func TestListRun(t *testing.T) {
 			wantErr: "could not access directory",
 		},
 		{
+			name: "lists source skills in bare project skills directory as published",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				writeSkill(t, repoDir, "skills/gh", heredoc.Doc(`
+					---
+					name: gh
+					description: GitHub CLI patterns
+					---
+					Body
+				`))
+				writeSkill(t, repoDir, "skills/gh-skill", heredoc.Doc(`
+					---
+					name: gh-skill
+					description: GitHub Skill patterns
+					---
+					Body
+				`))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Scope:     "project",
+				}
+			},
+			wantStdout: "gh\tn/a (published)\tproject\t-\ngh-skill\tn/a (published)\tproject\t-\n",
+		},
+		{
+			name: "lists openclaw project skill with install metadata",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				writeSkill(t, repoDir, "skills/openclaw-helper", remoteSkillFrontmatter("openclaw-helper", "skills/openclaw-helper", "refs/heads/main", ""))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Agent:     "openclaw",
+					Scope:     "project",
+				}
+			},
+			wantStdout: "openclaw-helper\topenclaw\tproject\tmonalisa/skills-repo\n",
+		},
+		{
 			name: "recovers namespaced skill name from source path",
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				writeSkill(t, repoDir, ".agents/skills/xlsx-pro", remoteSkillFrontmatter("xlsx-pro", "skills/bob/xlsx-pro", "refs/heads/main", ""))

@@ -32,7 +32,19 @@ var skillListFields = []string{
 	"path",
 }
 
-const scopeCustom = "custom"
+const (
+	agentHostPublished        = "published"
+	agentHostPublishedDisplay = "n/a (published)"
+	scopeCustom               = "custom"
+)
+
+type scanFilter int
+
+const (
+	scanAllSkills scanFilter = iota
+	scanInstalledOnly
+	scanPublishedOnly
+)
 
 type ListOptions struct {
 	IO        *iostreams.IOStreams
@@ -50,6 +62,7 @@ type scanTarget struct {
 	dir          string
 	agentHostIDs []string
 	scope        string
+	filter       scanFilter
 }
 
 type listedSkill struct {
@@ -175,7 +188,7 @@ func listInstalledSkills(opts *ListOptions) ([]listedSkill, error) {
 
 	var all []listedSkill
 	for _, target := range targets {
-		skills, scanErr := scanInstalledSkills(target.dir, target.agentHostIDs, target.scope)
+		skills, scanErr := scanInstalledSkills(target.dir, target.agentHostIDs, target.scope, target.filter)
 		if scanErr != nil {
 			if opts.Dir != "" {
 				return nil, fmt.Errorf("could not scan directory: %w", scanErr)
@@ -220,6 +233,7 @@ func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
 
 			if idx, ok := byDir[dir]; ok {
 				targets[idx].agentHostIDs = appendAgentHostID(targets[idx].agentHostIDs, agentHost.ID)
+				targets[idx].filter = mergeScanFilters(targets[idx].filter, scanFilterForAgentHost(agentHost, scope))
 				continue
 			}
 
@@ -228,8 +242,17 @@ func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
 				dir:          dir,
 				agentHostIDs: []string{agentHost.ID},
 				scope:        string(scope),
+				filter:       scanFilterForAgentHost(agentHost, scope),
 			})
 		}
+	}
+	if shouldListPublishedProjectSkills(opts.Agent, scopes, gitRoot) {
+		targets = append(targets, scanTarget{
+			dir:          filepath.Join(gitRoot, "skills"),
+			agentHostIDs: []string{agentHostPublished},
+			scope:        string(registry.ScopeProject),
+			filter:       scanPublishedOnly,
+		})
 	}
 
 	return targets, nil
@@ -267,7 +290,33 @@ func appendAgentHostID(agentHostIDs []string, agentHostID string) []string {
 	return append(agentHostIDs, agentHostID)
 }
 
-func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string) ([]listedSkill, error) {
+func scanFilterForAgentHost(agentHost *registry.AgentHost, scope registry.Scope) scanFilter {
+	if scope == registry.ScopeProject && agentHost.ProjectDir == "skills" {
+		return scanInstalledOnly
+	}
+	return scanAllSkills
+}
+
+func mergeScanFilters(a, b scanFilter) scanFilter {
+	if a == b {
+		return a
+	}
+	return scanAllSkills
+}
+
+func shouldListPublishedProjectSkills(agentID string, scopes []registry.Scope, gitRoot string) bool {
+	if agentID != "" || gitRoot == "" {
+		return false
+	}
+	for _, scope := range scopes {
+		if scope == registry.ScopeProject {
+			return true
+		}
+	}
+	return false
+}
+
+func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string, filter scanFilter) ([]listedSkill, error) {
 	entries, err := os.ReadDir(skillsDir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -286,7 +335,10 @@ func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string) 
 		skillDir := filepath.Join(skillsDir, e.Name())
 		skillFile := filepath.Join(skillDir, "SKILL.md")
 		if data, readErr := os.ReadFile(skillFile); readErr == nil {
-			skills = append(skills, parseInstalledSkill(data, e.Name(), skillDir, agentHostIDs, scope))
+			skill, hasInstallMetadata := parseInstalledSkill(data, e.Name(), skillDir, agentHostIDs, scope)
+			if shouldIncludeSkill(filter, hasInstallMetadata) {
+				skills = append(skills, skill)
+			}
 			continue
 		}
 
@@ -303,7 +355,10 @@ func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string) 
 			subSkillFile := filepath.Join(subSkillDir, "SKILL.md")
 			if data, readErr := os.ReadFile(subSkillFile); readErr == nil {
 				installName := e.Name() + "/" + sub.Name()
-				skills = append(skills, parseInstalledSkill(data, installName, subSkillDir, agentHostIDs, scope))
+				skill, hasInstallMetadata := parseInstalledSkill(data, installName, subSkillDir, agentHostIDs, scope)
+				if shouldIncludeSkill(filter, hasInstallMetadata) {
+					skills = append(skills, skill)
+				}
 			}
 		}
 	}
@@ -311,7 +366,18 @@ func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string) 
 	return skills, nil
 }
 
-func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, scope string) listedSkill {
+func shouldIncludeSkill(filter scanFilter, hasInstallMetadata bool) bool {
+	switch filter {
+	case scanInstalledOnly:
+		return hasInstallMetadata
+	case scanPublishedOnly:
+		return !hasInstallMetadata
+	default:
+		return true
+	}
+}
+
+func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, scope string) (listedSkill, bool) {
 	s := listedSkill{
 		skillName:    name,
 		agentHostIDs: agentHostIDs,
@@ -321,13 +387,14 @@ func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, s
 
 	result, err := frontmatter.Parse(string(data))
 	if err != nil {
-		return s
+		return s, false
 	}
 
 	meta := result.Metadata.Meta
 	if meta == nil {
-		return s
+		return s, false
 	}
+	installMetadata := hasInstallMetadata(meta)
 
 	if sourcePath, _ := meta["github-path"].(string); sourcePath != "" {
 		if skillName := skillNameFromSourcePath(sourcePath); skillName != "" {
@@ -357,7 +424,20 @@ func parseInstalledSkill(data []byte, name, dir string, agentHostIDs []string, s
 		}
 	}
 
-	return s
+	return s, installMetadata
+}
+
+func hasInstallMetadata(meta map[string]interface{}) bool {
+	for _, key := range []string{"github-repo", "github-ref", "github-tree-sha", "github-path", "github-pinned", "local-path"} {
+		value, ok := meta[key]
+		if !ok {
+			continue
+		}
+		if str, ok := value.(string); !ok || strings.TrimSpace(str) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func skillNameFromSourcePath(sourcePath string) string {
@@ -430,6 +510,9 @@ func displayOrDash(value string) string {
 func formatHosts(hosts []string) string {
 	if len(hosts) == 0 {
 		return "-"
+	}
+	if len(hosts) == 1 && hosts[0] == agentHostPublished {
+		return agentHostPublishedDisplay
 	}
 	return strings.Join(hosts, ", ")
 }
