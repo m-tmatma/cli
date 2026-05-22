@@ -442,13 +442,25 @@ release:
         uses: actions/checkout@v4
       - name: Merge built artifacts
         uses: actions/download-artifact@v4
+      - name: Generate site deploy token
+        id: site-deploy-token
+        if: inputs.environment == 'production'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.SITE_DEPLOY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SITE_DEPLOY_APP_PRIVATE_KEY }}
+          owner: github
+          repositories: cli.github.com
       - name: Checkout documentation site
         uses: actions/checkout@v4
         with:
           repository: github/cli.github.com
           path: site
           fetch-depth: 0
-          token: ${{ secrets.SITE_DEPLOY_PAT }}
+          # In non-production environments the App token step is skipped, so
+          # fall back to github.token for anonymous read access to the public
+          # cli.github.com repo (push is gated separately on DO_PUBLISH).
+          token: ${{ steps.site-deploy-token.outputs.token || github.token }}
       - name: Update site man pages
         env:
           GIT_COMMITTER_NAME: cli automation
