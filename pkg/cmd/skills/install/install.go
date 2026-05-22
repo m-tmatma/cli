@@ -137,7 +137,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			enables %[1]sgh skill update%[1]s to detect changes.
 
 			Use %[1]s--all%[1]s to install every discovered skill from the repository
-			without prompting. When run non-interactively, %[1]srepository%[1]s and either
+			without prompting for skill selection. When run non-interactively, %[1]srepository%[1]s and either
 			a skill name or %[1]s--all%[1]s are required.
 		`, "`", registry.AgentHelpList()),
 		Example: heredoc.Doc(`
@@ -186,7 +186,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			opts.ScopeChanged = cmd.Flags().Changed("scope")
 
 			if opts.All && opts.SkillName != "" {
-				return cmdutil.FlagErrorf("cannot use `--all` with skill name")
+				return cmdutil.FlagErrorf("cannot use --all with a skill argument")
 			}
 
 			// Resolve the source type early so installRun can branch directly.
@@ -223,7 +223,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 	cmdutil.StringEnumFlag(cmd, &opts.Scope, "scope", "", "project", []string{"project", "user"}, "Installation scope")
 	cmd.Flags().StringVar(&opts.Pin, "pin", "", "Pin to a specific git tag or commit SHA")
 	cmd.Flags().StringVar(&opts.Dir, "dir", "", "Install to a custom directory (overrides --agent and --scope)")
-	cmd.Flags().BoolVar(&opts.All, "all", false, "Install all skills without prompting")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Install all skills without prompting for skill selection")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite existing skills without prompting")
 	cmd.Flags().BoolVar(&opts.FromLocal, "from-local", false, "Treat the argument as a local directory path instead of a repository")
 	cmd.Flags().BoolVar(&opts.AllowHiddenDirs, "allow-hidden-dirs", false, "Include skills in hidden directories (e.g. .claude/skills/, .agents/skills/)")
