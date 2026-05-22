@@ -2139,7 +2139,7 @@ func Test_isSkillPath(t *testing.T) {
 	}{
 		{name: "empty string", path: "", want: false},
 		{name: "plain skill name", path: "git-commit", want: false},
-		{name: "SKILL.md at root", path: "SKILL.md", want: true},
+		{name: "bare SKILL.md", path: "SKILL.md", want: false},
 		{name: "SKILL.md suffix", path: "skills/code-review/SKILL.md", want: true},
 		{name: "starts with skills/", path: "skills/code-review", want: true},
 		{name: "starts with plugins/", path: "plugins/hubot/skills/pr-summary", want: true},

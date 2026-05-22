@@ -397,7 +397,7 @@ func IsSkillPath(name string) bool {
 	if name == "" {
 		return false
 	}
-	if name == "SKILL.md" || strings.HasSuffix(name, "/SKILL.md") {
+	if strings.HasSuffix(name, "/SKILL.md") {
 		return true
 	}
 	if strings.HasPrefix(name, "skills/") || strings.HasPrefix(name, "plugins/") {
@@ -473,11 +473,12 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 }
 
 // matchHiddenDirConventions checks if a blob path matches a skill convention
-// under a hidden (dot-prefixed) directory. These patterns mirror the standard
-// skills/ conventions, but only when the path contains a hidden segment:
+// under a path that contains a hidden (dot-prefixed) directory. These patterns
+// mirror the standard skills/ conventions, but only when a hidden segment
+// appears anywhere in the ancestor path:
 //
-//   - {prefix}/.{host}/skills/*/SKILL.md         -> "hidden-dir"
-//   - {prefix}/.{host}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
+//   - {prefix}/.{hidden}/{suffix}/skills/*/SKILL.md         -> "hidden-dir"
+//   - {prefix}/.{hidden}/{suffix}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
 func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {
 		return nil
@@ -674,8 +675,19 @@ func FetchDescriptionsConcurrent(client *api.Client, host, owner, repo string, s
 	wg.Wait()
 }
 
+// DiscoverSkillByPathOptions controls optional behavior for DiscoverSkillByPathWithOptions.
+type DiscoverSkillByPathOptions struct {
+	SkipDescription bool
+}
+
 // DiscoverSkillByPath looks up a single skill by its exact path in the repository.
 func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skillPath string) (*Skill, error) {
+	return DiscoverSkillByPathWithOptions(client, host, owner, repo, commitSHA, skillPath, DiscoverSkillByPathOptions{})
+}
+
+// DiscoverSkillByPathWithOptions looks up a single skill by its exact path in
+// the repository, applying the given options.
+func DiscoverSkillByPathWithOptions(client *api.Client, host, owner, repo, commitSHA, skillPath string, opts DiscoverSkillByPathOptions) (*Skill, error) {
 	skillPath = strings.TrimSuffix(skillPath, "/SKILL.md")
 	skillPath = strings.TrimSuffix(skillPath, "/")
 
@@ -756,7 +768,9 @@ func DiscoverSkillByPath(client *api.Client, host, owner, repo, commitSHA, skill
 		TreeSHA:    treeSHA,
 	}
 
-	skill.Description = fetchDescription(client, host, owner, repo, skill)
+	if !opts.SkipDescription {
+		skill.Description = fetchDescription(client, host, owner, repo, skill)
+	}
 
 	return skill, nil
 }

@@ -165,7 +165,7 @@ func previewRun(opts *PreviewOptions) error {
 	var skill discovery.Skill
 	if discovery.IsSkillPath(opts.SkillName) {
 		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
-		found, err := discovery.DiscoverSkillByPath(apiClient, hostname, owner, repoName, resolved.SHA, opts.SkillName)
+		found, err := discovery.DiscoverSkillByPathWithOptions(apiClient, hostname, owner, repoName, resolved.SHA, opts.SkillName, discovery.DiscoverSkillByPathOptions{SkipDescription: true})
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err

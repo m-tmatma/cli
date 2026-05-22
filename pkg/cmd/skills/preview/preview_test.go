@@ -292,10 +292,6 @@ func TestPreviewRun(t *testing.T) {
 					}`),
 				)
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/blobs/blob999"),
-					httpmock.StringResponse(`{"sha": "blob999", "content": "`+encodedContent+`", "encoding": "base64"}`),
-				)
-				reg.Register(
 					httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA4"),
 					httpmock.StringResponse(`{
 						"tree": [

@@ -1325,6 +1325,32 @@ func TestDiscoverSkillByPath(t *testing.T) {
 	}
 }
 
+func TestDiscoverSkillByPathWithOptionsSkipsDescription(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/monalisa/octocat-skills/contents/skills"),
+		httpmock.JSONResponse([]map[string]interface{}{
+			{"name": "code-review", "path": "skills/code-review", "sha": "tree-sha", "type": "dir"},
+		}))
+	reg.Register(
+		httpmock.REST("GET", "repos/monalisa/octocat-skills/git/trees/tree-sha"),
+		httpmock.JSONResponse(map[string]interface{}{
+			"sha": "tree-sha", "truncated": false,
+			"tree": []map[string]interface{}{
+				{"path": "SKILL.md", "type": "blob", "sha": "blob-sha"},
+			},
+		}))
+
+	client := api.NewClientFromHTTP(&http.Client{Transport: reg})
+	skill, err := DiscoverSkillByPathWithOptions(client, "github.com", "monalisa", "octocat-skills", "abc123", "skills/code-review", DiscoverSkillByPathOptions{SkipDescription: true})
+
+	require.NoError(t, err)
+	assert.Equal(t, "code-review", skill.Name)
+	assert.Empty(t, skill.Description)
+}
+
 func TestDiscoverLocalSkills(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1534,7 +1560,7 @@ func TestIsSkillPath(t *testing.T) {
 	}{
 		{name: "empty string", path: "", want: false},
 		{name: "plain skill name", path: "git-commit", want: false},
-		{name: "SKILL.md at root", path: "SKILL.md", want: true},
+		{name: "bare SKILL.md", path: "SKILL.md", want: false},
 		{name: "SKILL.md suffix", path: "skills/code-review/SKILL.md", want: true},
 		{name: "starts with skills/", path: "skills/code-review", want: true},
 		{name: "starts with plugins/", path: "plugins/hubot/skills/pr-summary", want: true},
