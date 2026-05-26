@@ -38,6 +38,8 @@ func TestFindByID(t *testing.T) {
 }
 
 func TestInstallDir(t *testing.T) {
+	t.Setenv(claudeConfigDirEnv, "")
+
 	tests := []struct {
 		name    string
 		hostID  string
