@@ -1537,6 +1537,40 @@ func TestInstallProgress(t *testing.T) {
 	assert.NotNil(t, installProgress(ios, 2))
 }
 
+func TestInstallRun_ClaudeCodeUserScopeUsesConfigDir(t *testing.T) {
+	homeDir := t.TempDir()
+	claudeConfigDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	t.Setenv("CLAUDE_CONFIG_DIR", claudeConfigDir)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
+	stubDiscoverTree(reg, "monalisa", "skills-repo", "abc123",
+		singleSkillTreeJSON("git-commit", "treeSHA", "blobSHA"))
+	stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
+
+	ios, _, stdout, _ := iostreams.Test()
+
+	err := installRun(&InstallOptions{
+		IO:           ios,
+		HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
+		GitClient:    &git.Client{RepoDir: t.TempDir()},
+		SkillSource:  "monalisa/skills-repo",
+		SkillName:    "git-commit",
+		Agent:        "claude-code",
+		Scope:        "user",
+		ScopeChanged: true,
+		Telemetry:    &telemetry.NoOpService{},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, stdout.String(), "Installed git-commit")
+	assert.FileExists(t, filepath.Join(claudeConfigDir, "skills", "git-commit", "SKILL.md"))
+	assert.NoFileExists(t, filepath.Join(homeDir, ".claude", "skills", "git-commit", "SKILL.md"))
+}
+
 func TestInstallRun_DeduplicatesSharedProjectDirAcrossHosts(t *testing.T) {
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
