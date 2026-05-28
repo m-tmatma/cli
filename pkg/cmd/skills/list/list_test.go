@@ -384,6 +384,46 @@ func TestListRun(t *testing.T) {
 			wantJSON: "[]",
 		},
 		{
+			name: "lists skill whose SKILL.md is a symlink to a regular file",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				customDir := filepath.Join(repoDir, "custom-skills")
+				skillDir := filepath.Join(customDir, "linked")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				target := filepath.Join(repoDir, "target.md")
+				require.NoError(t, os.WriteFile(target, []byte("---\nname: linked\nmetadata:\n  local-path: /src/linked\n---\nBody\n"), 0o644))
+				require.NoError(t, os.Symlink(target, filepath.Join(skillDir, "SKILL.md")))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Dir:       filepath.Join(repoDir, "custom-skills"),
+				}
+			},
+			wantStdout: "linked\t-\tcustom\t/src/linked\n",
+		},
+		{
+			name: "skips skill whose SKILL.md is not a regular file",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				customDir := filepath.Join(repoDir, "custom-skills")
+				skillDir := filepath.Join(customDir, "bogus")
+				require.NoError(t, os.MkdirAll(skillDir, 0o755))
+				targetDir := filepath.Join(repoDir, "target-dir")
+				require.NoError(t, os.MkdirAll(targetDir, 0o755))
+				require.NoError(t, os.Symlink(targetDir, filepath.Join(skillDir, "SKILL.md")))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Dir:       filepath.Join(repoDir, "custom-skills"),
+				}
+			},
+			wantErr: "no installed skills found",
+		},
+		{
 			name: "sanitizes terminal escapes from skill frontmatter",
 			setup: func(t *testing.T, repoDir, homeDir string) {
 				customDir := filepath.Join(repoDir, "custom-skills")

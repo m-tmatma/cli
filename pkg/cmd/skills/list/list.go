@@ -338,7 +338,8 @@ func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string, 
 		// Flat layout: {dir}/{name}/SKILL.md.
 		skillDir := filepath.Join(skillsDir, e.Name())
 		skillFile := filepath.Join(skillDir, "SKILL.md")
-		if data, readErr := os.ReadFile(skillFile); readErr == nil {
+		// TODO: maybe we should surface this error instead of a silent skip
+		if data, readErr := readSkillFile(skillFile); readErr == nil {
 			skill, hasInstallMetadata := parseInstalledSkill(data, e.Name(), skillDir, agentHostIDs, scope)
 			if shouldIncludeSkill(filter, hasInstallMetadata) {
 				skills = append(skills, skill)
@@ -357,7 +358,7 @@ func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string, 
 			}
 			subSkillDir := filepath.Join(skillDir, sub.Name())
 			subSkillFile := filepath.Join(subSkillDir, "SKILL.md")
-			if data, readErr := os.ReadFile(subSkillFile); readErr == nil {
+			if data, readErr := readSkillFile(subSkillFile); readErr == nil {
 				installName := e.Name() + "/" + sub.Name()
 				skill, hasInstallMetadata := parseInstalledSkill(data, installName, subSkillDir, agentHostIDs, scope)
 				if shouldIncludeSkill(filter, hasInstallMetadata) {
@@ -368,6 +369,18 @@ func scanInstalledSkills(skillsDir string, agentHostIDs []string, scope string, 
 	}
 
 	return skills, nil
+}
+
+// readSkillFile reads a SKILL.md file only if it resolves to a regular file.
+func readSkillFile(path string) ([]byte, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("SKILL.md is not a regular file: %s", path)
+	}
+	return os.ReadFile(path)
 }
 
 func shouldIncludeSkill(filter scanFilter, hasInstallMetadata bool) bool {
@@ -505,7 +518,7 @@ func renderTable(io *iostreams.IOStreams, skills []listedSkill) error {
 }
 
 // sanitizeForTerminal replaces ASCII control characters in s with inert
-// caret-style stand-ins so untrusted content cannot inject terminal escapes.
+// caret-style stand-ins so frontmatter values cannot inject terminal escapes.
 func sanitizeForTerminal(s string) string {
 	var buf bytes.Buffer
 	r := transform.NewReader(bytes.NewReader([]byte(s)), &asciisanitizer.Sanitizer{})
