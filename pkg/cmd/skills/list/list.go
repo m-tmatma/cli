@@ -130,8 +130,8 @@ func NewCmdList(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, runF 
 			# List all installed skills
 			$ gh skill list
 
-			# List skills installed for Claude Code
-			$ gh skill list --agent claude-code
+			# List skills installed for GitHub Copilot
+			$ gh skill list --agent github-copilot
 
 			# List user-scope skills
 			$ gh skill list --scope user

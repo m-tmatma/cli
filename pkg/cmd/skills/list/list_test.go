@@ -33,9 +33,9 @@ func TestNewCmdList(t *testing.T) {
 		},
 		{
 			name: "agent and scope filters",
-			cli:  "--agent claude-code --scope user",
+			cli:  "--agent github-copilot --scope user",
 			wantOpts: ListOptions{
-				Agent:        "claude-code",
+				Agent:        "github-copilot",
 				Scope:        "user",
 				ScopeChanged: true,
 			},
@@ -69,7 +69,7 @@ func TestNewCmdList(t *testing.T) {
 		},
 		{
 			name:    "dir and agent are mutually exclusive",
-			cli:     "--dir ./skills --agent claude-code",
+			cli:     "--dir ./skills --agent github-copilot",
 			wantErr: "--dir and --agent cannot be used together",
 		},
 		{
@@ -156,7 +156,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "lists user skill as json",
 			setup: func(t *testing.T, repoDir, homeDir string) {
-				writeSkill(t, homeDir, ".claude/skills/code-review", remoteSkillFrontmatter("code-review", "skills/code-review", "refs/tags/v2.0.0", "v2.0.0"))
+				writeSkill(t, homeDir, ".copilot/skills/code-review", remoteSkillFrontmatter("code-review", "skills/code-review", "refs/tags/v2.0.0", "v2.0.0"))
 			},
 			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
 				exporter := cmdutil.NewJSONExporter()
@@ -166,21 +166,21 @@ func TestListRun(t *testing.T) {
 					Telemetry: spy,
 					GitClient: &git.Client{RepoDir: repoDir},
 					Exporter:  exporter,
-					Agent:     "claude-code",
+					Agent:     "github-copilot",
 					Scope:     "user",
 				}
 			},
 			wantJSON: fmt.Sprintf(`[
 				{
 					"skillName": "code-review",
-					"agentHosts": ["claude-code"],
+					"agentHosts": ["github-copilot"],
 					"scope": "user",
 					"sourceURL": "https://github.com/monalisa/skills-repo",
 					"version": "v2.0.0",
 					"pinned": true,
 					"path": %q
 				}
-			]`, filepath.Join("HOME", ".claude", "skills", "code-review")),
+			]`, filepath.Join("HOME", ".copilot", "skills", "code-review")),
 			verify: func(t *testing.T, stdout string, spy *telemetry.CommandRecorderSpy) {
 				assert.Equal(t, "json", spy.Events[0].Dimensions["format"])
 			},
