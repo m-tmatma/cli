@@ -160,7 +160,7 @@ func TestListRun(t *testing.T) {
 			},
 			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
 				exporter := cmdutil.NewJSONExporter()
-				exporter.SetFields([]string{"skillName", "hosts", "scope", "sourceURL", "version", "pinned", "path"})
+				exporter.SetFields([]string{"skillName", "agentHosts", "scope", "sourceURL", "version", "pinned", "path"})
 				return &ListOptions{
 					IO:        ios,
 					Telemetry: spy,
@@ -173,7 +173,7 @@ func TestListRun(t *testing.T) {
 			wantJSON: fmt.Sprintf(`[
 				{
 					"skillName": "code-review",
-					"hosts": ["claude-code"],
+					"agentHosts": ["claude-code"],
 					"scope": "user",
 					"sourceURL": "https://github.com/monalisa/skills-repo",
 					"version": "v2.0.0",

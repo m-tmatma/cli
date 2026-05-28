@@ -28,7 +28,7 @@ import (
 
 var skillListFields = []string{
 	"skillName",
-	"hosts",
+	"agentHosts",
 	"scope",
 	"sourceURL",
 	"version",
@@ -87,7 +87,7 @@ func (s listedSkill) ExportData(fields []string) map[string]interface{} {
 		switch f {
 		case "skillName":
 			data[f] = s.skillName
-		case "hosts":
+		case "agentHosts":
 			data[f] = s.agentHostIDs
 		case "scope":
 			data[f] = s.scope
@@ -220,7 +220,7 @@ func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
 	gitRoot := installer.ResolveGitRoot(opts.GitClient)
 	homeDir := installer.ResolveHomeDir()
 
-	agentHosts, err := selectedHosts(opts.Agent)
+	agentHosts, err := selectedAgentHosts(opts.Agent)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func buildScanTargets(opts *ListOptions) ([]scanTarget, error) {
 	return targets, nil
 }
 
-func selectedHosts(agentID string) ([]*registry.AgentHost, error) {
+func selectedAgentHosts(agentID string) ([]*registry.AgentHost, error) {
 	if agentID != "" {
 		host, err := registry.FindByID(agentID)
 		if err != nil {
@@ -271,11 +271,11 @@ func selectedHosts(agentID string) ([]*registry.AgentHost, error) {
 		return []*registry.AgentHost{host}, nil
 	}
 
-	hosts := make([]*registry.AgentHost, len(registry.Agents))
+	agentHosts := make([]*registry.AgentHost, len(registry.Agents))
 	for i := range registry.Agents {
-		hosts[i] = &registry.Agents[i]
+		agentHosts[i] = &registry.Agents[i]
 	}
-	return hosts, nil
+	return agentHosts, nil
 }
 
 func selectedScopes(scope string) []registry.Scope {
@@ -496,8 +496,8 @@ func sortListedSkills(skills []listedSkill) {
 		if skills[i].scope != skills[j].scope {
 			return skills[i].scope < skills[j].scope
 		}
-		if formatHosts(skills[i].agentHostIDs) != formatHosts(skills[j].agentHostIDs) {
-			return formatHosts(skills[i].agentHostIDs) < formatHosts(skills[j].agentHostIDs)
+		if formatAgentHosts(skills[i].agentHostIDs) != formatAgentHosts(skills[j].agentHostIDs) {
+			return formatAgentHosts(skills[i].agentHostIDs) < formatAgentHosts(skills[j].agentHostIDs)
 		}
 		return skills[i].path < skills[j].path
 	})
@@ -508,7 +508,7 @@ func renderTable(io *iostreams.IOStreams, skills []listedSkill) error {
 
 	for _, skill := range skills {
 		table.AddField(sanitizeForTerminal(skill.skillName))
-		table.AddField(formatHosts(skill.agentHostIDs))
+		table.AddField(formatAgentHosts(skill.agentHostIDs))
 		table.AddField(displayOrDash(skill.scope))
 		table.AddField(displayOrDash(sanitizeForTerminal(skill.source)))
 		table.EndRow()
@@ -535,14 +535,14 @@ func displayOrDash(value string) string {
 	return value
 }
 
-func formatHosts(hosts []string) string {
-	if len(hosts) == 0 {
+func formatAgentHosts(agentHostIDs []string) string {
+	if len(agentHostIDs) == 0 {
 		return "-"
 	}
-	if len(hosts) == 1 && hosts[0] == agentHostPublished {
+	if len(agentHostIDs) == 1 && agentHostIDs[0] == agentHostPublished {
 		return agentHostPublishedDisplay
 	}
-	return strings.Join(hosts, ", ")
+	return strings.Join(agentHostIDs, ", ")
 }
 
 func recordListTelemetry(opts *ListOptions, skillCount int) {
