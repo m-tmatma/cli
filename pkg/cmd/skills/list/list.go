@@ -1,7 +1,9 @@
 package list
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,7 +21,9 @@ import (
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/v2/pkg/asciisanitizer"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/transform"
 )
 
 var skillListFields = []string{
@@ -490,14 +494,25 @@ func renderTable(io *iostreams.IOStreams, skills []listedSkill) error {
 	table := tableprinter.New(io, tableprinter.WithHeader("Name", "Agent", "Scope", "Source"))
 
 	for _, skill := range skills {
-		table.AddField(skill.skillName)
+		table.AddField(sanitizeForTerminal(skill.skillName))
 		table.AddField(formatHosts(skill.agentHostIDs))
 		table.AddField(displayOrDash(skill.scope))
-		table.AddField(displayOrDash(skill.source))
+		table.AddField(displayOrDash(sanitizeForTerminal(skill.source)))
 		table.EndRow()
 	}
 
 	return table.Render()
+}
+
+// sanitizeForTerminal replaces ASCII control characters in s with inert
+// caret-style stand-ins so untrusted content cannot inject terminal escapes.
+func sanitizeForTerminal(s string) string {
+	var buf bytes.Buffer
+	r := transform.NewReader(bytes.NewReader([]byte(s)), &asciisanitizer.Sanitizer{})
+	if _, err := io.Copy(&buf, r); err != nil {
+		return "Unknown"
+	}
+	return buf.String()
 }
 
 func displayOrDash(value string) string {

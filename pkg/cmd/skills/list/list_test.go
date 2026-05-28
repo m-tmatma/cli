@@ -383,6 +383,30 @@ func TestListRun(t *testing.T) {
 			},
 			wantJSON: "[]",
 		},
+		{
+			name: "sanitizes terminal escapes from skill frontmatter",
+			setup: func(t *testing.T, repoDir, homeDir string) {
+				customDir := filepath.Join(repoDir, "custom-skills")
+				writeSkill(t, customDir, "helper", heredoc.Doc(`
+					---
+					name: helper
+					metadata:
+					  local-path: "/src/\x1b[33munsanitized-src\x1b[0m"
+					  github-path: "skills/\x1b[31munsanitized-name\x1b[0m/SKILL.md"
+					---
+					Body
+				`))
+			},
+			opts: func(ios *iostreams.IOStreams, repoDir, homeDir string, spy *telemetry.CommandRecorderSpy) *ListOptions {
+				return &ListOptions{
+					IO:        ios,
+					Telemetry: spy,
+					GitClient: &git.Client{RepoDir: repoDir},
+					Dir:       filepath.Join(repoDir, "custom-skills"),
+				}
+			},
+			wantStdout: "^[[31munsanitized-name^[[0m\t-\tcustom\t/src/^[[33munsanitized-src^[[0m\n",
+		},
 	}
 
 	for _, tt := range tests {
