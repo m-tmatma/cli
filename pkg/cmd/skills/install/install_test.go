@@ -804,7 +804,7 @@ func TestInstallRun(t *testing.T) {
 			stubs: func(reg *httpmock.Registry) {
 				stubResolveVersion(reg, "monalisa", "skills-repo", "v1.0.0", "abc123")
 				stubSkillByPath(reg, "monalisa", "skills-repo", "abc123",
-					"packages/agent-skills/netsuite-ai-connector-instructions", "netsuite-ai-connector-instructions", "treeSHA")
+					"packages/agent-skills/code-review", "code-review", "treeSHA")
 				// DiscoverSkillByPath: tree + blob (for fetchDescription)
 				stubInstallFiles(reg, "monalisa", "skills-repo", "treeSHA", "blobSHA", gitCommitContent)
 				// installer.Install: tree + blob (again, for writing files)
@@ -817,14 +817,14 @@ func TestInstallRun(t *testing.T) {
 					HttpClient:   func() (*http.Client, error) { return &http.Client{Transport: reg}, nil },
 					GitClient:    &git.Client{RepoDir: t.TempDir()},
 					SkillSource:  "monalisa/skills-repo",
-					SkillName:    "packages/agent-skills/netsuite-ai-connector-instructions",
+					SkillName:    "packages/agent-skills/code-review",
 					Agent:        "github-copilot",
 					Scope:        "project",
 					ScopeChanged: true,
 					Dir:          t.TempDir(),
 				}
 			},
-			wantStdout: "Installed netsuite-ai-connector-instructions",
+			wantStdout: "Installed code-review",
 		},
 		{
 			name:  "remote install with URL repo argument",
@@ -2127,34 +2127,6 @@ func TestRunLocalInstall(t *testing.T) {
 			if tt.verify != nil {
 				tt.verify(t, targetDir)
 			}
-		})
-	}
-}
-
-func Test_isSkillPath(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		want bool
-	}{
-		{name: "empty string", path: "", want: false},
-		{name: "plain skill name", path: "git-commit", want: false},
-		{name: "bare SKILL.md", path: "SKILL.md", want: false},
-		{name: "SKILL.md suffix", path: "skills/code-review/SKILL.md", want: true},
-		{name: "starts with skills/", path: "skills/code-review", want: true},
-		{name: "starts with plugins/", path: "plugins/hubot/skills/pr-summary", want: true},
-		{name: "nested skills/ path", path: "terraform/code-generation/skills/terraform-style-guide", want: true},
-		{name: "deeply nested skills/ path", path: "a/b/c/skills/my-skill", want: true},
-		{name: "nested plugins/ path", path: "vendor/plugins/hubot/skills/pr-summary", want: true},
-		{name: "arbitrary nested skill path", path: "packages/agent-skills/netsuite-ai-connector-instructions", want: true},
-		{name: "arbitrary nested skill path with trailing slash", path: "skills-catalog/matlab-core/matlab-debugging/", want: true},
-		{name: "name containing skills substring", path: "myskills", want: false},
-		{name: "namespaced skill name", path: "monalisa/code-review", want: false},
-		{name: "namespaced path", path: "skills/monalisa/issue-triage", want: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, isSkillPath(tt.path))
 		})
 	}
 }

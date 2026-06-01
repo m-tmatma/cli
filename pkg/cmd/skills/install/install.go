@@ -158,7 +158,7 @@ func NewCmdInstall(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			$ gh skill install github/awesome-copilot skills/monalisa/code-review
 
 			# Install from a non-standard nested path (efficient, skips full discovery)
-			$ gh skill install oracle/netsuite-suitecloud-sdk packages/agent-skills/netsuite-ai-connector-instructions
+			$ gh skill install monalisa/skills-repo packages/agent-skills/code-review
 
 			# Install from a local directory
 			$ gh skill install ./my-skills-repo --from-local
@@ -281,7 +281,7 @@ func installRun(opts *InstallOptions) error {
 
 	var selectedSkills []discovery.Skill
 
-	if isSkillPath(opts.SkillName) {
+	if discovery.IsSkillPath(opts.SkillName) {
 		opts.IO.StartProgressIndicatorWithLabel("Looking up skill")
 		skill, err := discovery.DiscoverSkillByPath(apiClient, hostname, opts.repo.RepoOwner(), opts.repo.RepoName(), resolved.SHA, opts.SkillName)
 		opts.IO.StopProgressIndicator()
@@ -546,12 +546,6 @@ func runLocalInstall(opts *InstallOptions) error {
 	}
 
 	return nil
-}
-
-// isSkillPath returns true if the argument looks like a repo-relative path
-// rather than a simple skill name.
-func isSkillPath(name string) bool {
-	return discovery.IsSkillPath(name)
 }
 
 func resolveRepoArg(skillSource string, canPrompt bool, p prompter.Prompter) (ghrepo.Interface, string, error) {

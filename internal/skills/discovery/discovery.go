@@ -477,8 +477,8 @@ func matchSkillConventions(entry treeEntry) *skillMatch {
 // mirror the standard skills/ conventions, but only when a hidden segment
 // appears anywhere in the ancestor path:
 //
-//   - {prefix}/.{hidden}/{suffix}/skills/*/SKILL.md         -> "hidden-dir"
-//   - {prefix}/.{hidden}/{suffix}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
+//   - {prefix}/.{host}/{suffix}/skills/*/SKILL.md         -> "hidden-dir"
+//   - {prefix}/.{host}/{suffix}/skills/{scope}/*/SKILL.md -> "hidden-dir-namespaced"
 func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 	if path.Base(entry.Path) != "SKILL.md" {
 		return nil
@@ -487,8 +487,8 @@ func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 		return nil
 	}
 
-	// {prefix}/.{host}/skills/*
-	// {prefix}/.{host}/skills/{scope}/*
+	// {prefix}/.{host}/{suffix}/skills/*
+	// {prefix}/.{host}/{suffix}/skills/{scope}/*
 	dir := path.Dir(entry.Path)
 	skillName := path.Base(dir)
 
@@ -496,16 +496,16 @@ func matchHiddenDirConventions(entry treeEntry) *skillMatch {
 		return nil
 	}
 
-	// {prefix}/.{host}/skills
-	// {prefix}/.{host}/skills/{scope}
+	// {prefix}/.{host}/{suffix}/skills
+	// {prefix}/.{host}/{suffix}/skills/{scope}
 	parentDir := path.Dir(dir)
 
-	// {prefix}/.{host}/skills/*/SKILL.md
+	// {prefix}/.{host}/{suffix}/skills/*/SKILL.md
 	if path.Base(parentDir) == "skills" {
 		return &skillMatch{entry: entry, name: skillName, skillDir: dir, convention: "hidden-dir"}
 	}
 
-	// {prefix}/.{host}/skills/{scope}/*/SKILL.md
+	// {prefix}/.{host}/{suffix}/skills/{scope}/*/SKILL.md
 	grandparentDir := path.Dir(parentDir)
 	if path.Base(grandparentDir) == "skills" {
 		namespace := path.Base(parentDir)

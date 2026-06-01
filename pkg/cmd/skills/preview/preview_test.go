@@ -266,7 +266,7 @@ func TestPreviewRun(t *testing.T) {
 			tty:  true,
 			opts: &PreviewOptions{
 				repo:      ghrepo.New("owner", "repo"),
-				SkillName: "packages/agent-skills/netsuite-ai-connector-instructions",
+				SkillName: "packages/agent-skills/code-review",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -280,16 +280,8 @@ func TestPreviewRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/owner/repo/contents/packages%2Fagent-skills"),
 					httpmock.StringResponse(`[
-						{"name": "netsuite-ai-connector-instructions", "path": "packages/agent-skills/netsuite-ai-connector-instructions", "sha": "treeSHA4", "type": "dir"}
+						{"name": "code-review", "path": "packages/agent-skills/code-review", "sha": "treeSHA4", "type": "dir"}
 					]`),
-				)
-				reg.Register(
-					httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA4"),
-					httpmock.StringResponse(`{
-						"tree": [
-							{"path": "SKILL.md", "type": "blob", "sha": "blob999", "size": 50}
-						]
-					}`),
 				)
 				reg.Register(
 					httpmock.REST("GET", "repos/owner/repo/git/trees/treeSHA4"),

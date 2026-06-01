@@ -89,7 +89,7 @@ func NewCmdPreview(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, ru
 			$ gh skill preview github/awesome-copilot documentation-writer@abc123def456
 
 			# Preview from a non-standard nested path (efficient, skips full discovery)
-			$ gh skill preview oracle/netsuite-suitecloud-sdk packages/agent-skills/netsuite-ai-connector-instructions
+			$ gh skill preview monalisa/skills-repo packages/agent-skills/code-review
 
 			# Browse and preview interactively
 			$ gh skill preview github/awesome-copilot
