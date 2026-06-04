@@ -232,10 +232,14 @@ func (c DiscussionComment) ExportReply() map[string]interface{} {
 	}
 }
 
+// DiscussionCommentListDirection indicates whether a comment list was fetched
+// in forward (oldest first) or backward (newest first) order.
 type DiscussionCommentListDirection string
 
 const (
-	DiscussionCommentListDirectionForward  DiscussionCommentListDirection = "forward"
+	// DiscussionCommentListDirectionForward means comments are ordered oldest first.
+	DiscussionCommentListDirectionForward DiscussionCommentListDirection = "forward"
+	// DiscussionCommentListDirectionBackward means comments are ordered newest first.
 	DiscussionCommentListDirectionBackward DiscussionCommentListDirection = "backward"
 )
 
