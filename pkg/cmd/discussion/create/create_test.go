@@ -51,7 +51,7 @@ func TestNewCmdCreate(t *testing.T) {
 			name:    "missing required flags non-interactively",
 			args:    "--title 'My question'",
 			isTTY:   false,
-			wantErr: "--title, --body, and --category are required when not running interactively",
+			wantErr: "--title, --body (or --body-file), and --category are required when not running interactively",
 		},
 		{
 			name:    "blank title",
@@ -70,6 +70,22 @@ func TestNewCmdCreate(t *testing.T) {
 			args:    "--body '   '",
 			isTTY:   true,
 			wantErr: "body cannot be blank",
+		},
+		{
+			name:    "body and body-file mutually exclusive",
+			args:    "--body 'text' --body-file file.md --title 'T' --category 'Q&A'",
+			isTTY:   true,
+			wantErr: "specify only one of --body or --body-file",
+		},
+		{
+			name:  "body-file flag",
+			args:  "--title 'T' --body-file 'file.md' --category 'Q&A'",
+			isTTY: true,
+			wantOpts: CreateOptions{
+				Title:    "T",
+				BodyFile: "file.md",
+				Category: "Q&A",
+			},
 		},
 		{
 			name:         "repo override",
@@ -112,6 +128,7 @@ func TestNewCmdCreate(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantOpts.Title, gotOpts.Title)
 			assert.Equal(t, tt.wantOpts.Body, gotOpts.Body)
+			assert.Equal(t, tt.wantOpts.BodyFile, gotOpts.BodyFile)
 			assert.Equal(t, tt.wantOpts.Category, gotOpts.Category)
 			assert.Equal(t, tt.wantOpts.Labels, gotOpts.Labels)
 
@@ -126,13 +143,14 @@ func TestNewCmdCreate(t *testing.T) {
 
 func TestCreateRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      CreateOptions
-		isTTY     bool
-		setupMock func(*client.DiscussionClientMock)
-		prompter  *prompter.PrompterMock
-		wantErr   string
-		wantOut   string
+		name         string
+		opts         CreateOptions
+		isTTY        bool
+		stdinContent string
+		setupMock    func(*client.DiscussionClientMock)
+		prompter     *prompter.PrompterMock
+		wantErr      string
+		wantOut      string
 	}{
 		{
 			name: "success non-tty",
@@ -174,6 +192,25 @@ func TestCreateRun(t *testing.T) {
 				}
 				m.CreateFunc = func(repo ghrepo.Interface, input client.CreateDiscussionInput) (*client.Discussion, error) {
 					assert.Equal(t, []string{"L_enh", "L_bug"}, input.LabelIDs)
+					return sampleDiscussion(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5\n",
+		},
+		{
+			name:         "success non-tty body-file from stdin",
+			stdinContent: "Body from stdin",
+			opts: CreateOptions{
+				Title:    "My question",
+				BodyFile: "-",
+				Category: "Q&A",
+			},
+			setupMock: func(m *client.DiscussionClientMock) {
+				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
+					return sampleCategories(), nil
+				}
+				m.CreateFunc = func(repo ghrepo.Interface, input client.CreateDiscussionInput) (*client.Discussion, error) {
+					assert.Equal(t, "Body from stdin", input.Body)
 					return sampleDiscussion(), nil
 				}
 			},
@@ -387,9 +424,13 @@ func TestCreateRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, stdout, _ := iostreams.Test()
+			ios, stdin, stdout, _ := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStdinTTY(tt.isTTY)
+
+			if tt.stdinContent != "" {
+				stdin.WriteString(tt.stdinContent)
+			}
 
 			mockClient := &client.DiscussionClientMock{}
 			tt.setupMock(mockClient)

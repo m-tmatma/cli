@@ -29,7 +29,7 @@ type EditOptions struct {
 	CategoryProvided bool
 	LabelsProvided   bool
 
-	DiscussionNumber int
+	DiscussionNumber int32
 	Title            string
 	Body             string
 	BodyFile         string
@@ -151,7 +151,7 @@ func editRun(opts *EditOptions) error {
 		}
 
 		if !changed {
-			return fmt.Errorf("no changes made")
+			return cmdutil.CancelError
 		}
 	} else {
 		if opts.TitleProvided {

@@ -285,9 +285,9 @@ func TestViewRun(t *testing.T) {
 			name: "tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					return exampleAnswerableDiscussion(), nil
 				}
 			},
@@ -308,9 +308,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "nontty",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					return exampleAnswerableDiscussion(), nil
 				}
 			},
@@ -331,9 +331,9 @@ func TestViewRun(t *testing.T) {
 			name: "web",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					return exampleAnswerableDiscussion(), nil
 				}
 			},
@@ -347,9 +347,9 @@ func TestViewRun(t *testing.T) {
 			name: "not answerable tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					return exampleUnanswerableDiscussion(), nil
 				}
 			},
@@ -371,9 +371,9 @@ func TestViewRun(t *testing.T) {
 			name: "comments tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int32, commentLimit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, 30, commentLimit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, false, newest)
@@ -421,9 +421,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "comments nontty",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int32, commentLimit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, 30, commentLimit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, false, newest)
@@ -462,9 +462,9 @@ func TestViewRun(t *testing.T) {
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
 				d := exampleDiscussionWithComments()
 				d.Comments.NextCursor = "NEXT_CURSOR_123"
-				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int32, commentLimit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, 10, commentLimit)
 					assert.Equal(t, "CURSOR_ABC", after)
 					assert.Equal(t, false, newest)
@@ -518,9 +518,9 @@ func TestViewRun(t *testing.T) {
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
 				d := exampleDiscussionWithComments()
 				d.Comments.NextCursor = "NEXT_CURSOR_456"
-				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int32, commentLimit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, 30, commentLimit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, false, newest)
@@ -557,9 +557,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "json without comments field",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					return exampleAnswerableDiscussion(), nil
 				}
 			},
@@ -576,9 +576,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "json with comments field",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int32, commentLimit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, 30, commentLimit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, true, newest)
@@ -642,9 +642,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "json with comments field pagination",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int, commentLimit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetWithCommentsFunc = func(repo ghrepo.Interface, number int32, commentLimit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, 30, commentLimit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, true, newest)
@@ -712,9 +712,9 @@ func TestViewRun(t *testing.T) {
 			name: "replies tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -748,9 +748,9 @@ func TestViewRun(t *testing.T) {
 			name: "replies pagination tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -785,9 +785,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies nontty",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -815,9 +815,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies pagination nontty",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -846,9 +846,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies json",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -910,9 +910,9 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies json pagination",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
 					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, 123, number)
+					assert.Equal(t, int32(123), number)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)

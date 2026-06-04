@@ -56,6 +56,15 @@ func TestResolveLabels(t *testing.T) {
 			names:   []string{"bug", "invalid", "unknown"},
 			wantErr: "labels not found: invalid, unknown",
 		},
+		{
+			name: "whitespace trimmed from names",
+			allLabels: []client.DiscussionLabel{
+				{ID: "L1", Name: "bug"},
+				{ID: "L2", Name: "enhancement"},
+			},
+			names:   []string{" bug ", "  enhancement"},
+			wantIDs: []string{"L1", "L2"},
+		},
 	}
 
 	for _, tt := range tests {

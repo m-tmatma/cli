@@ -11,7 +11,7 @@ func TestParseDiscussionArg(t *testing.T) {
 	tests := []struct {
 		name      string
 		arg       string
-		wantNum   int
+		wantNum   int32
 		wantOwner string
 		wantRepo  string
 		wantHost  string

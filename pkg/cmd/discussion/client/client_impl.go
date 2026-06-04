@@ -352,7 +352,7 @@ func (c *discussionClient) Search(repo ghrepo.Interface, filters SearchFilters, 
 	return &result, nil
 }
 
-func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int) (*Discussion, error) {
+func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int32) (*Discussion, error) {
 	var query struct {
 		Repository struct {
 			HasDiscussionsEnabled bool
@@ -483,7 +483,7 @@ func mapCommentFromNode(n discussionCommentNode) DiscussionComment {
 	return dc
 }
 
-func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int, limit int, after string, newest bool) (*Discussion, error) {
+func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, limit int, after string, newest bool) (*Discussion, error) {
 	var query struct {
 		Repository struct {
 			HasDiscussionsEnabled bool
@@ -514,12 +514,12 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int, li
 	}
 
 	if newest {
-		variables["last"] = githubv4.Int(limit)
+		variables["last"] = githubv4.Int(min(limit, maxPageSize))
 		if after != "" {
 			variables["before"] = githubv4.String(after)
 		}
 	} else {
-		variables["first"] = githubv4.Int(limit)
+		variables["first"] = githubv4.Int(min(limit, maxPageSize))
 		if after != "" {
 			variables["after"] = githubv4.String(after)
 		}
@@ -585,7 +585,7 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int, li
 // GetCommentReplies fetches a discussion and a single comment with its
 // paginated replies. It uses the top-level node(id:) query for the comment
 // because the Discussion type does not expose a comment(id:) field.
-func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int, commentID string, limit int, after string, newest bool) (*Discussion, error) {
+func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*Discussion, error) {
 	var query struct {
 		Repository struct {
 			HasDiscussionsEnabled bool
@@ -606,6 +606,13 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int, 
 					Content string
 					Users   struct {
 						TotalCount int
+					}
+				}
+				Discussion struct {
+					Number     int
+					Repository struct {
+						Owner struct{ Login string }
+						Name  string
 					}
 				}
 				Replies struct {
@@ -634,12 +641,12 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int, 
 	}
 
 	if newest {
-		variables["last"] = githubv4.Int(limit)
+		variables["last"] = githubv4.Int(min(limit, maxPageSize))
 		if after != "" {
 			variables["before"] = githubv4.String(after)
 		}
 	} else {
-		variables["first"] = githubv4.Int(limit)
+		variables["first"] = githubv4.Int(min(limit, maxPageSize))
 		if after != "" {
 			variables["after"] = githubv4.String(after)
 		}
@@ -661,6 +668,11 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int, 
 	src := query.Node.DiscussionComment
 	if src.ID == "" {
 		return nil, fmt.Errorf("node %s is not a discussion comment", commentID)
+	}
+
+	if !strings.EqualFold(src.Discussion.Repository.Owner.Login, repo.RepoOwner()) ||
+		!strings.EqualFold(src.Discussion.Repository.Name, repo.RepoName()) {
+		return nil, fmt.Errorf("comment %s does not belong to %s/%s", commentID, repo.RepoOwner(), repo.RepoName())
 	}
 
 	d := mapDiscussionFromListNode(query.Repository.Discussion.discussionListNode)
@@ -1029,30 +1041,4 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 	return &d, nil
 }
 
-func (c *discussionClient) Close(_ ghrepo.Interface, _ string, _ CloseReason) (*Discussion, error) {
-	return nil, fmt.Errorf("not implemented")
-}
 
-func (c *discussionClient) Reopen(_ ghrepo.Interface, _ string) (*Discussion, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (c *discussionClient) AddComment(_ ghrepo.Interface, _ string, _ string, _ string) (*DiscussionComment, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (c *discussionClient) Lock(_ ghrepo.Interface, _ string, _ string) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (c *discussionClient) Unlock(_ ghrepo.Interface, _ string) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (c *discussionClient) MarkAnswer(_ ghrepo.Interface, _ string) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (c *discussionClient) UnmarkAnswer(_ ghrepo.Interface, _ string) error {
-	return fmt.Errorf("not implemented")
-}

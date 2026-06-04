@@ -13,14 +13,14 @@ var discussionURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/discussions/(\d+)$`)
 
 // ParseDiscussionArg parses a discussion number or URL from a command argument.
 // It returns the discussion number and, if the argument was a URL, a repo override.
-func ParseDiscussionArg(arg string) (int, ghrepo.Interface, error) {
-	if num, err := strconv.Atoi(arg); err == nil {
-		return num, nil, nil
+func ParseDiscussionArg(arg string) (int32, ghrepo.Interface, error) {
+	if num, err := strconv.ParseInt(arg, 10, 32); err == nil {
+		return int32(num), nil, nil
 	}
 
 	if len(arg) > 1 && arg[0] == '#' {
-		if num, err := strconv.Atoi(arg[1:]); err == nil {
-			return num, nil, nil
+		if num, err := strconv.ParseInt(arg[1:], 10, 32); err == nil {
+			return int32(num), nil, nil
 		}
 	}
 
@@ -29,15 +29,15 @@ func ParseDiscussionArg(arg string) (int, ghrepo.Interface, error) {
 		return 0, nil, fmt.Errorf("invalid discussion argument: %q", arg)
 	}
 
-	// Note that an HTTP URL is also okay, because we're just using the URL to find
-	// the discussion number, repo and host, and we wont be unsecure HTTP API calls.
+	// An HTTP URL is also accepted because we only extract the discussion number,
+	// repo and host from the URL path; no API calls are made over HTTP.
 
 	m := discussionURLRE.FindStringSubmatch(u.Path)
 	if m == nil {
 		return 0, nil, fmt.Errorf("invalid discussion URL: %q", arg)
 	}
 
-	num, _ := strconv.Atoi(m[3])
+	num, _ := strconv.ParseInt(m[3], 10, 32)
 	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
-	return num, repo, nil
+	return int32(num), repo, nil
 }

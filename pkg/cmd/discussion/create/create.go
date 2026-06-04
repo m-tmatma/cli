@@ -25,6 +25,7 @@ type CreateOptions struct {
 
 	Title    string
 	Body     string
+	BodyFile string
 	Category string
 	Labels   []string
 }
@@ -58,6 +59,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
+			if err := cmdutil.MutuallyExclusive("specify only one of --body or --body-file",
+				cmd.Flags().Changed("body"), cmd.Flags().Changed("body-file")); err != nil {
+				return err
+			}
+
 			if opts.Title != "" && strings.TrimSpace(opts.Title) == "" {
 				return cmdutil.FlagErrorf("title cannot be blank")
 			}
@@ -68,9 +74,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("category cannot be blank")
 			}
 
-			needsInput := opts.Title == "" || opts.Category == "" || opts.Body == ""
+			bodyProvided := cmd.Flags().Changed("body") || cmd.Flags().Changed("body-file")
+			needsInput := opts.Title == "" || opts.Category == "" || !bodyProvided
 			if needsInput && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("--title, --body, and --category are required when not running interactively")
+				return cmdutil.FlagErrorf("--title, --body (or --body-file), and --category are required when not running interactively")
 			}
 
 			if runF != nil {
@@ -84,6 +91,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Title for the discussion")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body for the discussion")
+	cmd.Flags().StringVarP(&opts.BodyFile, "body-file", "F", "", "Read body text from file (use \"-\" to read from stdin)")
 	cmd.Flags().StringVarP(&opts.Category, "category", "c", "", "Category name or slug for the discussion")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Labels to apply to the discussion")
 
@@ -134,6 +142,14 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 		category = &categories[idx]
+	}
+
+	if opts.BodyFile != "" {
+		bodyBytes, err := cmdutil.ReadFile(opts.BodyFile, opts.IO.In)
+		if err != nil {
+			return err
+		}
+		opts.Body = string(bodyBytes)
 	}
 
 	if opts.Body == "" {

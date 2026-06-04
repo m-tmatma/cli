@@ -75,7 +75,7 @@ type ViewOptions struct {
 	Browser  browser.Browser
 	Client   func() (client.DiscussionClient, error)
 
-	DiscussionNumber int
+	DiscussionNumber int32
 	WebMode          bool
 	Comments         bool
 	Replies          string
@@ -196,15 +196,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
-// exporterNeedsComments returns true when the JSON exporter requests the comments field.
-func exporterNeedsComments(exporter cmdutil.Exporter) bool {
-	return slices.Contains(exporter.Fields(), "comments")
-}
-
 // needsComments returns true when the command should fetch full comment data,
 // either because --comments was set or because --json requested the comments field.
 func needsComments(opts *ViewOptions) bool {
-	return opts.Comments || opts.Exporter != nil && exporterNeedsComments(opts.Exporter)
+	return opts.Comments || (opts.Exporter != nil && slices.Contains(opts.Exporter.Fields(), "comments"))
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -215,7 +210,7 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.WebMode {
 		openURL := ghrepo.GenerateRepoURL(repo, "discussions/%d", opts.DiscussionNumber)
-		if opts.IO.IsStdoutTTY() {
+		if opts.IO.IsStderrTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
@@ -245,9 +240,6 @@ func viewRun(opts *ViewOptions) error {
 		}
 		defer opts.IO.StopPager()
 
-		if len(discussion.Comments.Comments) == 0 {
-			return fmt.Errorf("no comment found for reply ID %s", opts.Replies)
-		}
 		comment := discussion.Comments.Comments[0]
 		if opts.IO.IsStdoutTTY() {
 			return printHumanReplies(opts, &comment)

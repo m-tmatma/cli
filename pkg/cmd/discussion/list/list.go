@@ -121,7 +121,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Category, "category", "c", "", "Filter by category name or slug")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
-	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, fmt.Sprintf("Maximum number of discussions to fetch (default %d)", defaultLimit))
+	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of discussions to fetch")
 	cmdutil.NilBoolFlag(cmd, &opts.Answered, "answered", "", "Filter by answered state")
 	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "", "updated", []string{"created", "updated"}, "Sort by field")
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "", "desc", []string{"asc", "desc"}, "Order of results")

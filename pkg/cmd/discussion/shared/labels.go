@@ -20,9 +20,10 @@ func ResolveLabels(allLabels []client.DiscussionLabel, names []string) ([]string
 	var missing []string
 
 	for _, name := range names {
-		id, ok := byName[strings.ToLower(name)]
+		trimmed := strings.TrimSpace(name)
+		id, ok := byName[strings.ToLower(trimmed)]
 		if !ok {
-			missing = append(missing, name)
+			missing = append(missing, trimmed)
 		} else {
 			ids = append(ids, id)
 		}

@@ -262,18 +262,6 @@ func (rg ReactionGroup) Export() map[string]interface{} {
 	}
 }
 
-// CloseReason represents the reason for closing a discussion.
-type CloseReason string
-
-const (
-	// CloseReasonResolved indicates the discussion topic has been resolved.
-	CloseReasonResolved CloseReason = "RESOLVED"
-	// CloseReasonOutdated indicates the discussion is no longer relevant.
-	CloseReasonOutdated CloseReason = "OUTDATED"
-	// CloseReasonDuplicate indicates the discussion is a duplicate of another.
-	CloseReasonDuplicate CloseReason = "DUPLICATE"
-)
-
 // Domain-level filter constants for state.
 const (
 	FilterStateOpen   = "open"

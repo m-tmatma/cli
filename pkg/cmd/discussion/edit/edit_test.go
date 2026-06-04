@@ -162,7 +162,7 @@ func TestEditRun(t *testing.T) {
 				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
@@ -183,7 +183,7 @@ func TestEditRun(t *testing.T) {
 				BodyProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
@@ -203,7 +203,7 @@ func TestEditRun(t *testing.T) {
 				CategoryProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
@@ -227,7 +227,7 @@ func TestEditRun(t *testing.T) {
 				LabelsProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
@@ -255,7 +255,7 @@ func TestEditRun(t *testing.T) {
 				LabelsProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
@@ -279,7 +279,7 @@ func TestEditRun(t *testing.T) {
 				LabelsProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
@@ -309,7 +309,7 @@ func TestEditRun(t *testing.T) {
 				LabelsProvided:   true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
@@ -342,7 +342,7 @@ func TestEditRun(t *testing.T) {
 				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 			},
@@ -355,7 +355,7 @@ func TestEditRun(t *testing.T) {
 				CategoryProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
@@ -371,7 +371,7 @@ func TestEditRun(t *testing.T) {
 				CategoryProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
@@ -387,7 +387,7 @@ func TestEditRun(t *testing.T) {
 				LabelsProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListLabelsFunc = func(repo ghrepo.Interface) ([]client.DiscussionLabel, error) {
@@ -405,7 +405,7 @@ func TestEditRun(t *testing.T) {
 				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return nil, fmt.Errorf("not found")
 				}
 			},
@@ -418,7 +418,7 @@ func TestEditRun(t *testing.T) {
 				TitleProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
@@ -432,7 +432,7 @@ func TestEditRun(t *testing.T) {
 			isTTY: true,
 			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
@@ -460,7 +460,7 @@ func TestEditRun(t *testing.T) {
 			isTTY: true,
 			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
@@ -486,7 +486,7 @@ func TestEditRun(t *testing.T) {
 			isTTY: true,
 			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.ListCategoriesFunc = func(repo ghrepo.Interface) ([]client.DiscussionCategory, error) {
@@ -517,7 +517,7 @@ func TestEditRun(t *testing.T) {
 			isTTY: true,
 			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 			},
@@ -526,7 +526,7 @@ func TestEditRun(t *testing.T) {
 					return []int{}, nil
 				},
 			},
-			wantErr: "no changes made",
+			wantErr: "CancelError",
 		},
 		{
 			name:            "success non-tty body-file",
@@ -535,7 +535,7 @@ func TestEditRun(t *testing.T) {
 				BodyProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
@@ -553,7 +553,7 @@ func TestEditRun(t *testing.T) {
 			isTTY: true,
 			opts:  EditOptions{Interactive: true},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 			},
@@ -575,7 +575,7 @@ func TestEditRun(t *testing.T) {
 				BodyProvided: true,
 			},
 			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int) (*client.Discussion, error) {
+				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
 				m.UpdateFunc = func(repo ghrepo.Interface, input client.UpdateDiscussionInput) (*client.Discussion, error) {
