@@ -18,7 +18,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const defaultLimit = 30
+const (
+	defaultLimit = 30
+
+	stateOpen   = "open"
+	stateClosed = "closed"
+	stateAll    = "all"
+
+	sortCreated = "created"
+	sortUpdated = "updated"
+
+	orderAsc  = "asc"
+	orderDesc = "desc"
+)
 
 // discussionListFields lists the field names available for --json output
 // on the discussion list command. This excludes fields like "comments"
@@ -120,11 +132,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Category, "category", "c", "", "Filter by category name or slug")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
-	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
+	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", stateOpen, []string{stateOpen, stateClosed, stateAll}, "Filter by state")
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of discussions to fetch")
 	cmdutil.NilBoolFlag(cmd, &opts.Answered, "answered", "", "Filter by answered state")
-	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "", "updated", []string{"created", "updated"}, "Sort by field")
-	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "", "desc", []string{"asc", "desc"}, "Order of results")
+	cmdutil.StringEnumFlag(cmd, &opts.Sort, "sort", "", sortUpdated, []string{sortCreated, sortUpdated}, "Sort by field")
+	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "", orderDesc, []string{orderAsc, orderDesc}, "Order of results")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search discussions with `query`")
 	cmd.Flags().StringVar(&opts.After, "after", "", "Cursor for the next page of results")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List discussions in the web browser")
@@ -137,15 +149,39 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 // "all" maps to nil (no state filter).
 func toFilterState(v string) *string {
 	switch v {
-	case "open":
+	case stateOpen:
 		s := client.FilterStateOpen
 		return &s
-	case "closed":
+	case stateClosed:
 		s := client.FilterStateClosed
 		return &s
 	default:
 		return nil
 	}
+}
+
+func toOrderByAndDirection(sort, order string) (string, string) {
+	var orderBy string
+	switch sort {
+	case sortCreated:
+		orderBy = client.OrderByCreated
+	case sortUpdated:
+		orderBy = client.OrderByUpdated
+	default:
+		orderBy = sort
+	}
+
+	var direction string
+	switch order {
+	case orderAsc:
+		direction = client.OrderDirectionAsc
+	case orderDesc:
+		direction = client.OrderDirectionDesc
+	default:
+		direction = order
+	}
+
+	return orderBy, direction
 }
 
 func listRun(opts *ListOptions) error {
@@ -179,6 +215,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	state := toFilterState(opts.State)
+	orderBy, direction := toOrderByAndDirection(opts.Sort, opts.Order)
 
 	var result *client.DiscussionListResult
 
@@ -191,8 +228,8 @@ func listRun(opts *ListOptions) error {
 			Category:  categorySlug,
 			Answered:  opts.Answered,
 			Keywords:  opts.Search,
-			OrderBy:   opts.Sort,
-			Direction: opts.Order,
+			OrderBy:   orderBy,
+			Direction: direction,
 		}
 		result, err = dc.Search(repo, filters, opts.After, opts.Limit)
 	} else {
@@ -200,8 +237,8 @@ func listRun(opts *ListOptions) error {
 			State:      state,
 			CategoryID: categoryID,
 			Answered:   opts.Answered,
-			OrderBy:    opts.Sort,
-			Direction:  opts.Order,
+			OrderBy:    orderBy,
+			Direction:  direction,
 		}
 		result, err = dc.List(repo, filters, opts.After, opts.Limit)
 	}
@@ -239,7 +276,7 @@ func openInBrowser(opts *ListOptions, repo ghrepo.Interface) error {
 	if opts.Search != "" {
 		queryParts = append(queryParts, opts.Search)
 	}
-	if opts.State != "" && opts.State != "all" {
+	if opts.State != "" && opts.State != stateAll {
 		queryParts = append(queryParts, "is:"+opts.State)
 	}
 	if opts.Author != "" {
@@ -271,9 +308,9 @@ func openInBrowser(opts *ListOptions, repo ghrepo.Interface) error {
 
 func noResults(repo ghrepo.Interface, state string) error {
 	switch state {
-	case "open":
+	case stateOpen:
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no open discussions match your search in %s", ghrepo.FullName(repo)))
-	case "closed":
+	case stateClosed:
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no closed discussions match your search in %s", ghrepo.FullName(repo)))
 	default:
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no discussions match your search in %s", ghrepo.FullName(repo)))
@@ -282,9 +319,9 @@ func noResults(repo ghrepo.Interface, state string) error {
 
 func listHeader(repoName string, count, total int, state string) string {
 	switch state {
-	case "open":
+	case stateOpen:
 		return fmt.Sprintf("Showing %d of %d open discussions in %s", count, total, repoName)
-	case "closed":
+	case stateClosed:
 		return fmt.Sprintf("Showing %d of %d closed discussions in %s", count, total, repoName)
 	default:
 		return fmt.Sprintf("Showing %d of %d discussions in %s", count, total, repoName)

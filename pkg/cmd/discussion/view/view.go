@@ -19,6 +19,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	orderOldest = "oldest"
+	orderNewest = "newest"
+)
+
 var discussionFields = []string{
 	"id",
 	"number",
@@ -190,7 +195,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Replies, "replies", "", "View replies on a specific comment by its node ID")
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of comments or replies to fetch")
 	cmd.Flags().StringVar(&opts.After, "after", "", "Cursor for the next page")
-	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "", "newest", []string{"oldest", "newest"}, "Order of comments or replies")
+	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "", orderNewest, []string{orderOldest, orderNewest}, "Order of comments or replies")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, discussionFields)
 
 	return cmd
@@ -225,7 +230,7 @@ func viewRun(opts *ViewOptions) error {
 	opts.IO.StartProgressIndicator()
 
 	if opts.Replies != "" {
-		discussion, err := c.GetCommentReplies(repo, opts.DiscussionNumber, opts.Replies, opts.Limit, opts.After, opts.Order == "newest")
+		discussion, err := c.GetCommentReplies(repo, opts.DiscussionNumber, opts.Replies, opts.Limit, opts.After, opts.Order == orderNewest)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -249,7 +254,7 @@ func viewRun(opts *ViewOptions) error {
 
 	var discussion *client.Discussion
 	if needsComments(opts) {
-		discussion, err = c.GetWithComments(repo, opts.DiscussionNumber, opts.Limit, opts.After, opts.Order == "newest")
+		discussion, err = c.GetWithComments(repo, opts.DiscussionNumber, opts.Limit, opts.After, opts.Order == orderNewest)
 	} else {
 		discussion, err = c.GetByNumber(repo, opts.DiscussionNumber)
 	}
