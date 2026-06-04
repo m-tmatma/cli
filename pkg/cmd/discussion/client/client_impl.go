@@ -1040,5 +1040,3 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 
 	return &d, nil
 }
-
-
