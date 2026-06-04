@@ -259,11 +259,10 @@ func listRun(opts *ListOptions) error {
 		return noResults(repo, opts.State)
 	}
 
-	if err := opts.IO.StartPager(); err == nil {
-		defer opts.IO.StopPager()
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
+	defer opts.IO.StopPager()
 
 	printDiscussions(opts, ghrepo.FullName(repo), result.Discussions, result.TotalCount)
 	return nil
