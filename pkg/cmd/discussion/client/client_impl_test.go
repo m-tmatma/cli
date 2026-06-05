@@ -1022,12 +1022,15 @@ func TestGetByNumber(t *testing.T) {
 			name: "maps all fields",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionMinimal\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 42,
@@ -1089,33 +1092,17 @@ func TestGetByNumber(t *testing.T) {
 			name: "discussions disabled",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query DiscussionMinimal\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"hasDiscussionsEnabled": false,
-									"discussion": null
-								}
-							},
-							"errors": [
-								{
-									"type": "NOT_FOUND",
-									"path": ["repository", "discussion"],
-									"message": "Could not resolve to a Discussion with the number of 42."
-								}
-							]
-						}
-					`)),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", false)),
 				)
 			},
-			wantErr: "Could not resolve to a Discussion with the number of 42.",
+			wantErr: "has discussions disabled",
 		},
 		{
 			name: "repo not found",
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query DiscussionMinimal\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
@@ -1180,12 +1167,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 42,
@@ -1311,12 +1301,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1376,12 +1369,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1453,12 +1449,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1516,27 +1515,11 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query DiscussionWithComments\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"hasDiscussionsEnabled": false,
-									"discussion": null
-								}
-							},
-							"errors": [
-								{
-									"type": "NOT_FOUND",
-									"path": ["repository", "discussion"],
-									"message": "Could not resolve to a Discussion with the number of 1."
-								}
-							]
-						}
-					`)),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", false)),
 				)
 			},
-			wantErr: "Could not resolve to a Discussion",
+			wantErr: "has discussions disabled",
 		},
 		{
 			name:   "repo not found",
@@ -1544,7 +1527,7 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query DiscussionWithComments\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
@@ -1569,12 +1552,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1619,12 +1605,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1696,12 +1685,15 @@ func TestGetWithComments(t *testing.T) {
 			newest: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionWithComments\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1840,12 +1832,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 42,
@@ -1967,12 +1962,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2055,12 +2053,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2142,12 +2143,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2229,12 +2233,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2303,43 +2310,11 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"hasDiscussionsEnabled": false,
-									"discussion": null
-								},
-								"node": {
-									"id": "DC_abc",
-									"url": "",
-									"author": {"__typename": "User", "login": "alice"},
-									"body": "Comment",
-									"createdAt": "2025-01-01T00:00:00Z",
-									"isAnswer": false,
-									"upvoteCount": 0,
-									"reactionGroups": [],
-									"discussion": {"number": 42, "repository": {"owner": {"login": "OWNER"}, "name": "REPO"}},
-									"replies": {
-										"totalCount": 0,
-										"pageInfo": {"endCursor": null, "hasNextPage": false, "startCursor": null, "hasPreviousPage": false},
-										"nodes": []
-									}
-								}
-							},
-							"errors": [
-								{
-									"type": "NOT_FOUND",
-									"path": ["repository", "discussion"],
-									"message": "Could not resolve to a Discussion with the number of 1."
-								}
-							]
-						}
-					`)),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", false)),
 				)
 			},
-			wantErr: "Could not resolve to a Discussion",
+			wantErr: "has discussions disabled",
 		},
 		{
 			name:      "repo not found",
@@ -2348,12 +2323,11 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": null,
-								"node": null
+								"repository": null
 							},
 							"errors": [
 								{
@@ -2375,12 +2349,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2424,12 +2401,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2466,12 +2446,15 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
 								"repository": {
-									"hasDiscussionsEnabled": true,
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2575,7 +2558,7 @@ func TestCreate(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(repoMetaResp("R_1", true)),
 				)
 				reg.Register(
@@ -2644,7 +2627,7 @@ func TestCreate(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(repoMetaResp("R_1", false)),
 				)
 			},
@@ -2659,7 +2642,7 @@ func TestCreate(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
@@ -2687,7 +2670,7 @@ func TestCreate(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(repoMetaResp("R_1", true)),
 				)
 				reg.Register(
@@ -2719,7 +2702,7 @@ func TestCreate(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(repoMetaResp("R_1", true)),
 				)
 				reg.Register(
@@ -2828,7 +2811,7 @@ func TestCreate(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMeta\b`),
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
 					httpmock.StringResponse(repoMetaResp("R_1", true)),
 				)
 				reg.Register(

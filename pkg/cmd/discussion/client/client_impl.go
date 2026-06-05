@@ -358,10 +358,17 @@ func (c *discussionClient) Search(repo ghrepo.Interface, filters SearchFilters, 
 }
 
 func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int32) (*Discussion, error) {
+	meta, err := c.getRepositoryMeta(repo)
+	if err != nil {
+		return nil, err
+	}
+	if !meta.HasDiscussionsEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
+	}
+
 	var query struct {
 		Repository struct {
-			HasDiscussionsEnabled bool
-			Discussion            struct {
+			Discussion struct {
 				discussionListNode
 				Comments struct {
 					TotalCount int
@@ -376,12 +383,8 @@ func (c *discussionClient) GetByNumber(repo ghrepo.Interface, number int32) (*Di
 		"number": githubv4.Int(number),
 	}
 
-	err := c.gql.Query(repo.RepoHost(), "DiscussionMinimal", &query, variables)
-	if err != nil {
+	if err := c.gql.Query(repo.RepoHost(), "DiscussionMinimal", &query, variables); err != nil {
 		return nil, err
-	}
-	if !query.Repository.HasDiscussionsEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
 	}
 
 	d := mapDiscussionFromListNode(query.Repository.Discussion.discussionListNode)
@@ -489,10 +492,17 @@ func mapCommentFromNode(n discussionCommentNode) DiscussionComment {
 }
 
 func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, limit int, after string, newest bool) (*Discussion, error) {
+	meta, err := c.getRepositoryMeta(repo)
+	if err != nil {
+		return nil, err
+	}
+	if !meta.HasDiscussionsEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
+	}
+
 	var query struct {
 		Repository struct {
-			HasDiscussionsEnabled bool
-			Discussion            struct {
+			Discussion struct {
 				discussionListNode
 				Comments struct {
 					TotalCount int
@@ -530,12 +540,8 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, 
 		}
 	}
 
-	err := c.gql.Query(repo.RepoHost(), "DiscussionWithComments", &query, variables)
-	if err != nil {
+	if err := c.gql.Query(repo.RepoHost(), "DiscussionWithComments", &query, variables); err != nil {
 		return nil, err
-	}
-	if !query.Repository.HasDiscussionsEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
 	}
 
 	src := query.Repository.Discussion
@@ -591,10 +597,17 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, 
 // paginated replies. It uses the top-level node(id:) query for the comment
 // because the Discussion type does not expose a comment(id:) field.
 func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*Discussion, error) {
+	meta, err := c.getRepositoryMeta(repo)
+	if err != nil {
+		return nil, err
+	}
+	if !meta.HasDiscussionsEnabled {
+		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
+	}
+
 	var query struct {
 		Repository struct {
-			HasDiscussionsEnabled bool
-			Discussion            struct {
+			Discussion struct {
 				discussionListNode
 			} `graphql:"discussion(number: $number)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
@@ -657,12 +670,8 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 		}
 	}
 
-	err := c.gql.Query(repo.RepoHost(), "DiscussionCommentReplies", &query, variables)
-	if err != nil {
+	if err := c.gql.Query(repo.RepoHost(), "DiscussionCommentReplies", &query, variables); err != nil {
 		return nil, err
-	}
-	if !query.Repository.HasDiscussionsEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
 	}
 
 	// The query above should already error for an invalid node ID, but guard against nil.
@@ -812,7 +821,7 @@ func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repository
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	if err := c.gql.Query(repo.RepoHost(), "RepositoryMeta", &query, variables); err != nil {
+	if err := c.gql.Query(repo.RepoHost(), "RepositoryMetaForDiscussions", &query, variables); err != nil {
 		return nil, err
 	}
 
