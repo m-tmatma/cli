@@ -16,6 +16,10 @@ type DiscussionClient interface {
 	GetCommentReplies(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*Discussion, error)
 	ListCategories(repo ghrepo.Interface) ([]DiscussionCategory, error)
 	ListLabels(repo ghrepo.Interface) ([]DiscussionLabel, error)
+	// Create creates a discussion. The returned discussion may be non-nil even
+	// when err is non-nil, indicating a secondary mutation failure (e.g., labels).
 	Create(repo ghrepo.Interface, input CreateDiscussionInput) (*Discussion, error)
+	// Update updates a discussion. The returned discussion may be non-nil even
+	// when err is non-nil, indicating a secondary mutation failure (e.g., labels).
 	Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error)
 }

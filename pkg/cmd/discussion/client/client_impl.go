@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -925,6 +926,10 @@ func (c *discussionClient) editDiscussionLabels(repo ghrepo.Interface, discussio
 	return node, nil
 }
 
+// Create creates a discussion and optionally assigns labels. If the discussion
+// is created successfully but the label mutation fails, the returned discussion
+// is non-nil (reflecting the created state without labels) and err describes
+// the label failure.
 func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionInput) (*Discussion, error) {
 	meta, err := c.getRepositoryMeta(repo)
 	if err != nil {
@@ -957,12 +962,14 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 
 	node := &mutation.CreateDiscussion.Discussion.discussionListNode
 
+	var secondaryErrs []error
 	if len(input.LabelIDs) > 0 {
 		labelNode, err := c.editDiscussionLabels(repo, node.ID, input.LabelIDs, nil)
 		if err != nil {
-			return nil, err
+			secondaryErrs = append(secondaryErrs, err)
+		} else {
+			node = labelNode
 		}
-		node = labelNode
 	}
 
 	d := mapDiscussionFromListNode(*node)
@@ -974,9 +981,15 @@ func (c *discussionClient) Create(repo ghrepo.Interface, input CreateDiscussionI
 		})
 	}
 
+	if len(secondaryErrs) > 0 {
+		return &d, fmt.Errorf("discussion created but some mutations failed: %w", errors.Join(secondaryErrs...))
+	}
 	return &d, nil
 }
 
+// Update updates a discussion's fields and/or labels. If field updates succeed
+// but the label mutation fails, the returned discussion is non-nil (reflecting
+// the updated fields without label changes) and err describes the label failure.
 func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error) {
 	hasFieldUpdate := input.Title != nil || input.Body != nil || input.CategoryID != nil
 	hasLabelUpdate := len(input.AddLabelIDs) > 0 || len(input.RemoveLabelIDs) > 0
@@ -1021,12 +1034,18 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 		node = &mutation.UpdateDiscussion.Discussion.discussionListNode
 	}
 
+	var secondaryErrs []error
 	if hasLabelUpdate {
 		labelNode, err := c.editDiscussionLabels(repo, input.DiscussionID, input.AddLabelIDs, input.RemoveLabelIDs)
 		if err != nil {
-			return nil, err
+			secondaryErrs = append(secondaryErrs, err)
+		} else {
+			node = labelNode
 		}
-		node = labelNode
+	}
+
+	if node == nil {
+		return nil, errors.Join(secondaryErrs...)
 	}
 
 	d := mapDiscussionFromListNode(*node)
@@ -1038,5 +1057,8 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 		})
 	}
 
+	if len(secondaryErrs) > 0 {
+		return &d, fmt.Errorf("discussion updated but some mutations failed: %w", errors.Join(secondaryErrs...))
+	}
 	return &d, nil
 }

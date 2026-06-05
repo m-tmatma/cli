@@ -210,6 +210,11 @@ func editRun(opts *EditOptions) error {
 	updated, err := c.Update(repo, input)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		if updated != nil {
+			fmt.Fprintln(opts.IO.Out, updated.URL)
+			fmt.Fprintln(opts.IO.ErrOut, err.Error())
+			return cmdutil.SilentError
+		}
 		return err
 	}
 

@@ -2813,7 +2813,7 @@ func TestCreate(t *testing.T) {
 			},
 		},
 		{
-			name: "add labels mutation failure returns error",
+			name: "add labels mutation failure returns discussion and error",
 			input: CreateDiscussionInput{
 				CategoryID: "CAT_1",
 				Title:      "Test",
@@ -2866,7 +2866,24 @@ func TestCreate(t *testing.T) {
 					`)),
 				)
 			},
-			wantErr: "could not apply labels",
+			wantErr: "discussion created but some mutations failed: GraphQL: could not apply labels",
+			assertDisc: &Discussion{
+				ID:     "D_new",
+				Number: 99,
+				Title:  "Test",
+				Body:   "Body",
+				URL:    "https://github.com/OWNER/REPO/discussions/99",
+				Author: DiscussionActor{ID: "U1", Login: "alice", Name: "Alice"},
+				Category: DiscussionCategory{
+					ID:    "CAT_1",
+					Name:  "General",
+					Slug:  "general",
+					Emoji: ":speech_balloon:",
+				},
+				Labels:    []DiscussionLabel{},
+				CreatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+				UpdatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+			},
 		},
 	}
 
@@ -2885,6 +2902,10 @@ func TestCreate(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+				if tt.assertDisc != nil {
+					require.NotNil(t, d)
+					assert.Equal(t, tt.assertDisc, d)
+				}
 				return
 			}
 
@@ -3509,6 +3530,55 @@ func TestUpdate(t *testing.T) {
 				UpdatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
 			},
 		},
+		{
+			name: "label failure after field update returns discussion and error",
+			input: UpdateDiscussionInput{
+				DiscussionID: "D_1",
+				Title:        &titleStr,
+				AddLabelIDs:  []string{"L_bug"},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateDiscussion\b`),
+					httpmock.StringResponse(`{"data":{"updateDiscussion":{"discussion":{"id":"D_1","number":5,"title":"Updated title","body":"B","url":"https://github.com/OWNER/REPO/discussions/5","closed":false,"stateReason":"","isAnswered":false,"answerChosenAt":"0001-01-01T00:00:00Z","author":{"__typename":"User","login":"alice","id":"U1","name":"Alice"},"category":{"id":"CAT_1","name":"General","slug":"general","emoji":"","isAnswerable":false},"answerChosenBy":null,"labels":{"nodes":[]},"reactionGroups":[],"createdAt":"2025-06-01T00:00:00Z","updatedAt":"2025-06-01T00:00:00Z","closedAt":"0001-01-01T00:00:00Z","locked":false}}}}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation AddLabelsToDiscussion\b`),
+					httpmock.StringResponse(`{"data":null,"errors":[{"message":"could not apply labels"}]}`),
+				)
+			},
+			wantErr: "discussion updated but some mutations failed: GraphQL: could not apply labels",
+			assertDisc: &Discussion{
+				ID:     "D_1",
+				Number: 5,
+				Title:  "Updated title",
+				Body:   "B",
+				URL:    "https://github.com/OWNER/REPO/discussions/5",
+				Author: DiscussionActor{ID: "U1", Login: "alice", Name: "Alice"},
+				Category: DiscussionCategory{
+					ID:   "CAT_1",
+					Name: "General",
+					Slug: "general",
+				},
+				Labels:    []DiscussionLabel{},
+				CreatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+				UpdatedAt: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			name: "label only failure returns nil discussion and error",
+			input: UpdateDiscussionInput{
+				DiscussionID: "D_1",
+				AddLabelIDs:  []string{"L_bug"},
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation AddLabelsToDiscussion\b`),
+					httpmock.StringResponse(`{"data":null,"errors":[{"message":"could not apply labels"}]}`),
+				)
+			},
+			wantErr: "could not apply labels",
+		},
 	}
 
 	for _, tt := range tests {
@@ -3526,6 +3596,10 @@ func TestUpdate(t *testing.T) {
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
+				if tt.assertDisc != nil {
+					require.NotNil(t, d)
+					assert.Equal(t, tt.assertDisc, d)
+				}
 				return
 			}
 

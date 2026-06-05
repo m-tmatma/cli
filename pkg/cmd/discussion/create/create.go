@@ -188,6 +188,11 @@ func createRun(opts *CreateOptions) error {
 	discussion, err := c.Create(repo, input)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		if discussion != nil {
+			fmt.Fprintln(opts.IO.Out, discussion.URL)
+			fmt.Fprintln(opts.IO.ErrOut, err.Error())
+			return cmdutil.SilentError
+		}
 		return fmt.Errorf("failed to create discussion: %w", err)
 	}
 
