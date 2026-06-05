@@ -368,7 +368,11 @@ func printDiscussions(opts *ListOptions, repoName string, discussions []client.D
 		tp.AddField(strings.Join(labelNames, ", "), tableprinter.WithTruncate(nil))
 
 		if d.Answered {
-			tp.AddField("✓")
+			if isTerminal {
+				tp.AddField("✓")
+			} else {
+				tp.AddField("answered")
+			}
 		} else {
 			tp.AddField("")
 		}
