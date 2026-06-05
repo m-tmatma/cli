@@ -105,15 +105,14 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			Display the title, body, and other information about a discussion.
 
-			With %[1]s--comments%[1]s flag, show threaded comments on the discussion.
-			Use %[1]s--order%[1]s to control comment ordering (oldest or newest first).
-			Use %[1]s--limit%[1]s and %[1]s--after%[1]s for paginating through comments.
+			To see the comments on a discussion, pass %[1]s--comments%[1]s. A few latest replies
+			of each comment will also be retrieved regardless of the selected ordering.
 
-			With %[1]s--replies%[1]s flag, show paginated replies on a specific comment.
-			Pass the comment node ID (e.g. %[1]sDC_abc123%[1]s) to fetch its replies.
-			Use %[1]s--limit%[1]s, %[1]s--after%[1]s, and %[1]s--order%[1]s to control reply pagination.
+			For a full thread of a comment, pass %[1]s--replies <COMMENT-ID>%[1]s.
 
-			With %[1]s--web%[1]s flag, open the discussion in a web browser instead.
+			Pagination and ordering can be controlled via %[1]s--order%[1]s, %[1]s--limit%[1]s, and %[1]s--after%[1]s flags.
+
+			Use %[1]s--web%[1]s to open the discussion in a web browser instead.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# View a discussion by number
