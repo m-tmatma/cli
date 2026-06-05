@@ -289,7 +289,28 @@ const (
 type DiscussionListResult struct {
 	Discussions []Discussion
 	TotalCount  int
+	Cursor      string
 	NextCursor  string
+}
+
+// ExportData returns a map suitable for JSON output, including pagination
+// fields only when they are non-empty.
+func (r DiscussionListResult) ExportData(fields []string) map[string]interface{} {
+	discussions := make([]interface{}, len(r.Discussions))
+	for i, d := range r.Discussions {
+		discussions[i] = d.ExportData(fields)
+	}
+	m := map[string]interface{}{
+		"totalCount":  r.TotalCount,
+		"discussions": discussions,
+	}
+	if r.NextCursor != "" {
+		m["next"] = r.NextCursor
+	}
+	if r.Cursor != "" {
+		m["cursor"] = r.Cursor
+	}
+	return m
 }
 
 // ListFilters holds parameters for the repository.discussions query.

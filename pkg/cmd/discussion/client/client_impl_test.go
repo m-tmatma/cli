@@ -67,7 +67,7 @@ func minimalNodes(count int) string {
 }
 
 // listResp builds a mock repository.discussions JSON response.
-func listResp(hasNext bool, cursor string, total int, nodes string) string {
+func listResp(hasNext bool, endCursor string, total int, nodes string) string {
 	return heredoc.Docf(`
 		{
 			"data": {
@@ -84,11 +84,11 @@ func listResp(hasNext bool, cursor string, total int, nodes string) string {
 				}
 			}
 		}
-	`, total, hasNext, cursor, nodes)
+	`, total, hasNext, endCursor, nodes)
 }
 
 // searchResp builds a mock search JSON response.
-func searchResp(hasNext bool, cursor string, count int, nodes string) string {
+func searchResp(hasNext bool, endCursor string, count int, nodes string) string {
 	return heredoc.Docf(`
 		{
 			"data": {
@@ -102,7 +102,7 @@ func searchResp(hasNext bool, cursor string, count int, nodes string) string {
 				}
 			}
 		}
-	`, count, hasNext, cursor, nodes)
+	`, count, hasNext, endCursor, nodes)
 }
 
 func TestList(t *testing.T) {
@@ -180,6 +180,7 @@ func TestList(t *testing.T) {
 		wantErr        string
 		wantTotal      int
 		wantLen        int
+		wantNextCursor string
 		wantCursor     string
 		wantTitles     []string
 		wantSingleDisc *Discussion
@@ -291,6 +292,7 @@ func TestList(t *testing.T) {
 					}),
 				)
 			},
+			wantCursor: "someCursor",
 		},
 		{
 			name:    "open state filter",
@@ -478,9 +480,9 @@ func TestList(t *testing.T) {
 					httpmock.StringResponse(listResp(true, "cursor42", 5, minimalNode("D1", "Discussion 1"))),
 				)
 			},
-			wantLen:    1,
-			wantTotal:  5,
-			wantCursor: "cursor42",
+			wantLen:        1,
+			wantTotal:      5,
+			wantNextCursor: "cursor42",
 		},
 		{
 			// Two pages are fetched when limit exceeds the first page's results.
@@ -537,7 +539,8 @@ func TestList(t *testing.T) {
 			require.NotNil(t, result)
 			assert.Equal(t, tt.wantTotal, result.TotalCount)
 			assert.Len(t, result.Discussions, tt.wantLen)
-			assert.Equal(t, tt.wantCursor, result.NextCursor)
+			assert.Equal(t, tt.wantCursor, result.Cursor)
+			assert.Equal(t, tt.wantNextCursor, result.NextCursor)
 
 			for i, title := range tt.wantTitles {
 				assert.Equal(t, title, result.Discussions[i].Title)
@@ -609,6 +612,7 @@ func TestSearch(t *testing.T) {
 		wantTotal      int
 		wantLen        int
 		wantCursor     string
+		wantNextCursor string
 		wantTitles     []string
 		wantSingleDisc *Discussion
 	}{
@@ -695,6 +699,7 @@ func TestSearch(t *testing.T) {
 					}),
 				)
 			},
+			wantCursor: "someCursor",
 		},
 		{
 			name:    "open state filter",
@@ -860,9 +865,9 @@ func TestSearch(t *testing.T) {
 					httpmock.StringResponse(searchResp(true, "searchCursor42", 5, minimalNode("D1", "Discussion 1"))),
 				)
 			},
-			wantLen:    1,
-			wantTotal:  5,
-			wantCursor: "searchCursor42",
+			wantLen:        1,
+			wantTotal:      5,
+			wantNextCursor: "searchCursor42",
 		},
 		{
 			// Two pages are fetched when limit exceeds the first page's results.
@@ -919,7 +924,8 @@ func TestSearch(t *testing.T) {
 			require.NotNil(t, result)
 			assert.Equal(t, tt.wantTotal, result.TotalCount)
 			assert.Len(t, result.Discussions, tt.wantLen)
-			assert.Equal(t, tt.wantCursor, result.NextCursor)
+			assert.Equal(t, tt.wantCursor, result.Cursor)
+			assert.Equal(t, tt.wantNextCursor, result.NextCursor)
 
 			for i, title := range tt.wantTitles {
 				assert.Equal(t, title, result.Discussions[i].Title)

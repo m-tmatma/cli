@@ -209,7 +209,9 @@ func (c *discussionClient) List(repo ghrepo.Interface, filters ListFilters, afte
 		variables["answered"] = githubv4.Boolean(*filters.Answered)
 	}
 
-	var result DiscussionListResult
+	result := DiscussionListResult{
+		Cursor: after,
+	}
 	remaining := limit
 
 	for {
@@ -326,7 +328,9 @@ func (c *discussionClient) Search(repo ghrepo.Interface, filters SearchFilters, 
 		variables["after"] = githubv4.String(after)
 	}
 
-	var result DiscussionListResult
+	result := DiscussionListResult{
+		Cursor: after,
+	}
 	remaining := limit
 
 	for {

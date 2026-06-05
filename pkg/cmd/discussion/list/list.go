@@ -247,12 +247,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.Exporter != nil {
-		envelope := map[string]interface{}{
-			"totalCount":  result.TotalCount,
-			"discussions": result.Discussions,
-			"next":        result.NextCursor,
-		}
-		return opts.Exporter.Write(opts.IO, envelope)
+		return opts.Exporter.Write(opts.IO, result)
 	}
 
 	if len(result.Discussions) == 0 {
