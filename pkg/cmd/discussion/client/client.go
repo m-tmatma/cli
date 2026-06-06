@@ -22,4 +22,13 @@ type DiscussionClient interface {
 	// Update updates a discussion. The returned discussion may be non-nil even
 	// when err is non-nil, indicating a secondary mutation failure (e.g., labels).
 	Update(repo ghrepo.Interface, input UpdateDiscussionInput) (*Discussion, error)
+	// AddComment adds a comment or reply to a discussion. If replyToID is
+	// non-empty, the comment is created as a reply to that comment.
+	AddComment(repo ghrepo.Interface, discussionID, body, replyToID string) (*DiscussionComment, error)
+	// UpdateComment updates the body of an existing discussion comment or reply.
+	UpdateComment(repo ghrepo.Interface, commentID, body string) (*DiscussionComment, error)
+	// DeleteComment deletes a discussion comment or reply.
+	DeleteComment(repo ghrepo.Interface, commentID string) error
+	// GetComment fetches a single discussion comment by node ID.
+	GetComment(repo ghrepo.Interface, commentID string) (*DiscussionComment, error)
 }
