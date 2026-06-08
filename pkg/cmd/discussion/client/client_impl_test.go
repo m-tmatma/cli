@@ -2533,6 +2533,7 @@ func repoMetaResp(id string, discussionsEnabled bool) string {
 		"data": {
 			"repository": {
 				"id": %q,
+				"databaseId": 982069338,
 				"hasDiscussionsEnabled": %t
 			}
 		}
@@ -3967,6 +3968,63 @@ func TestGetComment(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, comment)
 			assert.Equal(t, tt.wantComment, comment)
+		})
+	}
+}
+
+func TestResolveCommentNodeID(t *testing.T) {
+	tests := []struct {
+		name             string
+		commentDatabaseID int64
+		httpStubs        func(*httpmock.Registry)
+		wantNodeID       string
+		wantErr          string
+	}{
+		{
+			name:             "encodes node ID correctly",
+			commentDatabaseID: 17196842,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(repoMetaResp("R_1", true)),
+				)
+			},
+			wantNodeID: "DC_kwDOOokwWs4BBmcq",
+		},
+		{
+			name:             "repo not found",
+			commentDatabaseID: 123,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
+					httpmock.StringResponse(`{"data":null,"errors":[{"message":"repo not found"}]}`),
+				)
+			},
+			wantErr: "repo not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := ghrepo.New("OWNER", "REPO")
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+
+			c := newTestDiscussionClient(reg)
+			nodeID, err := c.ResolveCommentNodeID(repo, tt.commentDatabaseID)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantNodeID, nodeID)
 		})
 	}
 }

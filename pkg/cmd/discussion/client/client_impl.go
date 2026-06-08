@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // maxPageSize is the maximum number of items per page allowed by the GitHub GraphQL API.
@@ -801,17 +804,19 @@ func (c *discussionClient) ListCategories(repo ghrepo.Interface) ([]DiscussionCa
 	return categories, nil
 }
 
-// repositoryMeta holds the node ID and feature flags fetched for a repository.
+// repositoryMeta holds the node ID, database ID, and feature flags fetched for a repository.
 type repositoryMeta struct {
 	ID                    string
+	DatabaseId            int64
 	HasDiscussionsEnabled bool
 }
 
-// getRepositoryMeta fetches the node ID and discussion-enabled flag for a repository.
+// getRepositoryMeta fetches the node ID, database ID, and discussion-enabled flag for a repository.
 func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repositoryMeta, error) {
 	var query struct {
 		Repository struct {
 			ID                    string
+			DatabaseId            int64
 			HasDiscussionsEnabled bool
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
@@ -827,6 +832,7 @@ func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repository
 
 	return &repositoryMeta{
 		ID:                    query.Repository.ID,
+		DatabaseId:            query.Repository.DatabaseId,
 		HasDiscussionsEnabled: query.Repository.HasDiscussionsEnabled,
 	}, nil
 }
@@ -1212,13 +1218,16 @@ func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (
 		Node struct {
 			Typename          string `graphql:"__typename"`
 			DiscussionComment struct {
-				ID             string
-				URL            string `graphql:"url"`
-				Author         actorNode
-				Body           string
-				CreatedAt      time.Time
-				IsAnswer       bool
-				UpvoteCount    int
+				ID         string
+				URL        string `graphql:"url"`
+				Author     actorNode
+				Body       string
+				CreatedAt  time.Time
+				IsAnswer   bool
+				UpvoteCount int
+				Discussion struct {
+					ID string
+				}
 				ReactionGroups []struct {
 					Content string
 					Users   struct {
@@ -1243,13 +1252,14 @@ func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (
 
 	src := query.Node.DiscussionComment
 	comment := &DiscussionComment{
-		ID:          src.ID,
-		URL:         src.URL,
-		Author:      mapActorFromListNode(src.Author),
-		Body:        src.Body,
-		CreatedAt:   src.CreatedAt,
-		IsAnswer:    src.IsAnswer,
-		UpvoteCount: src.UpvoteCount,
+		ID:           src.ID,
+		URL:          src.URL,
+		DiscussionID: src.Discussion.ID,
+		Author:       mapActorFromListNode(src.Author),
+		Body:         src.Body,
+		CreatedAt:    src.CreatedAt,
+		IsAnswer:     src.IsAnswer,
+		UpvoteCount:  src.UpvoteCount,
 	}
 	for _, rg := range src.ReactionGroups {
 		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
@@ -1258,4 +1268,27 @@ func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (
 		})
 	}
 	return comment, nil
+}
+
+// ResolveCommentNodeID constructs a discussion comment node ID from a
+// repository and a comment database ID. It fetches the repository's database
+// ID via the API, then encodes the data into a  "DC_" prefixed node ID.
+func (c *discussionClient) ResolveCommentNodeID(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+	meta, err := c.getRepositoryMeta(repo)
+	if err != nil {
+		return "", err
+	}
+
+	buf := bytes.Buffer{}
+	parts := []int64{0, meta.DatabaseId, commentDatabaseID}
+
+	encoder := msgpack.NewEncoder(&buf)
+	encoder.UseCompactInts(true)
+
+	if err := encoder.Encode(parts); err != nil {
+		return "", fmt.Errorf("encoding comment node ID: %w", err)
+	}
+
+	encoded := base64.RawURLEncoding.EncodeToString(buf.Bytes())
+	return "DC_" + encoded, nil
 }

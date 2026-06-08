@@ -20,13 +20,13 @@ type CommentOptions struct {
 	Client   func() (client.DiscussionClient, error)
 	Prompter prompter.Prompter
 
-	DiscussionNumber int32
-	Body             string
-	BodyFile         string
-	ReplyTo          string
-	EditID           string
-	DeleteID         string
-	Yes              bool
+	ParsedArg *shared.ParsedDiscussionOrCommentArg
+
+	Body     string
+	BodyFile string
+	Edit     bool
+	Delete   bool
+	Yes      bool
 }
 
 // NewCmdComment returns the "discussion comment" command.
@@ -37,75 +37,88 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "comment {<number> | <url>}",
-		Short: "Add, edit, or delete a comment on a discussion",
+		Use:   "comment {<number> | <discussion-url> | <comment-id> | <comment-url>} [flags]",
+		Short: "Add, edit, or delete a comment or a reply on a discussion (preview)",
 		Long: heredoc.Docf(`
-			Manage comments on a GitHub discussion.
+			Manage comments or replies on a GitHub discussion.
 
-			Without flags, adds a new top-level comment. Use %[1]s--reply-to%[1]s to reply to
-			an existing comment, %[1]s--edit%[1]s to update a comment, or %[1]s--delete%[1]s to remove one.
+			The positional argument can be a discussion number or URL (to add a new
+			top-level comment), or a comment node ID or comment URL (to reply, edit,
+			or delete that comment).
 
-			The body can be supplied via %[1]s--body%[1]s, %[1]s--body-file%[1]s, or interactively through
-			an editor.
+			When the argument is a discussion number or URL, the default action is to
+			add a new top-level comment. Likewise, if the argument is a comment URL or ID
+			the default action is to add a reply.
+
+			Use %[1]s--edit%[1]s to update the comment/reply body, or %[1]s--delete%[1]s to remove it.
+
+			The body can be supplied via %[1]s--body%[1]s, %[1]s--body-file%[1]s, or interactively
+			through an editor.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# Add a comment
-			$ gh discussion comment 123 --body "my comment"
+			# Add a top-level comment to discussion #123
+			$ gh discussion comment 123 --body 'Thanks'
 
-			# Reply to a comment
-			$ gh discussion comment 123 --reply-to DC_abc123 --body "my comment"
+			# Reply to a comment using its URL
+			$ gh discussion comment 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456' --body 'Thanks'
 
-			# Edit a comment
-			$ gh discussion comment 123 --edit DC_abc123 --body "my comment"
+			# Reply to a comment using its node ID
+			$ gh discussion comment DC_abc123 --body 'Thanks'
 
-			# Delete a comment
-			$ gh discussion comment 123 --delete DC_abc123
+			# Edit a comment/reply
+			$ gh discussion comment 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456' --edit --body 'Thanks'
+
+			# Delete a comment/reply
+			$ gh discussion comment 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456' --delete
+
+			# Delete a comment/reply without confirmation prompt
+			$ gh discussion comment 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456' --delete --yes
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 			opts.Client = shared.DiscussionClientFunc(f)
 
-			if err := cmdutil.MutuallyExclusive("specify only one of --reply-to, --edit, or --delete",
-				cmd.Flags().Changed("reply-to"), cmd.Flags().Changed("edit"), cmd.Flags().Changed("delete")); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of --edit or --delete",
+				cmd.Flags().Changed("edit"), cmd.Flags().Changed("delete")); err != nil {
 				return err
+			}
+			if opts.Delete {
+				if cmd.Flags().Changed("body") || cmd.Flags().Changed("body-file") {
+					return cmdutil.FlagErrorf("--delete cannot be combined with --body or --body-file")
+				}
+			}
+			if opts.Yes && !opts.Delete {
+				return cmdutil.FlagErrorf("--yes can only be used with --delete")
+			}
+			if !opts.IO.CanPrompt() && opts.Delete && !opts.Yes {
+				return cmdutil.FlagErrorf("--yes is required when not running interactively with --delete")
+			}
+			if !opts.IO.CanPrompt() && !opts.Delete {
+				if !cmd.Flags().Changed("body") && !cmd.Flags().Changed("body-file") {
+					return cmdutil.FlagErrorf("--body or --body-file is required when not running interactively")
+				}
 			}
 			if err := cmdutil.MutuallyExclusive("specify only one of --body or --body-file",
 				cmd.Flags().Changed("body"), cmd.Flags().Changed("body-file")); err != nil {
 				return err
 			}
-			if cmd.Flags().Changed("delete") {
-				if cmd.Flags().Changed("body") || cmd.Flags().Changed("body-file") {
-					return cmdutil.FlagErrorf("--delete cannot be combined with --body, --body-file, or --editor")
-				}
-			}
 
-			if opts.Yes && opts.DeleteID == "" {
-				return cmdutil.FlagErrorf("--yes can only be used with --delete")
-			}
-
-			if !opts.IO.CanPrompt() && !opts.Yes && opts.DeleteID != "" {
-				return cmdutil.FlagErrorf("--yes is required when not running interactively and using --delete")
-			}
-
-			if !opts.IO.CanPrompt() && !cmd.Flags().Changed("delete") {
-				if !cmd.Flags().Changed("body") && !cmd.Flags().Changed("body-file") {
-					return cmdutil.FlagErrorf("--body or --body-file is required when not running interactively")
-				}
-			}
-
-			number, repo, err := shared.ParseDiscussionArg(args[0])
+			parsed, err := shared.ParseDiscussionOrCommentArg(args[0])
 			if err != nil {
-				return cmdutil.FlagErrorWrap(err)
+				return err
 			}
-			opts.DiscussionNumber = number
 
-			if repo != nil {
+			opts.ParsedArg = parsed
+
+			if (opts.Edit || opts.Delete) && (parsed.CommentNodeID == "" && parsed.CommentDatabaseID == 0) {
+				return cmdutil.FlagErrorf("--edit and --delete require a comment ID or comment URL as argument")
+			}
+
+			if opts.ParsedArg.Repo != nil {
 				opts.BaseRepo = func() (ghrepo.Interface, error) {
-					return repo, nil
+					return parsed.Repo, nil
 				}
-			} else {
-				opts.BaseRepo = f.BaseRepo
 			}
 
 			if runF != nil {
@@ -115,14 +128,13 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 		},
 	}
 
-	cmdutil.EnableRepoOverride(cmd, f)
-
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Comment body text")
-	cmd.Flags().StringVarP(&opts.BodyFile, "body-file", "F", "", "Read body text from file (use \"-\" to read from stdin)")
-	cmd.Flags().StringVar(&opts.ReplyTo, "reply-to", "", "Reply to a comment by its node ID")
-	cmd.Flags().StringVar(&opts.EditID, "edit", "", "Edit a comment by its node ID")
-	cmd.Flags().StringVar(&opts.DeleteID, "delete", "", "Delete a comment by its node ID")
+	cmd.Flags().StringVarP(&opts.BodyFile, "body-file", "F", "", "Read body text from file (use \"-\" to read from standard input)")
+	cmd.Flags().BoolVar(&opts.Edit, "edit", false, "Edit the specified comment")
+	cmd.Flags().BoolVar(&opts.Delete, "delete", false, "Delete the specified comment")
 	cmd.Flags().BoolVar(&opts.Yes, "yes", false, "Skip the delete confirmation prompt")
+
+	cmdutil.EnableRepoOverride(cmd, f)
 
 	return cmd
 }
@@ -138,17 +150,25 @@ func commentRun(opts *CommentOptions) error {
 		return err
 	}
 
-	if opts.DeleteID != "" {
+	if opts.Delete {
 		return runDelete(opts, c, baseRepo)
 	}
-	if opts.EditID != "" {
+	if opts.Edit {
 		return runEdit(opts, c, baseRepo)
+	}
+	if opts.ParsedArg.CommentNodeID != "" || opts.ParsedArg.CommentDatabaseID != 0 {
+		return runReply(opts, c, baseRepo)
 	}
 	return runAdd(opts, c, baseRepo)
 }
 
 func runDelete(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.Interface) error {
-	if _, err := c.GetComment(baseRepo, opts.DeleteID); err != nil {
+	commentID, err := resolveCommentID(opts, c, baseRepo)
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.GetComment(baseRepo, commentID); err != nil {
 		return err
 	}
 
@@ -162,14 +182,16 @@ func runDelete(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.
 		}
 	}
 
-	if err := c.DeleteComment(baseRepo, opts.DeleteID); err != nil {
-		return err
-	}
-	return nil
+	return c.DeleteComment(baseRepo, commentID)
 }
 
 func runEdit(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.Interface) error {
-	existing, err := c.GetComment(baseRepo, opts.EditID)
+	commentID, err := resolveCommentID(opts, c, baseRepo)
+	if err != nil {
+		return err
+	}
+
+	existing, err := c.GetComment(baseRepo, commentID)
 	if err != nil {
 		return err
 	}
@@ -180,7 +202,36 @@ func runEdit(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.In
 	}
 
 	opts.IO.StartProgressIndicator()
-	comment, err := c.UpdateComment(baseRepo, opts.EditID, body)
+	comment, err := c.UpdateComment(baseRepo, commentID, body)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(opts.IO.Out, comment.URL)
+	return nil
+}
+
+func runReply(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.Interface) error {
+	commentID, err := resolveCommentID(opts, c, baseRepo)
+	if err != nil {
+		return err
+	}
+
+	opts.IO.StartProgressIndicator()
+	existing, err := c.GetComment(baseRepo, commentID)
+	opts.IO.StopProgressIndicator()
+	if err != nil {
+		return err
+	}
+
+	body, err := resolveBody(opts, "")
+	if err != nil {
+		return err
+	}
+
+	opts.IO.StartProgressIndicator()
+	comment, err := c.AddComment(baseRepo, existing.DiscussionID, body, commentID)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -197,14 +248,14 @@ func runAdd(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.Int
 	}
 
 	opts.IO.StartProgressIndicator()
-	discussion, err := c.GetByNumber(baseRepo, opts.DiscussionNumber)
+	discussion, err := c.GetByNumber(baseRepo, opts.ParsedArg.Number)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
 	opts.IO.StartProgressIndicator()
-	comment, err := c.AddComment(baseRepo, discussion.ID, body, opts.ReplyTo)
+	comment, err := c.AddComment(baseRepo, discussion.ID, body, "")
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -212,6 +263,19 @@ func runAdd(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.Int
 
 	fmt.Fprintln(opts.IO.Out, comment.URL)
 	return nil
+}
+
+// resolveCommentID returns the comment node ID, resolving it from the database
+// ID via the API if the arg was a comment URL.
+func resolveCommentID(opts *CommentOptions, c client.DiscussionClient, repo ghrepo.Interface) (string, error) {
+	if opts.ParsedArg.CommentNodeID != "" {
+		return opts.ParsedArg.CommentNodeID, nil
+	}
+	if opts.ParsedArg.CommentDatabaseID != 0 {
+		return c.ResolveCommentNodeID(repo, opts.ParsedArg.CommentDatabaseID)
+	}
+	// We should never reach here due to checks at flag parsing.
+	return "", fmt.Errorf("no comment ID/URL available")
 }
 
 // resolveBody determines the comment body from flags or interactive input.

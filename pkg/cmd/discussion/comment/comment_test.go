@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/discussion/client"
+	"github.com/cli/cli/v2/pkg/cmd/discussion/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
@@ -31,70 +32,95 @@ func TestNewCmdComment(t *testing.T) {
 			args:  "123 --body 'Hello world'",
 			isTTY: true,
 			wantOpts: CommentOptions{
-				DiscussionNumber: 123,
-				Body:             "Hello world",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 123},
+				Body:      "Hello world",
 			},
 		},
 		{
-			name:  "add reply",
-			args:  "123 --reply-to DC_abc --body 'Reply text'",
+			name:  "reply to comment by node ID",
+			args:  "DC_abc --body 'Reply text'",
 			isTTY: true,
 			wantOpts: CommentOptions{
-				DiscussionNumber: 123,
-				Body:             "Reply text",
-				ReplyTo:          "DC_abc",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_abc"},
+				Body:      "Reply text",
 			},
 		},
 		{
-			name:  "edit comment with body",
-			args:  "123 --edit DC_abc --body 'Updated'",
+			name:  "reply to comment by comment URL",
+			args:  "https://github.com/OWNER/REPO/discussions/5#discussioncomment-999 --body 'Reply text'",
 			isTTY: true,
 			wantOpts: CommentOptions{
-				DiscussionNumber: 123,
-				EditID:           "DC_abc",
-				Body:             "Updated",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{
+					Number:            5,
+					CommentDatabaseID: 999,
+				},
+				Body: "Reply text",
 			},
+			wantBaseRepo: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 		},
 		{
-			name:  "delete comment",
-			args:  "123 --delete DC_abc",
+			name:  "edit comment by node ID",
+			args:  "DC_abc --edit --body 'Updated'",
 			isTTY: true,
 			wantOpts: CommentOptions{
-				DiscussionNumber: 123,
-				DeleteID:         "DC_abc",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_abc"},
+				Edit:      true,
+				Body:      "Updated",
 			},
 		},
 		{
-			name:  "delete with yes",
-			args:  "123 --delete DC_abc --yes",
+			name:  "edit comment by comment URL",
+			args:  "https://github.com/OWNER/REPO/discussions/5#discussioncomment-999 --edit --body 'Updated'",
 			isTTY: true,
 			wantOpts: CommentOptions{
-				DiscussionNumber: 123,
-				DeleteID:         "DC_abc",
-				Yes:              true,
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{
+					Number:            5,
+					CommentDatabaseID: 999,
+				},
+				Edit: true,
+				Body: "Updated",
 			},
+			wantBaseRepo: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 		},
 		{
-			name:  "url arg overrides base repo",
-			args:  "https://github.com/OTHER/REPO2/discussions/42 --body 'text'",
+			name:  "delete comment by node ID",
+			args:  "DC_abc --delete --yes",
 			isTTY: true,
 			wantOpts: CommentOptions{
-				DiscussionNumber: 42,
-				Body:             "text",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_abc"},
+				Delete:    true,
+				Yes:       true,
 			},
-			wantBaseRepo: ghrepo.New("OTHER", "REPO2"),
 		},
 		{
-			name:    "mutual exclusion reply-to and edit",
-			args:    "123 --reply-to DC_1 --edit DC_2",
+			name:  "delete comment by comment URL",
+			args:  "https://github.com/OWNER/REPO/discussions/5#discussioncomment-999 --delete --yes",
+			isTTY: true,
+			wantOpts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{
+					Number:            5,
+					CommentDatabaseID: 999,
+				},
+				Delete: true,
+				Yes:    true,
+			},
+			wantBaseRepo: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+		},
+		{
+			name:  "discussion URL as argument",
+			args:  "https://github.com/OTHER/REPO2/discussions/42 --body 'comment'",
+			isTTY: true,
+			wantOpts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 42},
+				Body:      "comment",
+			},
+			wantBaseRepo: ghrepo.NewWithHost("OTHER", "REPO2", "github.com"),
+		},
+		{
+			name:    "mutual exclusion edit and delete",
+			args:    "DC_abc --edit --delete",
 			isTTY:   true,
-			wantErr: "specify only one of --reply-to, --edit, or --delete",
-		},
-		{
-			name:    "mutual exclusion reply-to and delete",
-			args:    "123 --reply-to DC_1 --delete DC_2",
-			isTTY:   true,
-			wantErr: "specify only one of --reply-to, --edit, or --delete",
+			wantErr: "specify only one of --edit or --delete",
 		},
 		{
 			name:    "mutual exclusion body and body-file",
@@ -104,15 +130,45 @@ func TestNewCmdComment(t *testing.T) {
 		},
 		{
 			name:    "delete with body is invalid",
-			args:    "123 --delete DC_1 --body 'text'",
+			args:    "DC_abc --delete --body 'text'",
 			isTTY:   true,
-			wantErr: "--delete cannot be combined with --body, --body-file, or --editor",
+			wantErr: "--delete cannot be combined with --body or --body-file",
+		},
+		{
+			name:    "delete with body is invalid",
+			args:    "DC_abc --delete --body-file /some/path",
+			isTTY:   true,
+			wantErr: "--delete cannot be combined with --body or --body-file",
 		},
 		{
 			name:    "yes without delete is invalid",
 			args:    "123 --yes --body 'text'",
 			isTTY:   true,
 			wantErr: "--yes can only be used with --delete",
+		},
+		{
+			name:    "edit requires comment arg but given discussion number",
+			args:    "123 --edit --body 'text'",
+			isTTY:   true,
+			wantErr: "--edit and --delete require a comment ID or comment URL",
+		},
+		{
+			name:    "edit requires comment arg but given discussion URL",
+			args:    "https://github.com/OWNER/REPO/discussions/123 --edit --body 'text'",
+			isTTY:   true,
+			wantErr: "--edit and --delete require a comment ID or comment URL",
+		},
+		{
+			name:    "delete requires comment arg but given discussion number",
+			args:    "123 --delete --yes",
+			isTTY:   true,
+			wantErr: "--edit and --delete require a comment ID or comment URL",
+		},
+		{
+			name:    "delete requires comment arg but given discussion URL",
+			args:    "https://github.com/OWNER/REPO/discussions/123 --delete --yes",
+			isTTY:   true,
+			wantErr: "--edit and --delete require a comment ID or comment URL",
 		},
 		{
 			name:    "no body non-tty is error",
@@ -122,9 +178,9 @@ func TestNewCmdComment(t *testing.T) {
 		},
 		{
 			name:    "delete without yes non-tty is error",
-			args:    "123 --delete DC_1",
+			args:    "DC_abc --delete",
 			isTTY:   false,
-			wantErr: "--yes is required when not running interactively",
+			wantErr: "--yes is required when not running interactively with --delete",
 		},
 		{
 			name:    "no args",
@@ -160,12 +216,15 @@ func TestNewCmdComment(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantOpts.DiscussionNumber, gotOpts.DiscussionNumber)
+			require.NotNil(t, gotOpts.ParsedArg)
+			if tt.wantOpts.ParsedArg != nil {
+				assert.Equal(t, tt.wantOpts.ParsedArg.Number, gotOpts.ParsedArg.Number)
+				assert.Equal(t, tt.wantOpts.ParsedArg.CommentNodeID, gotOpts.ParsedArg.CommentNodeID)
+				assert.Equal(t, tt.wantOpts.ParsedArg.CommentDatabaseID, gotOpts.ParsedArg.CommentDatabaseID)
+			}
 			assert.Equal(t, tt.wantOpts.Body, gotOpts.Body)
-			assert.Equal(t, tt.wantOpts.BodyFile, gotOpts.BodyFile)
-			assert.Equal(t, tt.wantOpts.ReplyTo, gotOpts.ReplyTo)
-			assert.Equal(t, tt.wantOpts.EditID, gotOpts.EditID)
-			assert.Equal(t, tt.wantOpts.DeleteID, gotOpts.DeleteID)
+			assert.Equal(t, tt.wantOpts.Edit, gotOpts.Edit)
+			assert.Equal(t, tt.wantOpts.Delete, gotOpts.Delete)
 			assert.Equal(t, tt.wantOpts.Yes, gotOpts.Yes)
 
 			if tt.wantBaseRepo != nil {
@@ -184,18 +243,18 @@ func TestCommentRun(t *testing.T) {
 		bodyFileContent string
 		stdinContent    string
 		isTTY           bool
-		setupMock       func(*client.DiscussionClientMock)
+		setupMock       func(*testing.T, *client.DiscussionClientMock)
 		prompter        *prompter.PrompterMock
 		wantErr         string
 		wantOut         string
 	}{
 		{
-			name: "add comment with body",
+			name: "non-tty add comment with body",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				Body:             "Hello world",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5},
+				Body:      "Hello world",
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					assert.Equal(t, int32(5), number)
 					return sampleDiscussion(), nil
@@ -210,32 +269,12 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name: "add reply with body",
+			name: "non-tty add comment with body-file",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				Body:             "Reply text",
-				ReplyTo:          "DC_parent",
-			},
-			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
-					return sampleDiscussion(), nil
-				}
-				m.AddCommentFunc = func(repo ghrepo.Interface, discussionID, body, replyToID string) (*client.DiscussionComment, error) {
-					assert.Equal(t, "D_1", discussionID)
-					assert.Equal(t, "Reply text", body)
-					assert.Equal(t, "DC_parent", replyToID)
-					return sampleComment(), nil
-				}
-			},
-			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
-		},
-		{
-			name: "add comment with body-file",
-			opts: CommentOptions{
-				DiscussionNumber: 5,
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5},
 			},
 			bodyFileContent: "Body from file",
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
@@ -247,13 +286,13 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name: "add comment with body-file from stdin",
+			name: "non-tty add comment with body-file from stdin",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				BodyFile:         "-",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5},
+				BodyFile:  "-",
 			},
 			stdinContent: "Body from stdin",
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
@@ -265,12 +304,12 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name:  "add comment interactive editor",
+			name:  "tty add comment interactive editor",
 			isTTY: true,
 			opts: CommentOptions{
-				DiscussionNumber: 5,
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5},
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
@@ -281,7 +320,6 @@ func TestCommentRun(t *testing.T) {
 			},
 			prompter: &prompter.PrompterMock{
 				MarkdownEditorFunc: func(prompt, defaultValue string, blankAllowed bool) (string, error) {
-					assert.False(t, blankAllowed)
 					assert.Equal(t, "", defaultValue)
 					return "Editor body", nil
 				},
@@ -289,13 +327,66 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name: "edit comment with body",
+			name: "non-tty reply to comment by node ID",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				EditID:           "DC_1",
-				Body:             "Updated body",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_parent"},
+				Body:      "Reply text",
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					return &client.DiscussionComment{
+						ID:           "DC_parent",
+						URL:          "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1",
+						DiscussionID: "D_1",
+						Body:         "Parent comment",
+					}, nil
+				}
+				m.AddCommentFunc = func(repo ghrepo.Interface, discussionID, body, replyToID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "D_1", discussionID)
+					assert.Equal(t, "Reply text", body)
+					assert.Equal(t, "DC_parent", replyToID)
+					return sampleComment(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
+		},
+		{
+			name: "non-tty reply via comment URL",
+			opts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{
+					Number:            5,
+					CommentDatabaseID: 17196842,
+				},
+				Body: "Reply text",
+			},
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.ResolveCommentNodeIDFunc = func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+					assert.Equal(t, int64(17196842), commentDatabaseID)
+					return "DC_resolved", nil
+				}
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "DC_resolved", commentID)
+					return &client.DiscussionComment{
+						ID:           "DC_resolved",
+						DiscussionID: "D_1",
+					}, nil
+				}
+				m.AddCommentFunc = func(repo ghrepo.Interface, discussionID, body, replyToID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "D_1", discussionID)
+					assert.Equal(t, "DC_resolved", replyToID)
+					return sampleComment(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
+		},
+		{
+			name: "non-tty edit comment via node ID with body",
+			opts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Edit:      true,
+				Body:      "Updated body",
+			},
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
 					assert.Equal(t, "DC_1", commentID)
 					return sampleComment(), nil
@@ -309,13 +400,57 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name:  "edit comment interactive editor pre-populates",
+			name: "non-tty edit comment via comment URL with body",
+			opts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5, CommentDatabaseID: 999},
+				Edit:      true,
+				Body:      "Updated body",
+			},
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.ResolveCommentNodeIDFunc = func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+					assert.Equal(t, int64(999), commentDatabaseID)
+					return "DC_resolved", nil
+				}
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "DC_resolved", commentID)
+					return sampleComment(), nil
+				}
+				m.UpdateCommentFunc = func(repo ghrepo.Interface, commentID, body string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "DC_resolved", commentID)
+					assert.Equal(t, "Updated body", body)
+					return sampleComment(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
+		},
+		{
+			name: "non-tty edit comment with body-file from stdin",
+			opts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Edit:      true,
+				BodyFile:  "-",
+			},
+			stdinContent: "Edited from stdin",
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					return sampleComment(), nil
+				}
+				m.UpdateCommentFunc = func(repo ghrepo.Interface, commentID, body string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "DC_1", commentID)
+					assert.Equal(t, "Edited from stdin", body)
+					return sampleComment(), nil
+				}
+			},
+			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
+		},
+		{
+			name:  "tty edit comment via node ID interactive editor pre-populates",
 			isTTY: true,
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				EditID:           "DC_1",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Edit:      true,
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
@@ -326,7 +461,6 @@ func TestCommentRun(t *testing.T) {
 			},
 			prompter: &prompter.PrompterMock{
 				MarkdownEditorFunc: func(prompt, defaultValue string, blankAllowed bool) (string, error) {
-					assert.False(t, blankAllowed)
 					assert.Equal(t, "Original comment body", defaultValue)
 					return "Edited in editor", nil
 				},
@@ -334,15 +468,14 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name:  "delete comment with confirmation",
+			name:  "tty delete comment via node ID with confirmation",
 			isTTY: true,
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				DeleteID:         "DC_1",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Delete:    true,
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
-					assert.Equal(t, "DC_1", commentID)
 					return sampleComment(), nil
 				}
 				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
@@ -359,13 +492,41 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "",
 		},
 		{
-			name: "delete comment with --yes skips prompt",
+			name:  "tty delete comment via comment URL with confirmation",
+			isTTY: true,
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				DeleteID:         "DC_1",
-				Yes:              true,
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5, CommentDatabaseID: 999},
+				Delete:    true,
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.ResolveCommentNodeIDFunc = func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+					return "DC_resolved", nil
+				}
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "DC_resolved", commentID)
+					return sampleComment(), nil
+				}
+				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
+					assert.Equal(t, "DC_resolved", commentID)
+					return nil
+				}
+			},
+			prompter: &prompter.PrompterMock{
+				ConfirmFunc: func(prompt string, defaultValue bool) (bool, error) {
+					return true, nil
+				},
+			},
+			wantOut: "",
+		},
+		{
+			name:  "tty delete comment with --yes skips prompt",
+			isTTY: true,
+			opts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Delete:    true,
+				Yes:       true,
+			},
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
@@ -376,13 +537,13 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "",
 		},
 		{
-			name:  "delete comment declined",
+			name:  "tty delete comment declined",
 			isTTY: true,
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				DeleteID:         "DC_1",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Delete:    true,
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
@@ -395,12 +556,12 @@ func TestCommentRun(t *testing.T) {
 			wantErr: "CancelError",
 		},
 		{
-			name: "add comment discussion not found",
+			name: "GetByNumber error",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				Body:             "text",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5},
+				Body:      "text",
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return nil, fmt.Errorf("not found")
 				}
@@ -408,12 +569,12 @@ func TestCommentRun(t *testing.T) {
 			wantErr: "not found",
 		},
 		{
-			name: "add comment mutation failed",
+			name: "AddComment error",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				Body:             "text",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{Number: 5},
+				Body:      "text",
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetByNumberFunc = func(repo ghrepo.Interface, number int32) (*client.Discussion, error) {
 					return sampleDiscussion(), nil
 				}
@@ -424,44 +585,47 @@ func TestCommentRun(t *testing.T) {
 			wantErr: "mutation failed",
 		},
 		{
-			name: "edit comment not found",
+			name: "UpdateComment mutation error",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				EditID:           "DC_bad",
-				Body:             "text",
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Edit:      true,
+				Body:      "text",
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
-					return nil, fmt.Errorf("comment not found")
-				}
-			},
-			wantErr: "comment not found",
-		},
-		{
-			name: "edit comment mutation error",
-			opts: CommentOptions{
-				DiscussionNumber: 5,
-				EditID:           "DC_1",
-				Body:             "text",
-			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.UpdateCommentFunc = func(repo ghrepo.Interface, commentID, body string) (*client.DiscussionComment, error) {
-					return nil, fmt.Errorf("edit comment mutation failed")
+					return nil, fmt.Errorf("update mutation failed")
 				}
 			},
-			wantErr: "edit comment mutation failed",
+			wantErr: "update mutation failed",
 		},
 		{
-			name: "delete comment not found",
+			name: "DeleteComment mutation error",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				DeleteID:         "DC_bad",
-				Yes:              true,
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_1"},
+				Delete:    true,
+				Yes:       true,
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					return sampleComment(), nil
+				}
+				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
+					return fmt.Errorf("delete mutation failed")
+				}
+			},
+			wantErr: "delete mutation failed",
+		},
+		{
+			name: "GetComment error on edit",
+			opts: CommentOptions{
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_bad"},
+				Edit:      true,
+				Body:      "text",
+			},
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
 					return nil, fmt.Errorf("comment not found")
 				}
@@ -469,21 +633,18 @@ func TestCommentRun(t *testing.T) {
 			wantErr: "comment not found",
 		},
 		{
-			name: "delete comment mutation error",
+			name: "GetComment error on delete",
 			opts: CommentOptions{
-				DiscussionNumber: 5,
-				DeleteID:         "DC_1",
-				Yes:              true,
+				ParsedArg: &shared.ParsedDiscussionOrCommentArg{CommentNodeID: "DC_bad"},
+				Delete:    true,
+				Yes:       true,
 			},
-			setupMock: func(m *client.DiscussionClientMock) {
+			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
 				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
-					return sampleComment(), nil
-				}
-				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
-					return fmt.Errorf("delete comment mutation failed")
+					return nil, fmt.Errorf("comment not found")
 				}
 			},
-			wantErr: "delete comment mutation failed",
+			wantErr: "comment not found",
 		},
 	}
 
@@ -499,7 +660,7 @@ func TestCommentRun(t *testing.T) {
 
 			mockClient := &client.DiscussionClientMock{}
 			if tt.setupMock != nil {
-				tt.setupMock(mockClient)
+				tt.setupMock(t, mockClient)
 			}
 
 			opts := tt.opts

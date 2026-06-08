@@ -48,6 +48,9 @@ var _ DiscussionClient = &DiscussionClientMock{}
 //			ListLabelsFunc: func(repo ghrepo.Interface) ([]DiscussionLabel, error) {
 //				panic("mock out the ListLabels method")
 //			},
+//			ResolveCommentNodeIDFunc: func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+//				panic("mock out the ResolveCommentNodeID method")
+//			},
 //			SearchFunc: func(repo ghrepo.Interface, filters SearchFilters, after string, limit int) (*DiscussionListResult, error) {
 //				panic("mock out the Search method")
 //			},
@@ -93,6 +96,9 @@ type DiscussionClientMock struct {
 
 	// ListLabelsFunc mocks the ListLabels method.
 	ListLabelsFunc func(repo ghrepo.Interface) ([]DiscussionLabel, error)
+
+	// ResolveCommentNodeIDFunc mocks the ResolveCommentNodeID method.
+	ResolveCommentNodeIDFunc func(repo ghrepo.Interface, commentDatabaseID int64) (string, error)
 
 	// SearchFunc mocks the Search method.
 	SearchFunc func(repo ghrepo.Interface, filters SearchFilters, after string, limit int) (*DiscussionListResult, error)
@@ -193,6 +199,13 @@ type DiscussionClientMock struct {
 			// Repo is the repo argument value.
 			Repo ghrepo.Interface
 		}
+		// ResolveCommentNodeID holds details about calls to the ResolveCommentNodeID method.
+		ResolveCommentNodeID []struct {
+			// Repo is the repo argument value.
+			Repo ghrepo.Interface
+			// CommentDatabaseID is the commentDatabaseID argument value.
+			CommentDatabaseID int64
+		}
 		// Search holds details about calls to the Search method.
 		Search []struct {
 			// Repo is the repo argument value.
@@ -221,19 +234,20 @@ type DiscussionClientMock struct {
 			Body string
 		}
 	}
-	lockAddComment        sync.RWMutex
-	lockCreate            sync.RWMutex
-	lockDeleteComment     sync.RWMutex
-	lockGetByNumber       sync.RWMutex
-	lockGetComment        sync.RWMutex
-	lockGetCommentReplies sync.RWMutex
-	lockGetWithComments   sync.RWMutex
-	lockList              sync.RWMutex
-	lockListCategories    sync.RWMutex
-	lockListLabels        sync.RWMutex
-	lockSearch            sync.RWMutex
-	lockUpdate            sync.RWMutex
-	lockUpdateComment     sync.RWMutex
+	lockAddComment           sync.RWMutex
+	lockCreate               sync.RWMutex
+	lockDeleteComment        sync.RWMutex
+	lockGetByNumber          sync.RWMutex
+	lockGetComment           sync.RWMutex
+	lockGetCommentReplies    sync.RWMutex
+	lockGetWithComments      sync.RWMutex
+	lockList                 sync.RWMutex
+	lockListCategories       sync.RWMutex
+	lockListLabels           sync.RWMutex
+	lockResolveCommentNodeID sync.RWMutex
+	lockSearch               sync.RWMutex
+	lockUpdate               sync.RWMutex
+	lockUpdateComment        sync.RWMutex
 }
 
 // AddComment calls AddCommentFunc.
@@ -629,6 +643,42 @@ func (mock *DiscussionClientMock) ListLabelsCalls() []struct {
 	mock.lockListLabels.RLock()
 	calls = mock.calls.ListLabels
 	mock.lockListLabels.RUnlock()
+	return calls
+}
+
+// ResolveCommentNodeID calls ResolveCommentNodeIDFunc.
+func (mock *DiscussionClientMock) ResolveCommentNodeID(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+	if mock.ResolveCommentNodeIDFunc == nil {
+		panic("DiscussionClientMock.ResolveCommentNodeIDFunc: method is nil but DiscussionClient.ResolveCommentNodeID was just called")
+	}
+	callInfo := struct {
+		Repo              ghrepo.Interface
+		CommentDatabaseID int64
+	}{
+		Repo:              repo,
+		CommentDatabaseID: commentDatabaseID,
+	}
+	mock.lockResolveCommentNodeID.Lock()
+	mock.calls.ResolveCommentNodeID = append(mock.calls.ResolveCommentNodeID, callInfo)
+	mock.lockResolveCommentNodeID.Unlock()
+	return mock.ResolveCommentNodeIDFunc(repo, commentDatabaseID)
+}
+
+// ResolveCommentNodeIDCalls gets all the calls that were made to ResolveCommentNodeID.
+// Check the length with:
+//
+//	len(mockedDiscussionClient.ResolveCommentNodeIDCalls())
+func (mock *DiscussionClientMock) ResolveCommentNodeIDCalls() []struct {
+	Repo              ghrepo.Interface
+	CommentDatabaseID int64
+} {
+	var calls []struct {
+		Repo              ghrepo.Interface
+		CommentDatabaseID int64
+	}
+	mock.lockResolveCommentNodeID.RLock()
+	calls = mock.calls.ResolveCommentNodeID
+	mock.lockResolveCommentNodeID.RUnlock()
 	return calls
 }
 

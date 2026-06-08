@@ -142,11 +142,24 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
+			name: "replies flag with comment url",
+			args: "123 --replies https://github.com/OWNER/REPO2/discussions/123#discussioncomment-456",
+			wantOpts: ViewOptions{
+				DiscussionNumber:   123,
+				RepliesCommentDBID: 456,
+				RepliesArg:         "https://github.com/OWNER/REPO2/discussions/123#discussioncomment-456",
+				Limit:              30,
+				Order:              "newest",
+			},
+			wantRepo: "OWNER/REPO2",
+		},
+		{
 			name: "replies flag",
 			args: "123 --replies DC_abc",
 			wantOpts: ViewOptions{
 				DiscussionNumber: 123,
-				Replies:          "DC_abc",
+				RepliesArg:       "DC_abc",
+				RepliesCommentID: "DC_abc",
 				Limit:            30,
 				Order:            "newest",
 			},
@@ -156,7 +169,8 @@ func TestNewCmdView(t *testing.T) {
 			args: "123 --replies DC_abc --limit 10",
 			wantOpts: ViewOptions{
 				DiscussionNumber: 123,
-				Replies:          "DC_abc",
+				RepliesArg:       "DC_abc",
+				RepliesCommentID: "DC_abc",
 				Limit:            10,
 				Order:            "newest",
 			},
@@ -166,7 +180,8 @@ func TestNewCmdView(t *testing.T) {
 			args: "123 --replies DC_abc --after CURSOR",
 			wantOpts: ViewOptions{
 				DiscussionNumber: 123,
-				Replies:          "DC_abc",
+				RepliesArg:       "DC_abc",
+				RepliesCommentID: "DC_abc",
 				Limit:            30,
 				After:            "CURSOR",
 				Order:            "newest",
@@ -177,7 +192,8 @@ func TestNewCmdView(t *testing.T) {
 			args: "123 --replies DC_abc --order oldest",
 			wantOpts: ViewOptions{
 				DiscussionNumber: 123,
-				Replies:          "DC_abc",
+				RepliesArg:       "DC_abc",
+				RepliesCommentID: "DC_abc",
 				Limit:            30,
 				Order:            "oldest",
 			},
@@ -261,7 +277,9 @@ func TestNewCmdView(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.DiscussionNumber, gotOpts.DiscussionNumber)
 			assert.Equal(t, tt.wantOpts.WebMode, gotOpts.WebMode)
 			assert.Equal(t, tt.wantOpts.Comments, gotOpts.Comments)
-			assert.Equal(t, tt.wantOpts.Replies, gotOpts.Replies)
+			assert.Equal(t, tt.wantOpts.RepliesArg, gotOpts.RepliesArg)
+			assert.Equal(t, tt.wantOpts.RepliesCommentDBID, gotOpts.RepliesCommentDBID)
+			assert.Equal(t, tt.wantOpts.RepliesCommentID, gotOpts.RepliesCommentID)
 			assert.Equal(t, tt.wantOpts.Limit, gotOpts.Limit)
 			assert.Equal(t, tt.wantOpts.After, gotOpts.After)
 			assert.Equal(t, tt.wantOpts.Order, gotOpts.Order)
@@ -723,7 +741,46 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				Replies: "DC_abc",
+				RepliesCommentID: "DC_abc",
+			},
+			wantStdout: heredoc.Doc(`
+				octocat commented less than a minute ago ✓ Answer
+
+				  This is the parent comment                                                  
+
+				👍 3
+
+				  hubot commented less than a minute ago
+				  
+				    First reply                                                                 
+				  
+				  
+				  monalisa commented less than a minute ago
+				  
+				    Second reply                                                                
+				  
+				  
+			`),
+		},
+		{
+			name: "replies via comment URL tty",
+			tty:  true,
+			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.ResolveCommentNodeIDFunc = func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+					assert.Equal(t, int64(9999999), commentDatabaseID)
+					return "DC_resolved", nil
+				}
+				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
+					assert.Equal(t, int32(123), number)
+					assert.Equal(t, "DC_resolved", commentID)
+					assert.Equal(t, 30, limit)
+					assert.Equal(t, true, newest)
+					return exampleDiscussionWithReplies(""), nil
+				}
+			},
+			opts: ViewOptions{
+				RepliesCommentDBID: 9999999,
 			},
 			wantStdout: heredoc.Doc(`
 				octocat commented less than a minute ago ✓ Answer
@@ -759,7 +816,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				Replies: "DC_abc",
+				RepliesCommentID: "DC_abc",
 			},
 			wantStdout: heredoc.Doc(`
 				octocat commented less than a minute ago ✓ Answer
@@ -796,8 +853,8 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				Replies: "DC_abc",
-				Order:   "oldest",
+				RepliesCommentID: "DC_abc",
+				Order:            "oldest",
 			},
 			wantStdout: heredoc.Doc(`
 				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
@@ -826,8 +883,8 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				Replies: "DC_abc",
-				Order:   "oldest",
+				RepliesCommentID: "DC_abc",
+				Order:            "oldest",
 			},
 			wantStdout: heredoc.Doc(`
 				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
@@ -857,8 +914,8 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				Replies:  "DC_abc",
-				Exporter: jsonExporter("comments"),
+				RepliesCommentID: "DC_abc",
+				Exporter:         jsonExporter("comments"),
 			},
 			wantStdout: compactJSON(heredoc.Doc(`
 				{
@@ -921,8 +978,8 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				Replies:  "DC_abc",
-				Exporter: jsonExporter("comments"),
+				RepliesCommentID: "DC_abc",
+				Exporter:         jsonExporter("comments"),
 			},
 			wantStdout: compactJSON(heredoc.Doc(`
 				{

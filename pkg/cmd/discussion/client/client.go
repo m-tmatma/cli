@@ -31,4 +31,7 @@ type DiscussionClient interface {
 	DeleteComment(repo ghrepo.Interface, commentID string) error
 	// GetComment fetches a single discussion comment by node ID.
 	GetComment(repo ghrepo.Interface, commentID string) (*DiscussionComment, error)
+	// ResolveCommentNodeID constructs a discussion comment node ID from a
+	// repository and a comment database ID (the numeric ID from the URL fragment).
+	ResolveCommentNodeID(repo ghrepo.Interface, commentDatabaseID int64) (string, error)
 }
