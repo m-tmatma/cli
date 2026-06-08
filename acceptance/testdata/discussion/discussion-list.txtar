@@ -34,9 +34,8 @@ exec gh discussion create --title 'Second Discussion' --body 'Second body' --cat
 # Create a Q&A discussion and mark it as answered
 exec gh discussion create --title 'QA Discussion' --body 'QA body' --category 'Q&A'
 stdout2env QA_URL
-exec gh discussion view $QA_URL --json id --jq '.id'
-stdout2env QA_ID
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$QA_ID'", body: "This is the answer"}) { comment { id } } }' --jq '.data.addDiscussionComment.comment.id'
+exec gh discussion comment $QA_URL --body 'This is the answer'
+exec gh discussion view $QA_URL --comments --json comments --jq '.comments.nodes[0].id'
 stdout2env QA_COMMENT_ID
 exec gh api graphql -f query='mutation { markDiscussionCommentAsAnswer(input: {id: "'$QA_COMMENT_ID'"}) { discussion { id } } }'
 

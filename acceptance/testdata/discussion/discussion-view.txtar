@@ -36,19 +36,19 @@ jq-assert VIEW_JSON '.body' 'Discussion body content'
 jq-assert VIEW_JSON '.labels[0].name' 'bug'
 jq-assert VIEW_JSON '.labels[1].name' 'enhancement'
 
-# Get the discussion node ID for adding comments via API
-jq2env VIEW_JSON '.id' DISCUSSION_ID
+# Add two comments using the comment command
+exec gh discussion comment $DISCUSSION_URL --body 'First comment body'
+exec gh discussion comment $DISCUSSION_URL --body 'Second comment body'
 
-# Add two comments via API
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", body: "First comment body"}) { comment { id } } }' --jq '.data.addDiscussionComment.comment.id'
-stdout2env COMMENT1_ID
-
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", body: "Second comment body"}) { comment { id } } }' --jq '.data.addDiscussionComment.comment.id'
-stdout2env COMMENT2_ID
+# Get comment IDs for reply tests
+exec gh discussion view $DISCUSSION_URL --comments --order oldest --json comments
+stdout2env COMMENTS_JSON
+jq2env COMMENTS_JSON '.comments.nodes[0].id' COMMENT1_ID
+jq2env COMMENTS_JSON '.comments.nodes[1].id' COMMENT2_ID
 
 # Add replies to the first comment
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", replyToId: "'$COMMENT1_ID'", body: "Reply one to first"}) { comment { id } } }'
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", replyToId: "'$COMMENT1_ID'", body: "Reply two to first"}) { comment { id } } }'
+exec gh discussion comment $DISCUSSION_URL --reply-to $COMMENT1_ID --body 'Reply one to first'
+exec gh discussion comment $DISCUSSION_URL --reply-to $COMMENT1_ID --body 'Reply two to first'
 
 # View with --comments in non-interactive mode
 exec gh discussion view $DISCUSSION_URL --comments
