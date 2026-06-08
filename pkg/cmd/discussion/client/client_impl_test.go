@@ -3974,14 +3974,14 @@ func TestGetComment(t *testing.T) {
 
 func TestResolveCommentNodeID(t *testing.T) {
 	tests := []struct {
-		name             string
+		name              string
 		commentDatabaseID int64
-		httpStubs        func(*httpmock.Registry)
-		wantNodeID       string
-		wantErr          string
+		httpStubs         func(*httpmock.Registry)
+		wantNodeID        string
+		wantErr           string
 	}{
 		{
-			name:             "encodes node ID correctly",
+			name:              "encodes node ID correctly",
 			commentDatabaseID: 17196842,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -3992,7 +3992,7 @@ func TestResolveCommentNodeID(t *testing.T) {
 			wantNodeID: "DC_kwDOOokwWs4BBmcq",
 		},
 		{
-			name:             "repo not found",
+			name:              "repo not found",
 			commentDatabaseID: 123,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(

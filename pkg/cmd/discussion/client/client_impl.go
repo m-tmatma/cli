@@ -1218,14 +1218,14 @@ func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (
 		Node struct {
 			Typename          string `graphql:"__typename"`
 			DiscussionComment struct {
-				ID         string
-				URL        string `graphql:"url"`
-				Author     actorNode
-				Body       string
-				CreatedAt  time.Time
-				IsAnswer   bool
+				ID          string
+				URL         string `graphql:"url"`
+				Author      actorNode
+				Body        string
+				CreatedAt   time.Time
+				IsAnswer    bool
 				UpvoteCount int
-				Discussion struct {
+				Discussion  struct {
 					ID string
 				}
 				ReactionGroups []struct {
