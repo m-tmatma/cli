@@ -189,6 +189,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		},
 	}
 
+	cmdutil.EnableRepoOverride(cmd, f)
+
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open a discussion in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View discussion comments")
 	cmd.Flags().StringVar(&opts.Replies, "replies", "", "View replies on a specific comment by its node ID")
