@@ -35,11 +35,11 @@ jq2env COMMENTS_JSON '.comments.nodes[0].id' FIRST_COMMENT_ID
 jq2env COMMENTS_JSON '.comments.nodes[1].id' SECOND_COMMENT_ID
 
 # Add a reply to the first comment
-exec gh discussion comment $DISCUSSION_URL --reply-to $FIRST_COMMENT_ID --body 'Reply to first'
+exec gh discussion comment $FIRST_COMMENT_ID --body 'Reply to first'
 stdout 'discussioncomment'
 
 # Add a reply to the second comment from file
-exec gh discussion comment $DISCUSSION_URL --reply-to $SECOND_COMMENT_ID --body-file $WORK/reply-body.txt
+exec gh discussion comment $SECOND_COMMENT_ID --body-file $WORK/reply-body.txt
 stdout 'discussioncomment'
 
 # Verify the reply appears
@@ -56,19 +56,19 @@ jq-assert REPLIES_JSON '.comments.nodes[0].replies.nodes[0].body' 'Reply from fi
 jq2env REPLIES_JSON '.comments.nodes[0].replies.nodes[0].id' SECOND_REPLY_ID
 
 # Edit the first comment
-exec gh discussion comment $DISCUSSION_URL --edit $FIRST_COMMENT_ID --body 'Edited first comment'
+exec gh discussion comment $FIRST_COMMENT_ID --edit --body 'Edited first comment'
 stdout 'discussioncomment'
 
 # Edit the second comment from file
-exec gh discussion comment $DISCUSSION_URL --edit $SECOND_COMMENT_ID --body-file $WORK/edit-comment-body.txt
+exec gh discussion comment $SECOND_COMMENT_ID --edit --body-file $WORK/edit-comment-body.txt
 stdout 'discussioncomment'
 
 # Edit the first reply
-exec gh discussion comment $DISCUSSION_URL --edit $FIRST_REPLY_ID --body 'Edited first reply'
+exec gh discussion comment $FIRST_REPLY_ID --edit --body 'Edited first reply'
 stdout 'discussioncomment'
 
 # Edit the second reply from file
-exec gh discussion comment $DISCUSSION_URL --edit $SECOND_REPLY_ID --body-file $WORK/edit-reply-body.txt
+exec gh discussion comment $SECOND_REPLY_ID --edit --body-file $WORK/edit-reply-body.txt
 stdout 'discussioncomment'
 
 # Verify edits appear
@@ -80,23 +80,57 @@ jq-assert EDITED_COMMENTS_JSON '.comments.nodes[1].body' 'Edited comment from fi
 jq-assert EDITED_COMMENTS_JSON '.comments.nodes[1].replies.nodes[0].body' 'Edited reply from file'
 
 # Delete with --yes should fail when run non-interactively
-! exec gh discussion comment $DISCUSSION_URL --delete $SECOND_COMMENT_ID
+! exec gh discussion comment $SECOND_COMMENT_ID --delete
 stderr '--yes'
 
 # Delete the second comment and its reply
 #
 # Note that if we only delete the comment, the reply will still exist and the API will keep returning the comment
 # (parent), but with an empty body. We delete them both here to avoid confusing assertions later.
-exec gh discussion comment $DISCUSSION_URL --delete $SECOND_COMMENT_ID --yes
-exec gh discussion comment $DISCUSSION_URL --delete $SECOND_REPLY_ID --yes
+exec gh discussion comment $SECOND_COMMENT_ID --delete --yes
+exec gh discussion comment $SECOND_REPLY_ID --delete --yes
 
 # Verify deletion
-exec gh discussion view $DISCUSSION_URL --comments --json comments
+exec gh discussion view $DISCUSSION_URL --comments --order oldest --json comments
 stdout2env DELETED_COMMENTS_JSON
 jq-assert DELETED_COMMENTS_JSON '.comments.nodes | length' '^1$'
 jq-assert DELETED_COMMENTS_JSON '.comments.nodes[0].body' 'Edited first comment'
 jq-assert DELETED_COMMENTS_JSON '.comments.nodes[0].replies.nodes | length' '^1$'
 jq-assert DELETED_COMMENTS_JSON '.comments.nodes[0].replies.nodes[0].body' 'Edited first reply'
+
+# Test add, edit, and delete using comment URLs instead of node IDs
+
+# Get the URL of the remaining comment
+jq2env DELETED_COMMENTS_JSON '.comments.nodes[0].url' FIRST_COMMENT_URL
+
+# Add a reply using the comment URL
+exec gh discussion comment $FIRST_COMMENT_URL --body 'Reply via URL'
+stdout2env REPLY_URL
+stdout 'discussioncomment'
+
+# Verify the reply
+exec gh discussion view $DISCUSSION_URL --replies $FIRST_COMMENT_URL --order oldest --json comments
+stdout2env URL_REPLIES_JSON
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes | length' '^2$'
+
+# Edit the reply using its URL
+exec gh discussion comment $REPLY_URL --edit --body 'Edited reply via URL'
+stdout 'discussioncomment'
+
+# Verify the edit
+exec gh discussion view $DISCUSSION_URL --replies $FIRST_COMMENT_URL --order oldest --json comments
+stdout2env EDITED_URL_REPLIES_JSON
+jq-assert EDITED_URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[0].body' 'Edited first reply'
+jq-assert EDITED_URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[1].body' 'Edited reply via URL'
+
+# Delete the reply using its URL
+exec gh discussion comment $REPLY_URL --delete --yes
+
+# Verify deletion
+exec gh discussion view $DISCUSSION_URL --replies $FIRST_COMMENT_URL --order oldest --json comments
+stdout2env FINAL_URL_REPLIES_JSON
+jq-assert FINAL_URL_REPLIES_JSON '.comments.nodes[0].replies.nodes | length' '^1$'
+jq-assert FINAL_URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[0].body' 'Edited first reply'
 
 -- comment-body.txt --
 Comment from file

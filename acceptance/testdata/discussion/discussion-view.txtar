@@ -47,8 +47,8 @@ jq2env COMMENTS_JSON '.comments.nodes[0].id' COMMENT1_ID
 jq2env COMMENTS_JSON '.comments.nodes[1].id' COMMENT2_ID
 
 # Add replies to the first comment
-exec gh discussion comment $DISCUSSION_URL --reply-to $COMMENT1_ID --body 'Reply one to first'
-exec gh discussion comment $DISCUSSION_URL --reply-to $COMMENT1_ID --body 'Reply two to first'
+exec gh discussion comment $COMMENT1_ID --body 'Reply one to first'
+exec gh discussion comment $COMMENT1_ID --body 'Reply two to first'
 
 # View with --comments in non-interactive mode
 exec gh discussion view $DISCUSSION_URL --comments
@@ -114,3 +114,11 @@ jq-assert RPAGE2_JSON '.comments.nodes[0].replies.nodes | length' '^1$'
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies.nodes[0].body' 'Reply two to first'
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies.cursor' '.+'
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies | has("next")' 'false'
+
+# Test --replies with a comment URL instead of node ID
+jq2env COMMENTS_JSON '.comments.nodes[0].url' COMMENT1_URL
+exec gh discussion view $DISCUSSION_URL --replies $COMMENT1_URL --order oldest --json comments
+stdout2env URL_REPLIES_JSON
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes | length' '^2$'
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[0].body' 'Reply one to first'
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[1].body' 'Reply two to first'
