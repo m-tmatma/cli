@@ -121,6 +121,12 @@ func TestNewCmdComment(t *testing.T) {
 			wantErr: "--body or --body-file is required when not running interactively",
 		},
 		{
+			name:    "delete without yes non-tty is error",
+			args:    "123 --delete DC_1",
+			isTTY:   false,
+			wantErr: "--yes is required when not running interactively",
+		},
+		{
 			name:    "no args",
 			args:    "",
 			isTTY:   true,
@@ -328,7 +334,8 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1\n",
 		},
 		{
-			name: "delete comment with confirmation",
+			name:  "delete comment with confirmation",
+			isTTY: true,
 			opts: CommentOptions{
 				DiscussionNumber: 5,
 				DeleteID:         "DC_1",
@@ -369,7 +376,8 @@ func TestCommentRun(t *testing.T) {
 			wantOut: "",
 		},
 		{
-			name: "delete comment declined",
+			name:  "delete comment declined",
+			isTTY: true,
 			opts: CommentOptions{
 				DiscussionNumber: 5,
 				DeleteID:         "DC_1",
