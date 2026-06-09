@@ -2,7 +2,6 @@ package create
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -17,10 +16,9 @@ import (
 
 // CreateOptions holds the configuration for the discussion create command.
 type CreateOptions struct {
-	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
-	Client     func() (client.DiscussionClient, error)
+	IO       *iostreams.IOStreams
+	BaseRepo func() (ghrepo.Interface, error)
+	Client   func() (client.DiscussionClient, error)
 	Prompter   prompter.Prompter
 
 	Title    string
@@ -33,10 +31,9 @@ type CreateOptions struct {
 // NewCmdCreate returns a cobra command for creating a GitHub Discussion.
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Prompter:   f.Prompter,
-		Client:     shared.DiscussionClientFunc(f),
+		IO:       f.IOStreams,
+		Prompter: f.Prompter,
+		Client:   shared.DiscussionClientFunc(f),
 	}
 
 	cmd := &cobra.Command{

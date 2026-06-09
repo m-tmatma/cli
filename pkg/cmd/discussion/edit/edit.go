@@ -2,7 +2,6 @@ package edit
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -17,11 +16,10 @@ import (
 
 // EditOptions holds the configuration for the discussion edit command.
 type EditOptions struct {
-	IO         *iostreams.IOStreams
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
-	Client     func() (client.DiscussionClient, error)
-	Prompter   prompter.Prompter
+	IO       *iostreams.IOStreams
+	BaseRepo func() (ghrepo.Interface, error)
+	Client   func() (client.DiscussionClient, error)
+	Prompter prompter.Prompter
 
 	Interactive      bool
 	TitleProvided    bool
@@ -41,10 +39,9 @@ type EditOptions struct {
 // NewCmdEdit returns a cobra command for editing a GitHub Discussion.
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Prompter:   f.Prompter,
-		Client:     shared.DiscussionClientFunc(f),
+		IO:       f.IOStreams,
+		Prompter: f.Prompter,
+		Client:   shared.DiscussionClientFunc(f),
 	}
 
 	cmd := &cobra.Command{
