@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/gh/ghtelemetry"
 	accessibilityCmd "github.com/cli/cli/v2/pkg/cmd/accessibility"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	agentTaskCmd "github.com/cli/cli/v2/pkg/cmd/agent-task"
@@ -38,12 +39,15 @@ import (
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
+	sendTelemetryCmd "github.com/cli/cli/v2/pkg/cmd/send-telemetry"
+	skillsCmd "github.com/cli/cli/v2/pkg/cmd/skills"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	variableCmd "github.com/cli/cli/v2/pkg/cmd/variable"
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
@@ -56,7 +60,7 @@ func (ae *AuthError) Error() string {
 	return ae.err.Error()
 }
 
-func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, error) {
+func NewCmdRoot(f *cmdutil.Factory, telemetry ghtelemetry.CommandRecorder, version, buildDate string) (*cobra.Command, error) {
 	io := f.IOStreams
 	cfg, err := f.Config()
 	if err != nil {
@@ -86,6 +90,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 				}
 				return &AuthError{}
 			}
+
 			return nil
 		},
 	}
@@ -144,12 +149,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
 	cmd.AddCommand(projectCmd.NewCmdProject(f))
 	cmd.AddCommand(previewCmd.NewCmdPreview(f))
+	cmd.AddCommand(skillsCmd.NewCmdSkills(f, telemetry))
 
 	// Root commands with standalone functionality and no subcommands
-	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, nil))
+	cmd.AddCommand(copilotCmd.NewCmdCopilot(f, telemetry, nil))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(licensesCmd.NewCmdLicenses(f))
+	cmd.AddCommand(sendTelemetryCmd.NewCmdSendTelemetry(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
@@ -229,7 +236,19 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		}
 	}
 
+	// Official extension stubs: hidden commands that suggest installing
+	// GitHub-owned extensions when invoked. Registered after real extensions
+	// and aliases so that both take priority over stubs.
+	for i := range extensions.OfficialExtensions {
+		ext := &extensions.OfficialExtensions[i]
+		if _, _, err := cmd.Find([]string{ext.Name}); err == nil {
+			continue
+		}
+		cmd.AddCommand(NewCmdOfficialExtensionStub(io, f.Prompter, em, ext))
+	}
+
 	cmdutil.DisableAuthCheck(cmd)
+	cmdutil.RecordTelemetryForSubcommands(cmd, telemetry)
 
 	// The reference command produces paged output that displays information on every other command.
 	// Therefore, we explicitly set the Long text and HelpFunc here after all other commands are registered.

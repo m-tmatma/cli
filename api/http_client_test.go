@@ -315,6 +315,129 @@ func TestHTTPClientSanitizeControlCharactersC1(t *testing.T) {
 	assert.Equal(t, "monalisa¡", issue.Author.Login)
 }
 
+func TestNewHTTPClientTelemetryDisabler(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	tests := []struct {
+		name         string
+		host         string
+		wantDisabled bool
+	}{
+		{
+			name:         "enterprise host triggers disable",
+			host:         "ghes.example.com",
+			wantDisabled: true,
+		},
+		{
+			name:         "github.com does not trigger disable",
+			host:         "github.com",
+			wantDisabled: false,
+		},
+		{
+			name:         "tenancy host does not trigger disable",
+			host:         "my-company.ghe.com",
+			wantDisabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			disabler := &fakeTelemetryDisabler{}
+			client, err := NewHTTPClient(HTTPClientOptions{
+				TelemetryDisabler: disabler,
+			})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest("GET", ts.URL, nil)
+			require.NoError(t, err)
+			req.Host = tt.host
+
+			res, err := client.Do(req)
+			require.NoError(t, err)
+			assert.Equal(t, 204, res.StatusCode)
+			assert.Equal(t, tt.wantDisabled, disabler.disabled, "Disable() called")
+		})
+	}
+}
+
+func TestNewHTTPClientWithoutTelemetryDisabler(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	client, err := NewHTTPClient(HTTPClientOptions{})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest("GET", ts.URL, nil)
+	require.NoError(t, err)
+	req.Host = "ghes.example.com"
+
+	res, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, 204, res.StatusCode)
+}
+
+func TestNewExternalHTTPClient(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{
+			name: "third-party host",
+			url:  "https://example.com/path",
+		},
+		{
+			// Even when talking to GitHub, the external client must not set
+			// authorization or any GitHub-specific headers.
+			name: "github.com host",
+			url:  "https://api.github.com/repos/cli/cli",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotReq *http.Request
+			transport := &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+				gotReq = req
+				return &http.Response{StatusCode: 204, Body: io.NopCloser(strings.NewReader(""))}, nil
+			}}
+
+			client, err := NewExternalHTTPClient(ExternalHTTPClientOptions{
+				AppVersion: "v1.2.3",
+				Transport:  transport,
+			})
+			require.NoError(t, err)
+
+			req, err := http.NewRequest("GET", tt.url, nil)
+			require.NoError(t, err)
+
+			res, err := client.Do(req)
+			require.NoError(t, err)
+			assert.Equal(t, 204, res.StatusCode)
+
+			// No headers should be set by default, except for User-Agent which should include the app version.
+			assert.Equal(t, []string{"GitHub CLI v1.2.3"}, gotReq.Header.Values("user-agent"))
+			assert.Empty(t, gotReq.Header.Values("authorization"))
+			assert.Empty(t, gotReq.Header.Values("x-github-api-version"))
+			assert.Empty(t, gotReq.Header.Values("accept"))
+			assert.Empty(t, gotReq.Header.Values("content-type"))
+			assert.Empty(t, gotReq.Header.Values("time-zone"))
+		})
+	}
+}
+
+type fakeTelemetryDisabler struct {
+	disabled bool
+}
+
+func (f *fakeTelemetryDisabler) Disable() {
+	f.disabled = true
+}
+
 type tinyConfig map[string]string
 
 func (c tinyConfig) ActiveToken(host string) (string, string) {
