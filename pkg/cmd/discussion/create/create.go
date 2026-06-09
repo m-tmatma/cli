@@ -19,7 +19,7 @@ type CreateOptions struct {
 	IO       *iostreams.IOStreams
 	BaseRepo func() (ghrepo.Interface, error)
 	Client   func() (client.DiscussionClient, error)
-	Prompter   prompter.Prompter
+	Prompter prompter.Prompter
 
 	Title    string
 	Body     string
