@@ -39,7 +39,7 @@ func TestListJSONFields(t *testing.T) {
 	})
 }
 
-func TestNewCmdList2(t *testing.T) {
+func TestNewCmdList(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     string
