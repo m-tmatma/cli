@@ -242,7 +242,7 @@ func TestCreateRun(t *testing.T) {
 					return nil, fmt.Errorf("network error")
 				}
 			},
-			wantErr: "fetching categories: network error",
+			wantErr: "network error",
 		},
 		{
 			name: "non-tty create mutation errors",

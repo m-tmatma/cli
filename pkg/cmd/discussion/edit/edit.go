@@ -175,7 +175,7 @@ func editRun(opts *EditOptions) error {
 			categories, err := c.ListCategories(repo)
 			opts.IO.StopProgressIndicator()
 			if err != nil {
-				return fmt.Errorf("fetching categories: %w", err)
+				return err
 			}
 			cat, err := shared.MatchCategory(opts.Category, categories)
 			if err != nil {

@@ -113,7 +113,7 @@ func createRun(opts *CreateOptions) error {
 	categories, err := c.ListCategories(repo)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		return fmt.Errorf("fetching categories: %w", err)
+		return err
 	}
 
 	if opts.Title == "" {
