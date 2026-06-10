@@ -95,7 +95,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*CommentOptions) error) *cobra.
 				return cmdutil.FlagErrorf("--yes is required when not running interactively with --delete")
 			}
 			if !opts.IO.CanPrompt() && !opts.Delete {
-				if !cmd.Flags().Changed("body") && !cmd.Flags().Changed("body-file") {
+				if opts.Body == "" && opts.BodyFile == "" {
 					return cmdutil.FlagErrorf("--body or --body-file is required when not running interactively")
 				}
 			}
