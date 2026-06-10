@@ -190,14 +190,14 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name: "comment node id ignores comments flag",
-			args: "DC_abc --comments",
-			wantOpts: ViewOptions{
-				CommentNodeID: "DC_abc",
-				Comments:      true,
-				Limit:         30,
-				Order:         "newest",
-			},
+			name:    "comment node id with comments flag errors",
+			args:    "DC_abc --comments",
+			wantErr: "--comments is not supported with a comment argument",
+		},
+		{
+			name:    "comment URL with comments flag errors",
+			args:    "https://github.com/OWNER/REPO2/discussions/123#discussioncomment-456 --comments",
+			wantErr: "--comments is not supported with a comment argument",
 		},
 		{
 			name:    "comments with web is mutually exclusive",
@@ -881,7 +881,7 @@ func TestViewRun(t *testing.T) {
 			},
 			opts: ViewOptions{
 				CommentNodeID: "DC_abc",
-				Order:            "oldest",
+				Order:         "oldest",
 			},
 			wantStdout: heredoc.Doc(`
 				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
@@ -910,7 +910,7 @@ func TestViewRun(t *testing.T) {
 			},
 			opts: ViewOptions{
 				CommentNodeID: "DC_abc",
-				Order:            "oldest",
+				Order:         "oldest",
 			},
 			wantStdout: heredoc.Doc(`
 				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
@@ -940,7 +940,7 @@ func TestViewRun(t *testing.T) {
 			},
 			opts: ViewOptions{
 				CommentNodeID: "DC_abc",
-				Exporter:         jsonExporter("comments"),
+				Exporter:      jsonExporter("comments"),
 			},
 			wantStdout: compactJSON(heredoc.Doc(`
 				{
@@ -1003,7 +1003,7 @@ func TestViewRun(t *testing.T) {
 			},
 			opts: ViewOptions{
 				CommentNodeID: "DC_abc",
-				Exporter:         jsonExporter("comments"),
+				Exporter:      jsonExporter("comments"),
 			},
 			wantStdout: compactJSON(heredoc.Doc(`
 				{

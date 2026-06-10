@@ -174,6 +174,10 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			repliesMode := opts.CommentNodeID != "" || opts.CommentDatabaseID != 0
 
+			if repliesMode && opts.Comments {
+				return cmdutil.FlagErrorf("--comments is not supported with a comment argument")
+			}
+
 			paginatedMode := repliesMode || needsComments(opts)
 			if cmd.Flags().Changed("order") && !paginatedMode {
 				return cmdutil.FlagErrorf("--order requires --comments or a comment argument")
