@@ -42,7 +42,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Long: heredoc.Docf(`
 			Create a new GitHub Discussion in a repository.
 
-			With %[1]s--title%[1]s, %[1]s--body%[1]s, and %[1]s--category%[1]s, a discussion is created non-interactively.
+			With %[1]s--title%[1]s, %[1]s--body%[1]s (or %[1]s--body-file%[1]s), and %[1]s--category%[1]s, a discussion is created non-interactively.
 			Omitting any of these flags triggers interactive prompts when connected to a terminal.
 		`, "`"),
 		Example: heredoc.Doc(`
