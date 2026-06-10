@@ -253,7 +253,7 @@ func viewRun(opts *ViewOptions) error {
 			opts.IO.StopProgressIndicator()
 			return err
 		}
-		comment, err := c.GetComment(repo, commentID)
+		comment, err := c.GetComment(repo.RepoHost(), commentID)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err

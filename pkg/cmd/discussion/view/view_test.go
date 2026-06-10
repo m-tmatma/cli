@@ -355,8 +355,8 @@ func TestViewRun(t *testing.T) {
 			name: "web comment by node id",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					return &client.DiscussionComment{
 						URL: "https://github.com/OWNER/REPO/discussions/123#discussioncomment-456",
@@ -378,7 +378,7 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, int64(456), commentDatabaseID)
 					return "DC_resolved", nil
 				}
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					assert.Equal(t, "DC_resolved", commentID)
 					return &client.DiscussionComment{
 						URL: "https://github.com/OWNER/REPO/discussions/123#discussioncomment-456",

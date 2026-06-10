@@ -333,7 +333,7 @@ func TestCommentRun(t *testing.T) {
 				Body:      "Reply text",
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return &client.DiscussionComment{
 						ID:           "DC_parent",
 						URL:          "https://github.com/OWNER/REPO/discussions/5#discussioncomment-1",
@@ -364,7 +364,7 @@ func TestCommentRun(t *testing.T) {
 					assert.Equal(t, int64(17196842), commentDatabaseID)
 					return "DC_resolved", nil
 				}
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					assert.Equal(t, "DC_resolved", commentID)
 					return &client.DiscussionComment{
 						ID:           "DC_resolved",
@@ -387,7 +387,7 @@ func TestCommentRun(t *testing.T) {
 				Body:      "Updated body",
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					assert.Equal(t, "DC_1", commentID)
 					return sampleComment(), nil
 				}
@@ -411,7 +411,7 @@ func TestCommentRun(t *testing.T) {
 					assert.Equal(t, int64(999), commentDatabaseID)
 					return "DC_resolved", nil
 				}
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					assert.Equal(t, "DC_resolved", commentID)
 					return sampleComment(), nil
 				}
@@ -432,7 +432,7 @@ func TestCommentRun(t *testing.T) {
 			},
 			stdinContent: "Edited from stdin",
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.UpdateCommentFunc = func(repo ghrepo.Interface, commentID, body string) (*client.DiscussionComment, error) {
@@ -451,7 +451,7 @@ func TestCommentRun(t *testing.T) {
 				Edit:      true,
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.UpdateCommentFunc = func(repo ghrepo.Interface, commentID, body string) (*client.DiscussionComment, error) {
@@ -475,7 +475,7 @@ func TestCommentRun(t *testing.T) {
 				Delete:    true,
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
@@ -502,7 +502,7 @@ func TestCommentRun(t *testing.T) {
 				m.ResolveCommentNodeIDFunc = func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
 					return "DC_resolved", nil
 				}
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					assert.Equal(t, "DC_resolved", commentID)
 					return sampleComment(), nil
 				}
@@ -527,7 +527,7 @@ func TestCommentRun(t *testing.T) {
 				Yes:       true,
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
@@ -544,7 +544,7 @@ func TestCommentRun(t *testing.T) {
 				Delete:    true,
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 			},
@@ -592,7 +592,7 @@ func TestCommentRun(t *testing.T) {
 				Body:      "text",
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.UpdateCommentFunc = func(repo ghrepo.Interface, commentID, body string) (*client.DiscussionComment, error) {
@@ -609,7 +609,7 @@ func TestCommentRun(t *testing.T) {
 				Yes:       true,
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return sampleComment(), nil
 				}
 				m.DeleteCommentFunc = func(repo ghrepo.Interface, commentID string) error {
@@ -626,7 +626,7 @@ func TestCommentRun(t *testing.T) {
 				Body:      "text",
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return nil, fmt.Errorf("comment not found")
 				}
 			},
@@ -640,7 +640,7 @@ func TestCommentRun(t *testing.T) {
 				Yes:       true,
 			},
 			setupMock: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+				m.GetCommentFunc = func(host string, commentID string) (*client.DiscussionComment, error) {
 					return nil, fmt.Errorf("comment not found")
 				}
 			},

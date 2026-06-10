@@ -1189,7 +1189,7 @@ func (c *discussionClient) DeleteComment(repo ghrepo.Interface, commentID string
 }
 
 // GetComment fetches a single discussion comment by node ID.
-func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (*DiscussionComment, error) {
+func (c *discussionClient) GetComment(host string, commentID string) (*DiscussionComment, error) {
 	var query struct {
 		Node struct {
 			Typename          string `graphql:"__typename"`
@@ -1218,7 +1218,7 @@ func (c *discussionClient) GetComment(repo ghrepo.Interface, commentID string) (
 		"id": githubv4.ID(commentID),
 	}
 
-	if err := c.gql.Query(repo.RepoHost(), "GetDiscussionComment", &query, variables); err != nil {
+	if err := c.gql.Query(host, "GetDiscussionComment", &query, variables); err != nil {
 		return nil, err
 	}
 

@@ -3769,7 +3769,7 @@ func TestGetComment(t *testing.T) {
 
 			repo := ghrepo.New("OWNER", "REPO")
 			c := newTestDiscussionClient(reg)
-			comment, err := c.GetComment(repo, tt.commentID)
+			comment, err := c.GetComment(repo.RepoHost(), tt.commentID)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

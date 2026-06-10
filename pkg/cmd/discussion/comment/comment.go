@@ -168,7 +168,7 @@ func runDelete(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.
 		return err
 	}
 
-	if _, err := c.GetComment(baseRepo, commentID); err != nil {
+	if _, err := c.GetComment(baseRepo.RepoHost(), commentID); err != nil {
 		return err
 	}
 
@@ -191,7 +191,7 @@ func runEdit(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.In
 		return err
 	}
 
-	existing, err := c.GetComment(baseRepo, commentID)
+	existing, err := c.GetComment(baseRepo.RepoHost(), commentID)
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func runReply(opts *CommentOptions, c client.DiscussionClient, baseRepo ghrepo.I
 	}
 
 	opts.IO.StartProgressIndicator()
-	existing, err := c.GetComment(baseRepo, commentID)
+	existing, err := c.GetComment(baseRepo.RepoHost(), commentID)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err

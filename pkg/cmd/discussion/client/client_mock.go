@@ -30,7 +30,7 @@ var _ DiscussionClient = &DiscussionClientMock{}
 //			GetByNumberFunc: func(repo ghrepo.Interface, number int32) (*Discussion, error) {
 //				panic("mock out the GetByNumber method")
 //			},
-//			GetCommentFunc: func(repo ghrepo.Interface, commentID string) (*DiscussionComment, error) {
+//			GetCommentFunc: func(host string, commentID string) (*DiscussionComment, error) {
 //				panic("mock out the GetComment method")
 //			},
 //			GetCommentRepliesFunc: func(host string, commentID string, limit int, after string, newest bool) (*Discussion, error) {
@@ -80,7 +80,7 @@ type DiscussionClientMock struct {
 	GetByNumberFunc func(repo ghrepo.Interface, number int32) (*Discussion, error)
 
 	// GetCommentFunc mocks the GetComment method.
-	GetCommentFunc func(repo ghrepo.Interface, commentID string) (*DiscussionComment, error)
+	GetCommentFunc func(host string, commentID string) (*DiscussionComment, error)
 
 	// GetCommentRepliesFunc mocks the GetCommentReplies method.
 	GetCommentRepliesFunc func(host string, commentID string, limit int, after string, newest bool) (*Discussion, error)
@@ -145,8 +145,8 @@ type DiscussionClientMock struct {
 		}
 		// GetComment holds details about calls to the GetComment method.
 		GetComment []struct {
-			// Repo is the repo argument value.
-			Repo ghrepo.Interface
+			// Host is the host argument value.
+			Host string
 			// CommentID is the commentID argument value.
 			CommentID string
 		}
@@ -401,21 +401,21 @@ func (mock *DiscussionClientMock) GetByNumberCalls() []struct {
 }
 
 // GetComment calls GetCommentFunc.
-func (mock *DiscussionClientMock) GetComment(repo ghrepo.Interface, commentID string) (*DiscussionComment, error) {
+func (mock *DiscussionClientMock) GetComment(host string, commentID string) (*DiscussionComment, error) {
 	if mock.GetCommentFunc == nil {
 		panic("DiscussionClientMock.GetCommentFunc: method is nil but DiscussionClient.GetComment was just called")
 	}
 	callInfo := struct {
-		Repo      ghrepo.Interface
+		Host      string
 		CommentID string
 	}{
-		Repo:      repo,
+		Host:      host,
 		CommentID: commentID,
 	}
 	mock.lockGetComment.Lock()
 	mock.calls.GetComment = append(mock.calls.GetComment, callInfo)
 	mock.lockGetComment.Unlock()
-	return mock.GetCommentFunc(repo, commentID)
+	return mock.GetCommentFunc(host, commentID)
 }
 
 // GetCommentCalls gets all the calls that were made to GetComment.
@@ -423,11 +423,11 @@ func (mock *DiscussionClientMock) GetComment(repo ghrepo.Interface, commentID st
 //
 //	len(mockedDiscussionClient.GetCommentCalls())
 func (mock *DiscussionClientMock) GetCommentCalls() []struct {
-	Repo      ghrepo.Interface
+	Host      string
 	CommentID string
 } {
 	var calls []struct {
-		Repo      ghrepo.Interface
+		Host      string
 		CommentID string
 	}
 	mock.lockGetComment.RLock()
