@@ -596,24 +596,14 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, 
 	return &d, nil
 }
 
-// GetCommentReplies fetches a discussion and a single comment with its
-// paginated replies. It uses the top-level node(id:) query for the comment
-// because the Discussion type does not expose a comment(id:) field.
-func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*Discussion, error) {
-	meta, err := c.getRepositoryMeta(repo)
-	if err != nil {
-		return nil, err
-	}
-	if !meta.HasDiscussionsEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
-	}
-
+// GetCommentReplies fetches a single comment with its paginated replies, along
+// with its parent discussion. It uses the top-level node(id:) query because the
+// comment node ID is self-contained: the parent discussion (number, repository,
+// and detail fields) is resolved from the comment itself rather than from a
+// separate repository(owner:).discussion(number:) lookup. The host argument
+// selects the GraphQL endpoint.
+func (c *discussionClient) GetCommentReplies(host string, commentID string, limit int, after string, newest bool) (*Discussion, error) {
 	var query struct {
-		Repository struct {
-			Discussion struct {
-				discussionListNode
-			} `graphql:"discussion(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
 		Node *struct {
 			DiscussionComment struct {
 				ID             string
@@ -629,14 +619,8 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 						TotalCount int
 					}
 				}
-				Discussion struct {
-					Number     int
-					Repository struct {
-						Owner struct{ Login string }
-						Name  string
-					}
-				}
-				Replies struct {
+				Discussion discussionListNode
+				Replies    struct {
 					TotalCount int
 					PageInfo   struct {
 						EndCursor       string
@@ -651,9 +635,6 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(repo.RepoOwner()),
-		"name":      githubv4.String(repo.RepoName()),
-		"number":    githubv4.Int(number),
 		"commentID": githubv4.ID(commentID),
 		"first":     (*githubv4.Int)(nil),
 		"last":      (*githubv4.Int)(nil),
@@ -673,7 +654,7 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 		}
 	}
 
-	if err := c.gql.Query(repo.RepoHost(), "DiscussionCommentReplies", &query, variables); err != nil {
+	if err := c.gql.Query(host, "DiscussionCommentReplies", &query, variables); err != nil {
 		return nil, err
 	}
 
@@ -687,14 +668,9 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 		return nil, fmt.Errorf("node %s is not a discussion comment", commentID)
 	}
 
-	if !strings.EqualFold(src.Discussion.Repository.Owner.Login, repo.RepoOwner()) ||
-		!strings.EqualFold(src.Discussion.Repository.Name, repo.RepoName()) {
-		return nil, fmt.Errorf("comment %s does not belong to %s/%s", commentID, repo.RepoOwner(), repo.RepoName())
-	}
+	d := mapDiscussionFromListNode(src.Discussion)
 
-	d := mapDiscussionFromListNode(query.Repository.Discussion.discussionListNode)
-
-	for _, rg := range query.Repository.Discussion.ReactionGroups {
+	for _, rg := range src.Discussion.ReactionGroups {
 		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
 			Content:    rg.Content,
 			TotalCount: rg.Users.TotalCount,

@@ -1813,8 +1813,6 @@ func TestGetWithComments(t *testing.T) {
 }
 
 func TestGetCommentReplies(t *testing.T) {
-	repo := ghrepo.New("OWNER", "REPO")
-
 	tests := []struct {
 		name       string
 		commentID  string
@@ -1832,15 +1830,19 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
+								"node": {
+									"id": "DC_abc",
+									"url": "https://github.com/OWNER/REPO/discussions/42#discussioncomment-1",
+									"author": {"__typename": "User", "login": "octocat", "id": "U_octocat", "name": "Octocat"},
+									"body": "Top-level comment",
+									"createdAt": "2025-03-01T00:00:00Z",
+									"isAnswer": true,
+									"upvoteCount": 5,
+									"reactionGroups": [{"content": "HEART", "users": {"totalCount": 2}}],
 									"discussion": {
 										"id": "D_1",
 										"number": 42,
@@ -1860,18 +1862,7 @@ func TestGetCommentReplies(t *testing.T) {
 										"updatedAt": "2025-01-02T00:00:00Z",
 										"closedAt": "2025-06-01T00:00:00Z",
 										"locked": true
-									}
-								},
-								"node": {
-									"id": "DC_abc",
-									"url": "https://github.com/OWNER/REPO/discussions/42#discussioncomment-1",
-									"author": {"__typename": "User", "login": "octocat", "id": "U_octocat", "name": "Octocat"},
-									"body": "Top-level comment",
-									"createdAt": "2025-03-01T00:00:00Z",
-									"isAnswer": true,
-									"upvoteCount": 5,
-									"reactionGroups": [{"content": "HEART", "users": {"totalCount": 2}}],
-									"discussion": {"number": 42, "repository": {"owner": {"login": "OWNER"}, "name": "REPO"}},
+									},
 									"replies": {
 										"totalCount": 1,
 										"pageInfo": {"endCursor": "REP_CUR", "hasNextPage": true, "startCursor": "REP_START", "hasPreviousPage": false},
@@ -1962,15 +1953,19 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
+								"node": {
+									"id": "DC_abc",
+									"url": "",
+									"author": {"__typename": "User", "login": "alice"},
+									"body": "Comment",
+									"createdAt": "2025-01-01T00:00:00Z",
+									"isAnswer": false,
+									"upvoteCount": 0,
+									"reactionGroups": [],
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -1990,18 +1985,7 @@ func TestGetCommentReplies(t *testing.T) {
 										"updatedAt": "2024-01-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								},
-								"node": {
-									"id": "DC_abc",
-									"url": "",
-									"author": {"__typename": "User", "login": "alice"},
-									"body": "Comment",
-									"createdAt": "2025-01-01T00:00:00Z",
-									"isAnswer": false,
-									"upvoteCount": 0,
-									"reactionGroups": [],
-									"discussion": {"number": 42, "repository": {"owner": {"login": "OWNER"}, "name": "REPO"}},
+									},
 									"replies": {
 										"totalCount": 3,
 										"pageInfo": {"endCursor": "CUR_B", "hasNextPage": true, "startCursor": "CUR_A", "hasPreviousPage": false},
@@ -2053,15 +2037,19 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
+								"node": {
+									"id": "DC_abc",
+									"url": "",
+									"author": {"__typename": "User", "login": "alice"},
+									"body": "Comment",
+									"createdAt": "2025-01-01T00:00:00Z",
+									"isAnswer": false,
+									"upvoteCount": 0,
+									"reactionGroups": [],
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2081,18 +2069,7 @@ func TestGetCommentReplies(t *testing.T) {
 										"updatedAt": "2024-01-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								},
-								"node": {
-									"id": "DC_abc",
-									"url": "",
-									"author": {"__typename": "User", "login": "alice"},
-									"body": "Comment",
-									"createdAt": "2025-01-01T00:00:00Z",
-									"isAnswer": false,
-									"upvoteCount": 0,
-									"reactionGroups": [],
-									"discussion": {"number": 42, "repository": {"owner": {"login": "OWNER"}, "name": "REPO"}},
+									},
 									"replies": {
 										"totalCount": 5,
 										"pageInfo": {"endCursor": "CUR_END", "hasNextPage": false, "startCursor": "CUR_Y", "hasPreviousPage": true},
@@ -2143,15 +2120,19 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
+								"node": {
+									"id": "DC_abc",
+									"url": "",
+									"author": {"__typename": "User", "login": "alice"},
+									"body": "Comment",
+									"createdAt": "2025-01-01T00:00:00Z",
+									"isAnswer": false,
+									"upvoteCount": 0,
+									"reactionGroups": [],
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2171,18 +2152,7 @@ func TestGetCommentReplies(t *testing.T) {
 										"updatedAt": "2024-01-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								},
-								"node": {
-									"id": "DC_abc",
-									"url": "",
-									"author": {"__typename": "User", "login": "alice"},
-									"body": "Comment",
-									"createdAt": "2025-01-01T00:00:00Z",
-									"isAnswer": false,
-									"upvoteCount": 0,
-									"reactionGroups": [],
-									"discussion": {"number": 42, "repository": {"owner": {"login": "OWNER"}, "name": "REPO"}},
+									},
 									"replies": {
 										"totalCount": 3,
 										"pageInfo": {"endCursor": "", "hasNextPage": false, "startCursor": "CUR_START", "hasPreviousPage": true},
@@ -2233,15 +2203,19 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
+								"node": {
+									"id": "DC_abc",
+									"url": "",
+									"author": {"__typename": "User", "login": "alice"},
+									"body": "Comment",
+									"createdAt": "2025-01-01T00:00:00Z",
+									"isAnswer": false,
+									"upvoteCount": 0,
+									"reactionGroups": [],
 									"discussion": {
 										"id": "D_1",
 										"number": 1,
@@ -2261,18 +2235,7 @@ func TestGetCommentReplies(t *testing.T) {
 										"updatedAt": "2024-01-01T00:00:00Z",
 										"closedAt": "0001-01-01T00:00:00Z",
 										"locked": false
-									}
-								},
-								"node": {
-									"id": "DC_abc",
-									"url": "",
-									"author": {"__typename": "User", "login": "alice"},
-									"body": "Comment",
-									"createdAt": "2025-01-01T00:00:00Z",
-									"isAnswer": false,
-									"upvoteCount": 0,
-									"reactionGroups": [],
-									"discussion": {"number": 42, "repository": {"owner": {"login": "OWNER"}, "name": "REPO"}},
+									},
 									"replies": {
 										"totalCount": 1,
 										"pageInfo": {"endCursor": "CUR_ONLY", "hasNextPage": false, "startCursor": "CUR_ONLY", "hasPreviousPage": false},
@@ -2304,81 +2267,16 @@ func TestGetCommentReplies(t *testing.T) {
 			},
 		},
 		{
-			name:      "discussions disabled",
-			commentID: "DC_abc",
-			limit:     10,
-			newest:    false,
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", false)),
-				)
-			},
-			wantErr: "has discussions disabled",
-		},
-		{
-			name:      "repo not found",
-			commentID: "DC_abc",
-			limit:     10,
-			newest:    false,
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": null
-							},
-							"errors": [
-								{
-									"type": "NOT_FOUND",
-									"path": ["repository"],
-									"message": "Could not resolve to a Repository with the name 'OWNER/REPO'."
-								}
-							]
-						}
-					`)),
-				)
-			},
-			wantErr: "Could not resolve to a Repository",
-		},
-		{
 			name:      "reply node not found",
 			commentID: "DC_invalid",
 			limit:     10,
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
-									"discussion": {
-										"id": "D_1",
-										"number": 1,
-										"title": "Test",
-										"body": "",
-										"url": "",
-										"closed": false,
-										"stateReason": "",
-										"isAnswered": false,
-										"answerChosenAt": "0001-01-01T00:00:00Z",
-										"author": {"__typename": "User", "login": "alice"},
-										"category": {"id": "C1", "name": "General", "slug": "general", "emoji": "", "isAnswerable": false},
-										"answerChosenBy": null,
-										"labels": {"nodes": []},
-										"reactionGroups": [],
-										"createdAt": "2024-01-01T00:00:00Z",
-										"updatedAt": "2024-01-01T00:00:00Z",
-										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false
-									}
-								},
 								"node": null
 							},
 							"errors": [
@@ -2401,36 +2299,10 @@ func TestGetCommentReplies(t *testing.T) {
 			newest:    false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
 					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
 					httpmock.StringResponse(heredoc.Doc(`
 						{
 							"data": {
-								"repository": {
-									"discussion": {
-										"id": "D_1",
-										"number": 1,
-										"title": "Test",
-										"body": "",
-										"url": "",
-										"closed": false,
-										"stateReason": "",
-										"isAnswered": false,
-										"answerChosenAt": "0001-01-01T00:00:00Z",
-										"author": {"__typename": "User", "login": "alice"},
-										"category": {"id": "C1", "name": "General", "slug": "general", "emoji": "", "isAnswerable": false},
-										"answerChosenBy": null,
-										"labels": {"nodes": []},
-										"reactionGroups": [],
-										"createdAt": "2024-01-01T00:00:00Z",
-										"updatedAt": "2024-01-01T00:00:00Z",
-										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false
-									}
-								},
 								"node": {}
 							}
 						}
@@ -2438,66 +2310,6 @@ func TestGetCommentReplies(t *testing.T) {
 				)
 			},
 			wantErr: "node I_notacomment is not a discussion comment",
-		},
-		{
-			name:      "comment belongs to different repo",
-			commentID: "DC_other",
-			limit:     10,
-			newest:    false,
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMetaForDiscussions\b`),
-					httpmock.StringResponse(repoMetaResp("R_1", true)),
-				)
-				reg.Register(
-					httpmock.GraphQL(`query DiscussionCommentReplies\b`),
-					httpmock.StringResponse(heredoc.Doc(`
-						{
-							"data": {
-								"repository": {
-									"discussion": {
-										"id": "D_1",
-										"number": 1,
-										"title": "Test",
-										"body": "",
-										"url": "",
-										"closed": false,
-										"stateReason": "",
-										"isAnswered": false,
-										"answerChosenAt": "0001-01-01T00:00:00Z",
-										"author": {"__typename": "User", "login": "alice"},
-										"category": {"id": "C1", "name": "General", "slug": "general", "emoji": "", "isAnswerable": false},
-										"answerChosenBy": null,
-										"labels": {"nodes": []},
-										"reactionGroups": [],
-										"createdAt": "2024-01-01T00:00:00Z",
-										"updatedAt": "2024-01-01T00:00:00Z",
-										"closedAt": "0001-01-01T00:00:00Z",
-										"locked": false
-									}
-								},
-								"node": {
-									"id": "DC_other",
-									"url": "",
-									"author": {"__typename": "User", "login": "alice"},
-									"body": "Comment",
-									"createdAt": "2025-01-01T00:00:00Z",
-									"isAnswer": false,
-									"upvoteCount": 0,
-									"reactionGroups": [],
-									"discussion": {"number": 99, "repository": {"owner": {"login": "OTHER"}, "name": "DIFFERENT"}},
-									"replies": {
-										"totalCount": 0,
-										"pageInfo": {"endCursor": "", "hasNextPage": false, "startCursor": "", "hasPreviousPage": false},
-										"nodes": []
-									}
-								}
-							}
-						}
-					`)),
-				)
-			},
-			wantErr: "comment DC_other does not belong to OWNER/REPO",
 		},
 	}
 
@@ -2511,7 +2323,7 @@ func TestGetCommentReplies(t *testing.T) {
 			}
 
 			c := newTestDiscussionClient(reg)
-			d, err := c.GetCommentReplies(repo, 1, tt.commentID, tt.limit, tt.after, tt.newest)
+			d, err := c.GetCommentReplies("github.com", tt.commentID, tt.limit, tt.after, tt.newest)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)

@@ -83,7 +83,7 @@ func TestNewCmdView(t *testing.T) {
 		{
 			name:    "invalid argument",
 			args:    "not-a-number",
-			wantErr: "invalid discussion argument",
+			wantErr: "invalid argument",
 		},
 		{
 			name:    "no arguments",
@@ -142,91 +142,82 @@ func TestNewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name: "replies flag with comment url",
-			args: "123 --replies https://github.com/OWNER/REPO2/discussions/123#discussioncomment-456",
+			name: "comment url positional",
+			args: "https://github.com/OWNER/REPO2/discussions/123#discussioncomment-456",
 			wantOpts: ViewOptions{
-				DiscussionNumber:   123,
-				RepliesCommentDBID: 456,
-				RepliesArg:         "https://github.com/OWNER/REPO2/discussions/123#discussioncomment-456",
-				Limit:              30,
-				Order:              "newest",
+				DiscussionNumber:  123,
+				CommentDatabaseID: 456,
+				Limit:             30,
+				Order:             "newest",
 			},
 			wantRepo: "OWNER/REPO2",
 		},
 		{
-			name: "replies flag",
-			args: "123 --replies DC_abc",
+			name: "comment node id positional",
+			args: "DC_abc",
 			wantOpts: ViewOptions{
-				DiscussionNumber: 123,
-				RepliesArg:       "DC_abc",
-				RepliesCommentID: "DC_abc",
-				Limit:            30,
-				Order:            "newest",
+				CommentNodeID: "DC_abc",
+				Limit:         30,
+				Order:         "newest",
 			},
 		},
 		{
-			name: "replies with limit",
-			args: "123 --replies DC_abc --limit 10",
+			name: "comment node id with limit",
+			args: "DC_abc --limit 10",
 			wantOpts: ViewOptions{
-				DiscussionNumber: 123,
-				RepliesArg:       "DC_abc",
-				RepliesCommentID: "DC_abc",
-				Limit:            10,
-				Order:            "newest",
+				CommentNodeID: "DC_abc",
+				Limit:         10,
+				Order:         "newest",
 			},
 		},
 		{
-			name: "replies with after",
-			args: "123 --replies DC_abc --after CURSOR",
+			name: "comment node id with after",
+			args: "DC_abc --after CURSOR",
 			wantOpts: ViewOptions{
-				DiscussionNumber: 123,
-				RepliesArg:       "DC_abc",
-				RepliesCommentID: "DC_abc",
-				Limit:            30,
-				After:            "CURSOR",
-				Order:            "newest",
+				CommentNodeID: "DC_abc",
+				Limit:         30,
+				After:         "CURSOR",
+				Order:         "newest",
 			},
 		},
 		{
-			name: "replies with order oldest",
-			args: "123 --replies DC_abc --order oldest",
+			name: "comment node id with order oldest",
+			args: "DC_abc --order oldest",
 			wantOpts: ViewOptions{
-				DiscussionNumber: 123,
-				RepliesArg:       "DC_abc",
-				RepliesCommentID: "DC_abc",
-				Limit:            30,
-				Order:            "oldest",
+				CommentNodeID: "DC_abc",
+				Limit:         30,
+				Order:         "oldest",
 			},
 		},
 		{
-			name:    "replies with comments is mutually exclusive",
-			args:    "123 --replies DC_abc --comments",
-			wantErr: "specify only one of --comments, --replies, or --web",
-		},
-		{
-			name:    "replies with web is mutually exclusive",
-			args:    "123 --replies DC_abc --web",
-			wantErr: "specify only one of --comments, --replies, or --web",
+			name: "comment node id ignores comments flag",
+			args: "DC_abc --comments",
+			wantOpts: ViewOptions{
+				CommentNodeID: "DC_abc",
+				Comments:      true,
+				Limit:         30,
+				Order:         "newest",
+			},
 		},
 		{
 			name:    "comments with web is mutually exclusive",
 			args:    "123 --comments --web",
-			wantErr: "specify only one of --comments, --replies, or --web",
+			wantErr: "specify only one of --comments or --web",
 		},
 		{
-			name:    "order requires comments or replies",
+			name:    "order requires comments or comment arg",
 			args:    "123 --order newest",
-			wantErr: "--order requires --comments or --replies",
+			wantErr: "--order requires --comments or a comment argument",
 		},
 		{
-			name:    "limit requires comments or replies",
+			name:    "limit requires comments or comment arg",
 			args:    "123 --limit 5",
-			wantErr: "--limit requires --comments or --replies",
+			wantErr: "--limit requires --comments or a comment argument",
 		},
 		{
-			name:    "after requires comments or replies",
+			name:    "after requires comments or comment arg",
 			args:    "123 --after CURSOR",
-			wantErr: "--after requires --comments or --replies",
+			wantErr: "--after requires --comments or a comment argument",
 		},
 		{
 			name:    "invalid limit zero",
@@ -277,9 +268,8 @@ func TestNewCmdView(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.DiscussionNumber, gotOpts.DiscussionNumber)
 			assert.Equal(t, tt.wantOpts.WebMode, gotOpts.WebMode)
 			assert.Equal(t, tt.wantOpts.Comments, gotOpts.Comments)
-			assert.Equal(t, tt.wantOpts.RepliesArg, gotOpts.RepliesArg)
-			assert.Equal(t, tt.wantOpts.RepliesCommentDBID, gotOpts.RepliesCommentDBID)
-			assert.Equal(t, tt.wantOpts.RepliesCommentID, gotOpts.RepliesCommentID)
+			assert.Equal(t, tt.wantOpts.CommentDatabaseID, gotOpts.CommentDatabaseID)
+			assert.Equal(t, tt.wantOpts.CommentNodeID, gotOpts.CommentNodeID)
 			assert.Equal(t, tt.wantOpts.Limit, gotOpts.Limit)
 			assert.Equal(t, tt.wantOpts.After, gotOpts.After)
 			assert.Equal(t, tt.wantOpts.Order, gotOpts.Order)
@@ -360,6 +350,47 @@ func TestViewRun(t *testing.T) {
 			},
 			wantStderr:  "Opening https://github.com/OWNER/REPO/discussions/123 in your browser.\n",
 			wantBrowser: "https://github.com/OWNER/REPO/discussions/123",
+		},
+		{
+			name: "web comment by node id",
+			tty:  true,
+			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
+					assert.Equal(t, "DC_abc", commentID)
+					return &client.DiscussionComment{
+						URL: "https://github.com/OWNER/REPO/discussions/123#discussioncomment-456",
+					}, nil
+				}
+			},
+			opts: ViewOptions{
+				WebMode:       true,
+				CommentNodeID: "DC_abc",
+			},
+			wantStderr:  "Opening https://github.com/OWNER/REPO/discussions/123 in your browser.\n",
+			wantBrowser: "https://github.com/OWNER/REPO/discussions/123#discussioncomment-456",
+		},
+		{
+			name: "web comment by url",
+			tty:  true,
+			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
+				m.ResolveCommentNodeIDFunc = func(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+					assert.Equal(t, int64(456), commentDatabaseID)
+					return "DC_resolved", nil
+				}
+				m.GetCommentFunc = func(repo ghrepo.Interface, commentID string) (*client.DiscussionComment, error) {
+					assert.Equal(t, "DC_resolved", commentID)
+					return &client.DiscussionComment{
+						URL: "https://github.com/OWNER/REPO/discussions/123#discussioncomment-456",
+					}, nil
+				}
+			},
+			opts: ViewOptions{
+				WebMode:           true,
+				CommentDatabaseID: 456,
+			},
+			wantStderr:  "Opening https://github.com/OWNER/REPO/discussions/123 in your browser.\n",
+			wantBrowser: "https://github.com/OWNER/REPO/discussions/123#discussioncomment-456",
 		},
 		{
 			name: "not answerable tty",
@@ -730,9 +761,8 @@ func TestViewRun(t *testing.T) {
 			name: "replies tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -741,7 +771,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentID: "DC_abc",
+				CommentNodeID: "DC_abc",
 			},
 			wantStdout: heredoc.Doc(`
 				octocat commented less than a minute ago ✓ Answer
@@ -770,9 +800,8 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, int64(9999999), commentDatabaseID)
 					return "DC_resolved", nil
 				}
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_resolved", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, true, newest)
@@ -780,7 +809,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentDBID: 9999999,
+				CommentDatabaseID: 9999999,
 			},
 			wantStdout: heredoc.Doc(`
 				octocat commented less than a minute ago ✓ Answer
@@ -805,9 +834,8 @@ func TestViewRun(t *testing.T) {
 			name: "replies pagination tty",
 			tty:  true,
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -816,7 +844,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentID: "DC_abc",
+				CommentNodeID: "DC_abc",
 			},
 			wantStdout: heredoc.Doc(`
 				octocat commented less than a minute ago ✓ Answer
@@ -842,9 +870,8 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies nontty",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -853,7 +880,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentID: "DC_abc",
+				CommentNodeID: "DC_abc",
 				Order:            "oldest",
 			},
 			wantStdout: heredoc.Doc(`
@@ -872,9 +899,8 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies pagination nontty",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -883,7 +909,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentID: "DC_abc",
+				CommentNodeID: "DC_abc",
 				Order:            "oldest",
 			},
 			wantStdout: heredoc.Doc(`
@@ -903,9 +929,8 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies json",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -914,7 +939,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentID: "DC_abc",
+				CommentNodeID: "DC_abc",
 				Exporter:         jsonExporter("comments"),
 			},
 			wantStdout: compactJSON(heredoc.Doc(`
@@ -967,9 +992,8 @@ func TestViewRun(t *testing.T) {
 		{
 			name: "replies json pagination",
 			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.GetCommentRepliesFunc = func(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
-					assert.Equal(t, "OWNER/REPO", ghrepo.FullName(repo))
-					assert.Equal(t, int32(123), number)
+				m.GetCommentRepliesFunc = func(host string, commentID string, limit int, after string, newest bool) (*client.Discussion, error) {
+					assert.Equal(t, "github.com", host)
 					assert.Equal(t, "DC_abc", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
@@ -978,7 +1002,7 @@ func TestViewRun(t *testing.T) {
 				}
 			},
 			opts: ViewOptions{
-				RepliesCommentID: "DC_abc",
+				CommentNodeID: "DC_abc",
 				Exporter:         jsonExporter("comments"),
 			},
 			wantStdout: compactJSON(heredoc.Doc(`

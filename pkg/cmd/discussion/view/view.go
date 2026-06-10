@@ -80,17 +80,16 @@ type ViewOptions struct {
 	Browser  browser.Browser
 	Client   func() (client.DiscussionClient, error)
 
-	DiscussionNumber   int32
-	WebMode            bool
-	Comments           bool
-	RepliesArg         string
-	RepliesCommentID   string
-	RepliesCommentDBID int64
-	Limit              int
-	After              string
-	Order              string
-	Exporter           cmdutil.Exporter
-	Now                func() time.Time
+	DiscussionNumber  int32
+	WebMode           bool
+	Comments          bool
+	CommentNodeID     string
+	CommentDatabaseID int64
+	Limit             int
+	After             string
+	Order             string
+	Exporter          cmdutil.Exporter
+	Now               func() time.Time
 }
 
 // NewCmdView creates the "discussion view" command.
@@ -102,7 +101,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view {<number> | <url>} [flags]",
+		Use:   "view {<number> | <discussion-url> | <comment-id> | <comment-url>} [flags]",
 		Short: "View a discussion (preview)",
 		Long: heredoc.Docf(`
 			Display the title, body, and other information about a discussion.
@@ -110,12 +109,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			To see the comments on a discussion, pass %[1]s--comments%[1]s. A few latest replies
 			of each comment will also be retrieved regardless of the selected ordering.
 
-			For a full thread of a comment, pass %[1]s--replies%[1]s with a comment node ID or
-			comment URL (e.g., %[1]shttps://github.com/OWNER/REPO/discussions/123#discussioncomment-456%[1]s).
+			To see the full reply thread of a single comment, pass a comment node ID or
+			comment URL as the argument instead of a discussion
+			(e.g., %[1]shttps://github.com/OWNER/REPO/discussions/123#discussioncomment-456%[1]s).
 
 			Pagination and ordering can be controlled via %[1]s--order%[1]s, %[1]s--limit%[1]s, and %[1]s--after%[1]s flags.
 
-			Use %[1]s--web%[1]s to open the discussion in a web browser instead.
+			Use %[1]s--web%[1]s to open the discussion or comment in a web browser instead.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# View a discussion by number
@@ -136,14 +136,14 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			# Fetch the next page of comments
 			$ gh discussion view 123 --comments --after CURSOR
 
-			# View replies on a specific comment by node ID
-			$ gh discussion view 123 --replies DC_abc123
+			# View the reply thread of a comment by node ID
+			$ gh discussion view DC_abc123
 
-			# View replies on a comment using the its URL
-			$ gh discussion view --replies 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456'
+			# View the reply thread of a comment by URL
+			$ gh discussion view 'https://github.com/OWNER/REPO/discussions/123#discussioncomment-456'
 
 			# Paginate through replies
-			$ gh discussion view 123 --replies DC_abc123 --limit 10 --after CURSOR
+			$ gh discussion view DC_abc123 --limit 10 --after CURSOR
 
 			# Open in browser
 			$ gh discussion view 123 --web
@@ -152,57 +152,37 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of --comments, --replies, or --web",
-				opts.Comments, opts.RepliesArg != "", opts.WebMode); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of --comments or --web",
+				opts.Comments, opts.WebMode); err != nil {
 				return err
 			}
 
-			number, repo, err := shared.ParseDiscussionArg(args[0])
+			parsed, err := shared.ParseDiscussionOrCommentArg(args[0])
 			if err != nil {
 				return cmdutil.FlagErrorWrap(err)
 			}
 
-			if repo != nil {
+			if parsed.Repo != nil {
 				opts.BaseRepo = func() (ghrepo.Interface, error) {
-					return repo, nil
+					return parsed.Repo, nil
 				}
 			}
 
-			opts.DiscussionNumber = number
+			opts.DiscussionNumber = parsed.Number
+			opts.CommentNodeID = parsed.CommentNodeID
+			opts.CommentDatabaseID = parsed.CommentDatabaseID
 
-			repliesMode := cmd.Flags().Changed("replies")
-			if repliesMode {
-				parsed, err := shared.ParseDiscussionOrCommentArg(opts.RepliesArg)
-				if err != nil {
-					return cmdutil.FlagErrorf("invalid value for --replies: %w", err)
-				}
-				if parsed.CommentNodeID == "" && parsed.CommentDatabaseID == 0 {
-					return cmdutil.FlagErrorf("--replies requires a comment node ID or comment URL")
-				}
-				if parsed.CommentNodeID != "" {
-					opts.RepliesCommentID = parsed.CommentNodeID
-				} else {
-					// In this case a full comment URL is parsed, so repo and discussion number are also extracted and
-					// should be used instead of the positional argument.
-					opts.RepliesCommentDBID = parsed.CommentDatabaseID
-					opts.DiscussionNumber = parsed.Number
-					opts.BaseRepo = func() (ghrepo.Interface, error) {
-						return parsed.Repo, nil
-					}
-				}
-			}
+			repliesMode := opts.CommentNodeID != "" || opts.CommentDatabaseID != 0
 
-			commentsMode := needsComments(opts)
-
-			paginatedMode := commentsMode || repliesMode
+			paginatedMode := repliesMode || needsComments(opts)
 			if cmd.Flags().Changed("order") && !paginatedMode {
-				return cmdutil.FlagErrorf("--order requires --comments or --replies")
+				return cmdutil.FlagErrorf("--order requires --comments or a comment argument")
 			}
 			if cmd.Flags().Changed("limit") && !paginatedMode {
-				return cmdutil.FlagErrorf("--limit requires --comments or --replies")
+				return cmdutil.FlagErrorf("--limit requires --comments or a comment argument")
 			}
 			if cmd.Flags().Changed("after") && !paginatedMode {
-				return cmdutil.FlagErrorf("--after requires --comments or --replies")
+				return cmdutil.FlagErrorf("--after requires --comments or a comment argument")
 			}
 			if opts.Limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %d", opts.Limit)
@@ -221,13 +201,22 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open a discussion in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View discussion comments")
-	cmd.Flags().StringVar(&opts.RepliesArg, "replies", "", "View replies on a specific comment (node ID or comment URL)")
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of comments or replies to fetch")
 	cmd.Flags().StringVar(&opts.After, "after", "", "Cursor for the next page")
 	cmdutil.StringEnumFlag(cmd, &opts.Order, "order", "", orderNewest, []string{orderOldest, orderNewest}, "Order of comments or replies")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, discussionFields)
 
 	return cmd
+}
+
+// resolveCommentNodeID returns the comment node ID for the current invocation,
+// resolving it from a comment database ID (parsed from a comment URL) when the
+// node ID is not already known.
+func resolveCommentNodeID(c client.DiscussionClient, repo ghrepo.Interface, opts *ViewOptions) (string, error) {
+	if opts.CommentNodeID != "" {
+		return opts.CommentNodeID, nil
+	}
+	return c.ResolveCommentNodeID(repo, opts.CommentDatabaseID)
 }
 
 // needsComments returns true when the command should fetch full comment data,
@@ -242,34 +231,50 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	if opts.WebMode {
-		openURL := ghrepo.GenerateRepoURL(repo, "discussions/%d", opts.DiscussionNumber)
-		if opts.IO.IsStderrTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
-		}
-		return opts.Browser.Browse(openURL)
-	}
-
 	c, err := opts.Client()
 	if err != nil {
 		return err
 	}
 
+	repliesMode := opts.CommentNodeID != "" || opts.CommentDatabaseID != 0
+
+	if opts.WebMode {
+		if !repliesMode {
+			openURL := ghrepo.GenerateRepoURL(repo, "discussions/%d", opts.DiscussionNumber)
+			if opts.IO.IsStderrTTY() {
+				fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
+			}
+			return opts.Browser.Browse(openURL)
+		}
+
+		opts.IO.StartProgressIndicator()
+		commentID, err := resolveCommentNodeID(c, repo, opts)
+		if err != nil {
+			opts.IO.StopProgressIndicator()
+			return err
+		}
+		comment, err := c.GetComment(repo, commentID)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		if opts.IO.IsStderrTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(comment.URL))
+		}
+		return opts.Browser.Browse(comment.URL)
+	}
+
 	opts.IO.DetectTerminalTheme()
 	opts.IO.StartProgressIndicator()
 
-	if opts.RepliesCommentID != "" || opts.RepliesCommentDBID != 0 {
-		commentID := opts.RepliesCommentID
-		if commentID == "" {
-			resolved, err := c.ResolveCommentNodeID(repo, opts.RepliesCommentDBID)
-			if err != nil {
-				opts.IO.StopProgressIndicator()
-				return err
-			}
-			commentID = resolved
+	if repliesMode {
+		commentID, err := resolveCommentNodeID(c, repo, opts)
+		if err != nil {
+			opts.IO.StopProgressIndicator()
+			return err
 		}
 
-		discussion, err := c.GetCommentReplies(repo, opts.DiscussionNumber, commentID, opts.Limit, opts.After, opts.Order == orderNewest)
+		discussion, err := c.GetCommentReplies(repo.RepoHost(), commentID, opts.Limit, opts.After, opts.Order == orderNewest)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
