@@ -301,7 +301,7 @@ func TestViewRun(t *testing.T) {
 			},
 			wantStdout: heredoc.Doc(`
 				an interesting question #123
-				Open · Q&A · Asked by monalisa · about 1 hour ago · 3 comments
+				Open • Q&A • Asked by monalisa • about 1 hour ago • 3 comments
 				Labels: help-wanted
 
 				
@@ -404,7 +404,7 @@ func TestViewRun(t *testing.T) {
 			},
 			wantStdout: heredoc.Doc(`
 				a cool discussion #123
-				Open · General · Started by monalisa · about 1 hour ago · 3 comments
+				Open • General • Started by monalisa • about 1 hour ago • 3 comments
 				Labels: help-wanted
 
 				
@@ -435,31 +435,31 @@ func TestViewRun(t *testing.T) {
 			},
 			wantStdout: heredoc.Doc(`
 				an interesting question #123
-				Open · Q&A · Asked by monalisa · about 1 hour ago · 2 comments
+				Open • Q&A • Asked by monalisa • about 1 hour ago • 2 comments
 				Labels: help-wanted
 
-				
+
 				  about my interesting question                                               
-				
+
 
 				👍 5 • 🚀 2
 
 				Comments
 
-				octocat commented less than a minute ago ✓ Answer
+				octocat commented • 1h • ✓ Answer
 
 				  This is a comment                                                           
 
 				👍 3
 
-				  hubot commented less than a minute ago
+				———————— Not showing older 4 replies ————————
+
+				  hubot replied • 30m • Newest reply
 				  
 				    Thanks!                                                                     
 				  
 				  
-				  And 4 more replies
-
-				monalisa commented less than a minute ago
+				monalisa commented • 15m • Newest comment
 
 				  Another comment                                                             
 
@@ -494,13 +494,13 @@ func TestViewRun(t *testing.T) {
 				url:	https://github.com/OWNER/REPO/discussions/123
 				--
 				about my interesting question
-				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
+				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
 				--
 				This is a comment
-				  comment:	hubot	2025-03-02T01:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
+				  comment:	hubot	2025-03-01T00:30:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
 				  --
 				  Thanks!
-				comment:	monalisa	2025-03-03T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				comment:	monalisa	2025-03-01T00:45:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
 				--
 				Another comment
 			`),
@@ -528,31 +528,31 @@ func TestViewRun(t *testing.T) {
 			},
 			wantStdout: heredoc.Doc(`
 				an interesting question #123
-				Open · Q&A · Asked by monalisa · about 1 hour ago · 2 comments
+				Open • Q&A • Asked by monalisa • about 1 hour ago • 2 comments
 				Labels: help-wanted
 
-				
+
 				  about my interesting question                                               
-				
+
 
 				👍 5 • 🚀 2
 
 				Comments
 
-				octocat commented less than a minute ago ✓ Answer
+				octocat commented • 1h • ✓ Answer
 
 				  This is a comment                                                           
 
 				👍 3
 
-				  hubot commented less than a minute ago
+				———————— Not showing older 4 replies ————————
+
+				  hubot replied • 30m • Newest reply
 				  
 				    Thanks!                                                                     
 				  
 				  
-				  And 4 more replies
-
-				monalisa commented less than a minute ago
+				monalisa commented • 15m
 
 				  Another comment                                                             
 
@@ -592,13 +592,13 @@ func TestViewRun(t *testing.T) {
 				url:	https://github.com/OWNER/REPO/discussions/123
 				--
 				about my interesting question
-				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
+				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
 				--
 				This is a comment
-				  comment:	hubot	2025-03-02T01:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
+				  comment:	hubot	2025-03-01T00:30:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
 				  --
 				  Thanks!
-				comment:	monalisa	2025-03-03T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				comment:	monalisa	2025-03-01T00:45:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
 				--
 				Another comment
 			`),
@@ -644,7 +644,7 @@ func TestViewRun(t *testing.T) {
 				      {
 				        "author": {"id": "", "login": "octocat", "name": ""},
 				        "body": "This is a comment",
-				        "createdAt": "2025-03-02T00:00:00Z",
+				        "createdAt": "2025-03-01T00:00:00Z",
 				        "id": "C_1",
 				        "isAnswer": true,
 				        "reactionGroups": [
@@ -655,7 +655,7 @@ func TestViewRun(t *testing.T) {
 				            {
 				              "author": {"id": "", "login": "hubot", "name": ""},
 				              "body": "Thanks!",
-				              "createdAt": "2025-03-02T01:00:00Z",
+				              "createdAt": "2025-03-01T00:30:00Z",
 				              "id": "C_1_R1",
 				              "isAnswer": false,
 				              "reactionGroups": [],
@@ -671,7 +671,7 @@ func TestViewRun(t *testing.T) {
 				      {
 				        "author": {"id": "", "login": "monalisa", "name": ""},
 				        "body": "Another comment",
-				        "createdAt": "2025-03-03T00:00:00Z",
+				        "createdAt": "2025-03-01T00:45:00Z",
 				        "id": "C_2",
 				        "isAnswer": false,
 				        "reactionGroups": [],
@@ -713,7 +713,7 @@ func TestViewRun(t *testing.T) {
 				      {
 				        "author": {"id": "", "login": "octocat", "name": ""},
 				        "body": "This is a comment",
-				        "createdAt": "2025-03-02T00:00:00Z",
+				        "createdAt": "2025-03-01T00:00:00Z",
 				        "id": "C_1",
 				        "isAnswer": true,
 				        "reactionGroups": [
@@ -724,7 +724,7 @@ func TestViewRun(t *testing.T) {
 				            {
 				              "author": {"id": "", "login": "hubot", "name": ""},
 				              "body": "Thanks!",
-				              "createdAt": "2025-03-02T01:00:00Z",
+				              "createdAt": "2025-03-01T00:30:00Z",
 				              "id": "C_1_R1",
 				              "isAnswer": false,
 				              "reactionGroups": [],
@@ -740,7 +740,7 @@ func TestViewRun(t *testing.T) {
 				      {
 				        "author": {"id": "", "login": "monalisa", "name": ""},
 				        "body": "Another comment",
-				        "createdAt": "2025-03-03T00:00:00Z",
+				        "createdAt": "2025-03-01T00:45:00Z",
 				        "id": "C_2",
 				        "isAnswer": false,
 				        "reactionGroups": [],
@@ -767,25 +767,25 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, true, newest)
-					return exampleDiscussionWithReplies(""), nil
+					return exampleDiscussionWithReplies("", true), nil
 				}
 			},
 			opts: ViewOptions{
 				CommentNodeID: "DC_abc",
 			},
 			wantStdout: heredoc.Doc(`
-				octocat commented less than a minute ago ✓ Answer
+				octocat commented • 1h • ✓ Answer
 
 				  This is the parent comment                                                  
 
 				👍 3
 
-				  hubot commented less than a minute ago
+				  hubot replied • 40m
 				  
 				    First reply                                                                 
 				  
 				  
-				  monalisa commented less than a minute ago
+				  monalisa replied • 20m • Newest reply
 				  
 				    Second reply                                                                
 				  
@@ -805,25 +805,25 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, "DC_resolved", commentID)
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, true, newest)
-					return exampleDiscussionWithReplies(""), nil
+					return exampleDiscussionWithReplies("", true), nil
 				}
 			},
 			opts: ViewOptions{
 				CommentDatabaseID: 9999999,
 			},
 			wantStdout: heredoc.Doc(`
-				octocat commented less than a minute ago ✓ Answer
+				octocat commented • 1h • ✓ Answer
 
 				  This is the parent comment                                                  
 
 				👍 3
 
-				  hubot commented less than a minute ago
+				  hubot replied • 40m
 				  
 				    First reply                                                                 
 				  
 				  
-				  monalisa commented less than a minute ago
+				  monalisa replied • 20m • Newest reply
 				  
 				    Second reply                                                                
 				  
@@ -840,25 +840,25 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, true, newest)
-					return exampleDiscussionWithReplies("NEXT_CUR"), nil
+					return exampleDiscussionWithReplies("NEXT_CUR", true), nil
 				}
 			},
 			opts: ViewOptions{
 				CommentNodeID: "DC_abc",
 			},
 			wantStdout: heredoc.Doc(`
-				octocat commented less than a minute ago ✓ Answer
+				octocat commented • 1h • ✓ Answer
 
 				  This is the parent comment                                                  
 
 				👍 3
 
-				  hubot commented less than a minute ago
+				  hubot replied • 40m
 				  
 				    First reply                                                                 
 				  
 				  
-				  monalisa commented less than a minute ago
+				  monalisa replied • 20m • Newest reply
 				  
 				    Second reply                                                                
 				  
@@ -876,7 +876,7 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, false, newest)
-					return exampleDiscussionWithReplies(""), nil
+					return exampleDiscussionWithReplies("", false), nil
 				}
 			},
 			opts: ViewOptions{
@@ -884,14 +884,14 @@ func TestViewRun(t *testing.T) {
 				Order:         "oldest",
 			},
 			wantStdout: heredoc.Doc(`
-				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
+				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
 				replies:	2
 				--
 				This is the parent comment
-				  comment:	hubot	2025-03-02T01:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
+				  comment:	hubot	2025-03-01T00:20:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
 				  --
 				  First reply
-				  comment:	monalisa	2025-03-02T02:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				  comment:	monalisa	2025-03-01T00:40:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
 				  --
 				  Second reply
 			`),
@@ -905,7 +905,7 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, false, newest)
-					return exampleDiscussionWithReplies("NEXT_CUR_456"), nil
+					return exampleDiscussionWithReplies("NEXT_CUR_456", false), nil
 				}
 			},
 			opts: ViewOptions{
@@ -913,15 +913,15 @@ func TestViewRun(t *testing.T) {
 				Order:         "oldest",
 			},
 			wantStdout: heredoc.Doc(`
-				comment:	octocat	2025-03-02T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
+				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
 				replies:	2
 				next:	NEXT_CUR_456
 				--
 				This is the parent comment
-				  comment:	hubot	2025-03-02T01:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
+				  comment:	hubot	2025-03-01T00:20:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
 				  --
 				  First reply
-				  comment:	monalisa	2025-03-02T02:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				  comment:	monalisa	2025-03-01T00:40:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
 				  --
 				  Second reply
 			`),
@@ -935,7 +935,7 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, true, newest)
-					return exampleDiscussionWithReplies(""), nil
+					return exampleDiscussionWithReplies("", true), nil
 				}
 			},
 			opts: ViewOptions{
@@ -949,7 +949,7 @@ func TestViewRun(t *testing.T) {
 				      {
 				        "author": {"id": "", "login": "octocat", "name": ""},
 				        "body": "This is the parent comment",
-				        "createdAt": "2025-03-02T00:00:00Z",
+				        "createdAt": "2025-03-01T00:00:00Z",
 				        "id": "DC_abc",
 				        "isAnswer": true,
 				        "reactionGroups": [
@@ -958,24 +958,24 @@ func TestViewRun(t *testing.T) {
 				        "replies": {
 				          "nodes": [
 				            {
-				              "author": {"id": "", "login": "hubot", "name": ""},
-				              "body": "First reply",
-				              "createdAt": "2025-03-02T01:00:00Z",
-				              "id": "R1",
-				              "isAnswer": false,
-				              "reactionGroups": [],
-				              "upvoteCount": 0,
-				              "url": "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2"
-				            },
-				            {
 				              "author": {"id": "", "login": "monalisa", "name": ""},
 				              "body": "Second reply",
-				              "createdAt": "2025-03-02T02:00:00Z",
+				              "createdAt": "2025-03-01T00:40:00Z",
 				              "id": "R2",
 				              "isAnswer": false,
 				              "reactionGroups": [],
 				              "upvoteCount": 0,
 				              "url": "https://github.com/OWNER/REPO/discussions/123#discussioncomment-3"
+				            },
+				            {
+				              "author": {"id": "", "login": "hubot", "name": ""},
+				              "body": "First reply",
+				              "createdAt": "2025-03-01T00:20:00Z",
+				              "id": "R1",
+				              "isAnswer": false,
+				              "reactionGroups": [],
+				              "upvoteCount": 0,
+				              "url": "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2"
 				            }
 				          ],
 				          "totalCount": 2
@@ -998,7 +998,7 @@ func TestViewRun(t *testing.T) {
 					assert.Equal(t, 30, limit)
 					assert.Equal(t, "", after)
 					assert.Equal(t, true, newest)
-					return exampleDiscussionWithReplies("NEXT_REP_CUR"), nil
+					return exampleDiscussionWithReplies("NEXT_REP_CUR", true), nil
 				}
 			},
 			opts: ViewOptions{
@@ -1012,7 +1012,7 @@ func TestViewRun(t *testing.T) {
 				      {
 				        "author": {"id": "", "login": "octocat", "name": ""},
 				        "body": "This is the parent comment",
-				        "createdAt": "2025-03-02T00:00:00Z",
+				        "createdAt": "2025-03-01T00:00:00Z",
 				        "id": "DC_abc",
 				        "isAnswer": true,
 				        "reactionGroups": [
@@ -1022,24 +1022,24 @@ func TestViewRun(t *testing.T) {
 				          "next": "NEXT_REP_CUR",
 				          "nodes": [
 				            {
-				              "author": {"id": "", "login": "hubot", "name": ""},
-				              "body": "First reply",
-				              "createdAt": "2025-03-02T01:00:00Z",
-				              "id": "R1",
-				              "isAnswer": false,
-				              "reactionGroups": [],
-				              "upvoteCount": 0,
-				              "url": "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2"
-				            },
-				            {
 				              "author": {"id": "", "login": "monalisa", "name": ""},
 				              "body": "Second reply",
-				              "createdAt": "2025-03-02T02:00:00Z",
+				              "createdAt": "2025-03-01T00:40:00Z",
 				              "id": "R2",
 				              "isAnswer": false,
 				              "reactionGroups": [],
 				              "upvoteCount": 0,
 				              "url": "https://github.com/OWNER/REPO/discussions/123#discussioncomment-3"
+				            },
+				            {
+				              "author": {"id": "", "login": "hubot", "name": ""},
+				              "body": "First reply",
+				              "createdAt": "2025-03-01T00:20:00Z",
+				              "id": "R1",
+				              "isAnswer": false,
+				              "reactionGroups": [],
+				              "upvoteCount": 0,
+				              "url": "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2"
 				            }
 				          ],
 				          "totalCount": 2
@@ -1096,26 +1096,28 @@ func exampleDiscussionWithComments() *client.Discussion {
 	d := exampleAnswerableDiscussion()
 	d.Comments = client.DiscussionCommentList{
 		TotalCount: 2,
+		Direction:  client.DiscussionCommentListDirectionForward,
 		Comments: []client.DiscussionComment{
 			{
 				ID:        "C_1",
 				URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-1",
 				Author:    client.DiscussionActor{Login: "octocat"},
 				Body:      "This is a comment",
-				CreatedAt: time.Date(2025, 3, 2, 0, 0, 0, 0, time.UTC),
+				CreatedAt: time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
 				IsAnswer:  true,
 				ReactionGroups: []client.ReactionGroup{
 					{Content: "THUMBS_UP", TotalCount: 3},
 				},
 				Replies: client.DiscussionCommentList{
 					TotalCount: 5,
+					Direction:  client.DiscussionCommentListDirectionBackward,
 					Comments: []client.DiscussionComment{
 						{
 							ID:        "C_1_R1",
 							URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2",
 							Author:    client.DiscussionActor{Login: "hubot"},
 							Body:      "Thanks!",
-							CreatedAt: time.Date(2025, 3, 2, 1, 0, 0, 0, time.UTC),
+							CreatedAt: time.Date(2025, 3, 1, 0, 30, 0, 0, time.UTC),
 						},
 					},
 				},
@@ -1125,14 +1127,36 @@ func exampleDiscussionWithComments() *client.Discussion {
 				URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-3",
 				Author:    client.DiscussionActor{Login: "monalisa"},
 				Body:      "Another comment",
-				CreatedAt: time.Date(2025, 3, 3, 0, 0, 0, 0, time.UTC),
+				CreatedAt: time.Date(2025, 3, 1, 0, 45, 0, 0, time.UTC),
 			},
 		},
 	}
 	return d
 }
 
-func exampleDiscussionWithReplies(nextCursor string) *client.Discussion {
+func exampleDiscussionWithReplies(nextCursor string, newest bool) *client.Discussion {
+	firstReply := client.DiscussionComment{
+		ID:        "R1",
+		URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2",
+		Author:    client.DiscussionActor{Login: "hubot"},
+		Body:      "First reply",
+		CreatedAt: time.Date(2025, 3, 1, 0, 20, 0, 0, time.UTC),
+	}
+	secondReply := client.DiscussionComment{
+		ID:        "R2",
+		URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-3",
+		Author:    client.DiscussionActor{Login: "monalisa"},
+		Body:      "Second reply",
+		CreatedAt: time.Date(2025, 3, 1, 0, 40, 0, 0, time.UTC),
+	}
+
+	direction := client.DiscussionCommentListDirectionForward
+	replies := []client.DiscussionComment{firstReply, secondReply}
+	if newest {
+		direction = client.DiscussionCommentListDirectionBackward
+		replies = []client.DiscussionComment{secondReply, firstReply}
+	}
+
 	d := exampleAnswerableDiscussion()
 	d.Comments = client.DiscussionCommentList{
 		TotalCount: 1,
@@ -1142,7 +1166,7 @@ func exampleDiscussionWithReplies(nextCursor string) *client.Discussion {
 				URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-1",
 				Author:    client.DiscussionActor{Login: "octocat"},
 				Body:      "This is the parent comment",
-				CreatedAt: time.Date(2025, 3, 2, 0, 0, 0, 0, time.UTC),
+				CreatedAt: time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
 				IsAnswer:  true,
 				ReactionGroups: []client.ReactionGroup{
 					{Content: "THUMBS_UP", TotalCount: 3},
@@ -1150,22 +1174,8 @@ func exampleDiscussionWithReplies(nextCursor string) *client.Discussion {
 				Replies: client.DiscussionCommentList{
 					TotalCount: 2,
 					NextCursor: nextCursor,
-					Comments: []client.DiscussionComment{
-						{
-							ID:        "R1",
-							URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-2",
-							Author:    client.DiscussionActor{Login: "hubot"},
-							Body:      "First reply",
-							CreatedAt: time.Date(2025, 3, 2, 1, 0, 0, 0, time.UTC),
-						},
-						{
-							ID:        "R2",
-							URL:       "https://github.com/OWNER/REPO/discussions/123#discussioncomment-3",
-							Author:    client.DiscussionActor{Login: "monalisa"},
-							Body:      "Second reply",
-							CreatedAt: time.Date(2025, 3, 2, 2, 0, 0, 0, time.UTC),
-						},
-					},
+					Direction:  direction,
+					Comments:   replies,
 				},
 			},
 		},

@@ -295,7 +295,7 @@ func viewRun(opts *ViewOptions) error {
 
 		comment := discussion.Comments.Comments[0]
 		if opts.IO.IsStdoutTTY() {
-			return printHumanReplies(opts, &comment)
+			return printHumanCommentAndReplies(opts, &comment)
 		}
 		return printRawReplies(opts.IO.Out, &comment)
 	}
@@ -353,7 +353,7 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 		verb = "Asked by"
 	}
 
-	fmt.Fprintf(out, "%s · %s · %s %s · %s · %s\n",
+	fmt.Fprintf(out, "%s • %s • %s %s • %s • %s\n",
 		stateColor(state),
 		d.Category.Name,
 		verb,
@@ -391,22 +391,48 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 		fmt.Fprintln(out, cs.Bold("Comments"))
 		fmt.Fprintln(out)
 
-		for _, c := range d.Comments.Comments {
-			if err := printHumanComment(opts, out, c, ""); err != nil {
+		if d.Comments.Direction == client.DiscussionCommentListDirectionBackward {
+			if shown := len(d.Comments.Comments); shown < d.Comments.TotalCount {
+				remaining := d.Comments.TotalCount - shown
+				pluralized := "comment"
+				if remaining > 1 {
+					pluralized = "comments"
+				}
+				fmt.Fprintf(out, "%s\n\n", cs.Muted(fmt.Sprintf("———————— Not showing older %d %s ————————", remaining, pluralized)))
+			}
+		}
+
+		// The order of comments from the client is based on the order selected by the user (newest/oldest),
+		// but we want to show them in chronological order to avoid confusion. So we need to reverse the slice
+		// elements if it's a newest-first list.
+		intuitivelyOrdered := slices.Clone(d.Comments.Comments)
+		if d.Comments.Direction == client.DiscussionCommentListDirectionBackward {
+			slices.Reverse(intuitivelyOrdered)
+		}
+
+		// Let's figure out if the last element in our list is actually the newest comment.
+		// Note that we've already reordered the comments for display, so the "last" element
+		// is always the newer in the list.
+		lastIsNewest :=
+			d.Comments.Cursor == "" && d.Comments.Direction == client.DiscussionCommentListDirectionBackward ||
+				d.Comments.NextCursor == "" && d.Comments.Direction == client.DiscussionCommentListDirectionForward
+
+		for i, c := range intuitivelyOrdered {
+			isNewest := i == len(intuitivelyOrdered)-1 && lastIsNewest
+			if err := printHumanComment(opts, out, c, "", false, isNewest); err != nil {
 				return err
 			}
 		}
 
-		if shown := len(d.Comments.Comments); shown < d.Comments.TotalCount {
-			remaining := d.Comments.TotalCount - shown
-			age := "more"
-			if d.Comments.Direction == client.DiscussionCommentListDirectionForward {
-				age = "newer"
-			} else if d.Comments.Direction == client.DiscussionCommentListDirectionBackward {
-				age = "older"
+		if d.Comments.Direction == client.DiscussionCommentListDirectionForward {
+			if shown := len(d.Comments.Comments); shown < d.Comments.TotalCount {
+				remaining := d.Comments.TotalCount - shown
+				pluralized := "comment"
+				if remaining > 1 {
+					pluralized = "comments"
+				}
+				fmt.Fprintf(out, "%s\n\n", cs.Muted(fmt.Sprintf("———————— Not showing newer %d %s ————————", remaining, pluralized)))
 			}
-			fmt.Fprintf(out, cs.Muted("  And %d %s comments\n"), remaining, age)
-			fmt.Fprintln(out)
 		}
 
 		if d.Comments.NextCursor != "" {
@@ -448,17 +474,30 @@ func printRawView(out io.Writer, d *client.Discussion, showComments bool) error 
 	return nil
 }
 
-func printHumanComment(opts *ViewOptions, out io.Writer, c client.DiscussionComment, indent string) error {
+func printHumanComment(opts *ViewOptions, out io.Writer, c client.DiscussionComment, indent string, isReply bool, isNewest bool) error {
 	cs := opts.IO.ColorScheme()
 	now := opts.Now()
 
-	header := fmt.Sprintf("%s%s commented %s",
+	action := "commented"
+	if isReply {
+		action = "replied"
+	}
+
+	header := fmt.Sprintf("%s%s %s • %s",
 		indent,
 		cs.Bold(c.Author.Login),
-		text.FuzzyAgo(now, c.CreatedAt),
+		action,
+		text.FuzzyAgoAbbr(now, c.CreatedAt),
 	)
 	if c.IsAnswer {
-		header += fmt.Sprintf(" %s %s", cs.SuccessIcon(), cs.Green("Answer"))
+		header += fmt.Sprintf(" • %s %s", cs.SuccessIcon(), cs.Green("Answer"))
+	}
+	if isNewest {
+		kind := "comment"
+		if isReply {
+			kind = "reply"
+		}
+		header += fmt.Sprintf(" • %s", fmt.Sprintf(cs.CyanBold("Newest %s"), kind))
 	}
 	fmt.Fprintln(out, header)
 
@@ -481,20 +520,57 @@ func printHumanComment(opts *ViewOptions, out io.Writer, c client.DiscussionComm
 
 	fmt.Fprintln(out)
 
-	for _, reply := range c.Replies.Comments {
-		if err := printHumanComment(opts, out, reply, indent+"  "); err != nil {
+	if isReply {
+		// Replies are leaf nodes, so there won't be children replies/comments.
+		return nil
+	}
+
+	if len(c.Replies.Comments) == 0 {
+		return nil
+	}
+
+	if c.Replies.Direction == client.DiscussionCommentListDirectionBackward {
+		if shown := len(c.Replies.Comments); shown < c.Replies.TotalCount {
+			remaining := c.Replies.TotalCount - shown
+			pluralized := "reply"
+			if remaining > 1 {
+				pluralized = "replies"
+			}
+			fmt.Fprintf(out, "%s%s\n\n", indent, cs.Muted(fmt.Sprintf("———————— Not showing older %d %s ————————", remaining, pluralized)))
+		}
+	}
+
+	// The order of replies from the client is based on the order selected by the user (newest/oldest),
+	// but we want to show them in chronological order to avoid confusion. So we need to reverse the slice
+	// elements if it's a newest-first list.
+	intuitivelyOrdered := slices.Clone(c.Replies.Comments)
+	if c.Replies.Direction == client.DiscussionCommentListDirectionBackward {
+		slices.Reverse(intuitivelyOrdered)
+	}
+
+	// Let's figure out if the last element in our list is actually the newest reply.
+	// Note that we've already reordered the replies for display, so the "last" element
+	// is always the newer in the list.
+	lastIsNewest :=
+		c.Replies.Cursor == "" && c.Replies.Direction == client.DiscussionCommentListDirectionBackward ||
+			c.Replies.NextCursor == "" && c.Replies.Direction == client.DiscussionCommentListDirectionForward
+
+	for i, reply := range intuitivelyOrdered {
+		isNewest := i == len(intuitivelyOrdered)-1 && lastIsNewest
+		if err := printHumanComment(opts, out, reply, indent+"  ", true, isNewest); err != nil {
 			return err
 		}
 	}
 
-	if shown := len(c.Replies.Comments); shown < c.Replies.TotalCount {
-		directionLabel := "more"
-		if c.Replies.Direction == client.DiscussionCommentListDirectionForward {
-			directionLabel = "newer"
-		} else if c.Replies.Direction == client.DiscussionCommentListDirectionBackward {
-			directionLabel = "older"
+	if c.Replies.Direction == client.DiscussionCommentListDirectionForward {
+		if shown := len(c.Replies.Comments); shown < c.Replies.TotalCount {
+			remaining := c.Replies.TotalCount - shown
+			pluralized := "reply"
+			if remaining > 1 {
+				pluralized = "replies"
+			}
+			fmt.Fprintf(out, "%s%s\n\n", indent, cs.Muted(fmt.Sprintf("———————— Not showing newer %d %s ————————", remaining, pluralized)))
 		}
-		fmt.Fprintf(out, "%s  %s\n\n", indent, cs.Muted(fmt.Sprintf("And %d %s replies", c.Replies.TotalCount-shown, directionLabel)))
 	}
 
 	return nil
@@ -540,11 +616,11 @@ func labelList(labels []client.DiscussionLabel, cs *iostreams.ColorScheme) strin
 	return strings.Join(names, ", ")
 }
 
-func printHumanReplies(opts *ViewOptions, c *client.DiscussionComment) error {
+func printHumanCommentAndReplies(opts *ViewOptions, c *client.DiscussionComment) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
-	if err := printHumanComment(opts, out, *c, ""); err != nil {
+	if err := printHumanComment(opts, out, *c, "", false, false); err != nil {
 		return err
 	}
 
