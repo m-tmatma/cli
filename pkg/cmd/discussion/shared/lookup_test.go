@@ -53,6 +53,11 @@ func TestParseDiscussionArg(t *testing.T) {
 			wantErr: `invalid discussion URL: "https://github.com/owner/repo/discussions/"`,
 		},
 		{
+			name:    "URL with overflowing number",
+			arg:     "https://github.com/owner/repo/discussions/99999999999999999999",
+			wantErr: `invalid discussion number in URL: "99999999999999999999"`,
+		},
+		{
 			name:    "zero",
 			arg:     "0",
 			wantNum: 0,
@@ -165,6 +170,11 @@ func TestParseDiscussionOrCommentArg(t *testing.T) {
 			name:    "URL missing number",
 			arg:     "https://github.com/owner/repo/discussions/",
 			wantErr: `invalid discussion URL: "https://github.com/owner/repo/discussions/"`,
+		},
+		{
+			name:    "URL with overflowing number",
+			arg:     "https://github.com/owner/repo/discussions/99999999999999999999",
+			wantErr: `invalid discussion number in URL: "99999999999999999999"`,
 		},
 		{
 			name:    "comment URL with invalid fragment",

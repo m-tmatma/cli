@@ -38,7 +38,11 @@ func ParseDiscussionArg(arg string) (int32, ghrepo.Interface, error) {
 		return 0, nil, fmt.Errorf("invalid discussion URL: %q", arg)
 	}
 
-	num, _ := strconv.ParseInt(m[3], 10, 32)
+	num, err := strconv.ParseInt(m[3], 10, 32)
+	if err != nil {
+		return 0, nil, fmt.Errorf("invalid discussion number in URL: %q", m[3])
+	}
+
 	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
 	return int32(num), repo, nil
 }
@@ -84,7 +88,10 @@ func ParseDiscussionOrCommentArg(arg string) (*ParsedDiscussionOrCommentArg, err
 		return nil, fmt.Errorf("invalid discussion URL: %q", arg)
 	}
 
-	num, _ := strconv.ParseInt(m[3], 10, 32)
+	num, err := strconv.ParseInt(m[3], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid discussion number in URL: %q", m[3])
+	}
 	repo := ghrepo.NewWithHost(m[1], m[2], u.Hostname())
 
 	if fragment := u.Fragment; strings.HasPrefix(fragment, "discussioncomment-") {
