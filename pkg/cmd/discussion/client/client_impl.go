@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // maxPageSize is the maximum number of items per page allowed by the GitHub GraphQL API.
@@ -593,24 +596,14 @@ func (c *discussionClient) GetWithComments(repo ghrepo.Interface, number int32, 
 	return &d, nil
 }
 
-// GetCommentReplies fetches a discussion and a single comment with its
-// paginated replies. It uses the top-level node(id:) query for the comment
-// because the Discussion type does not expose a comment(id:) field.
-func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32, commentID string, limit int, after string, newest bool) (*Discussion, error) {
-	meta, err := c.getRepositoryMeta(repo)
-	if err != nil {
-		return nil, err
-	}
-	if !meta.HasDiscussionsEnabled {
-		return nil, fmt.Errorf("the '%s/%s' repository has discussions disabled", repo.RepoOwner(), repo.RepoName())
-	}
-
+// GetCommentReplies fetches a single comment with its paginated replies, along
+// with its parent discussion. It uses the top-level node(id:) query because the
+// comment node ID is self-contained: the parent discussion (number, repository,
+// and detail fields) is resolved from the comment itself rather than from a
+// separate repository(owner:).discussion(number:) lookup. The host argument
+// selects the GraphQL endpoint.
+func (c *discussionClient) GetCommentReplies(host string, commentID string, limit int, after string, newest bool) (*Discussion, error) {
 	var query struct {
-		Repository struct {
-			Discussion struct {
-				discussionListNode
-			} `graphql:"discussion(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
 		Node *struct {
 			DiscussionComment struct {
 				ID             string
@@ -626,14 +619,8 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 						TotalCount int
 					}
 				}
-				Discussion struct {
-					Number     int
-					Repository struct {
-						Owner struct{ Login string }
-						Name  string
-					}
-				}
-				Replies struct {
+				Discussion discussionListNode
+				Replies    struct {
 					TotalCount int
 					PageInfo   struct {
 						EndCursor       string
@@ -648,9 +635,6 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 	}
 
 	variables := map[string]interface{}{
-		"owner":     githubv4.String(repo.RepoOwner()),
-		"name":      githubv4.String(repo.RepoName()),
-		"number":    githubv4.Int(number),
 		"commentID": githubv4.ID(commentID),
 		"first":     (*githubv4.Int)(nil),
 		"last":      (*githubv4.Int)(nil),
@@ -670,7 +654,7 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 		}
 	}
 
-	if err := c.gql.Query(repo.RepoHost(), "DiscussionCommentReplies", &query, variables); err != nil {
+	if err := c.gql.Query(host, "DiscussionCommentReplies", &query, variables); err != nil {
 		return nil, err
 	}
 
@@ -684,14 +668,9 @@ func (c *discussionClient) GetCommentReplies(repo ghrepo.Interface, number int32
 		return nil, fmt.Errorf("node %s is not a discussion comment", commentID)
 	}
 
-	if !strings.EqualFold(src.Discussion.Repository.Owner.Login, repo.RepoOwner()) ||
-		!strings.EqualFold(src.Discussion.Repository.Name, repo.RepoName()) {
-		return nil, fmt.Errorf("comment %s does not belong to %s/%s", commentID, repo.RepoOwner(), repo.RepoName())
-	}
+	d := mapDiscussionFromListNode(src.Discussion)
 
-	d := mapDiscussionFromListNode(query.Repository.Discussion.discussionListNode)
-
-	for _, rg := range query.Repository.Discussion.ReactionGroups {
+	for _, rg := range src.Discussion.ReactionGroups {
 		d.ReactionGroups = append(d.ReactionGroups, ReactionGroup{
 			Content:    rg.Content,
 			TotalCount: rg.Users.TotalCount,
@@ -801,17 +780,19 @@ func (c *discussionClient) ListCategories(repo ghrepo.Interface) ([]DiscussionCa
 	return categories, nil
 }
 
-// repositoryMeta holds the node ID and feature flags fetched for a repository.
+// repositoryMeta holds the node ID, database ID, and feature flags fetched for a repository.
 type repositoryMeta struct {
 	ID                    string
+	DatabaseId            int64
 	HasDiscussionsEnabled bool
 }
 
-// getRepositoryMeta fetches the node ID and discussion-enabled flag for a repository.
+// getRepositoryMeta fetches the node ID, database ID, and discussion-enabled flag for a repository.
 func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repositoryMeta, error) {
 	var query struct {
 		Repository struct {
 			ID                    string
+			DatabaseId            int64
 			HasDiscussionsEnabled bool
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
@@ -827,6 +808,7 @@ func (c *discussionClient) getRepositoryMeta(repo ghrepo.Interface) (*repository
 
 	return &repositoryMeta{
 		ID:                    query.Repository.ID,
+		DatabaseId:            query.Repository.DatabaseId,
 		HasDiscussionsEnabled: query.Repository.HasDiscussionsEnabled,
 	}, nil
 }
@@ -1074,4 +1056,215 @@ func (c *discussionClient) Update(repo ghrepo.Interface, input UpdateDiscussionI
 		return &d, fmt.Errorf("discussion updated but some mutations failed: %w", errors.Join(secondaryErrs...))
 	}
 	return &d, nil
+}
+
+// AddComment adds a comment to a discussion. If replyToID is non-empty, the
+// comment is created as a reply to that comment.
+func (c *discussionClient) AddComment(repo ghrepo.Interface, discussionID, body, replyToID string) (*DiscussionComment, error) {
+	var mutation struct {
+		AddDiscussionComment struct {
+			Comment struct {
+				ID             string
+				URL            string `graphql:"url"`
+				Author         actorNode
+				Body           string
+				CreatedAt      time.Time
+				IsAnswer       bool
+				UpvoteCount    int
+				ReactionGroups []struct {
+					Content string
+					Users   struct {
+						TotalCount int
+					}
+				} `graphql:"reactionGroups"`
+			}
+		} `graphql:"addDiscussionComment(input: $input)"`
+	}
+
+	input := githubv4.AddDiscussionCommentInput{
+		DiscussionID: githubv4.ID(discussionID),
+		Body:         githubv4.String(body),
+	}
+	if replyToID != "" {
+		id := githubv4.ID(replyToID)
+		input.ReplyToID = &id
+	}
+
+	variables := map[string]interface{}{
+		"input": input,
+	}
+
+	if err := c.gql.Mutate(repo.RepoHost(), "AddDiscussionComment", &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	src := mutation.AddDiscussionComment.Comment
+	comment := &DiscussionComment{
+		ID:          src.ID,
+		URL:         src.URL,
+		Author:      mapActorFromListNode(src.Author),
+		Body:        src.Body,
+		CreatedAt:   src.CreatedAt,
+		IsAnswer:    src.IsAnswer,
+		UpvoteCount: src.UpvoteCount,
+	}
+	for _, rg := range src.ReactionGroups {
+		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+	return comment, nil
+}
+
+// UpdateComment updates the body of an existing discussion comment or reply.
+func (c *discussionClient) UpdateComment(repo ghrepo.Interface, commentID, body string) (*DiscussionComment, error) {
+	var mutation struct {
+		UpdateDiscussionComment struct {
+			Comment struct {
+				ID             string
+				URL            string `graphql:"url"`
+				Author         actorNode
+				Body           string
+				CreatedAt      time.Time
+				IsAnswer       bool
+				UpvoteCount    int
+				ReactionGroups []struct {
+					Content string
+					Users   struct {
+						TotalCount int
+					}
+				} `graphql:"reactionGroups"`
+			}
+		} `graphql:"updateDiscussionComment(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.UpdateDiscussionCommentInput{
+			CommentID: githubv4.ID(commentID),
+			Body:      githubv4.String(body),
+		},
+	}
+
+	if err := c.gql.Mutate(repo.RepoHost(), "UpdateDiscussionComment", &mutation, variables); err != nil {
+		return nil, err
+	}
+
+	src := mutation.UpdateDiscussionComment.Comment
+	comment := &DiscussionComment{
+		ID:          src.ID,
+		URL:         src.URL,
+		Author:      mapActorFromListNode(src.Author),
+		Body:        src.Body,
+		CreatedAt:   src.CreatedAt,
+		IsAnswer:    src.IsAnswer,
+		UpvoteCount: src.UpvoteCount,
+	}
+	for _, rg := range src.ReactionGroups {
+		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+	return comment, nil
+}
+
+// DeleteComment deletes a discussion comment or reply.
+func (c *discussionClient) DeleteComment(repo ghrepo.Interface, commentID string) error {
+	var mutation struct {
+		DeleteDiscussionComment struct {
+			Comment struct {
+				ID string
+			}
+		} `graphql:"deleteDiscussionComment(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.DeleteDiscussionCommentInput{
+			ID: githubv4.ID(commentID),
+		},
+	}
+
+	return c.gql.Mutate(repo.RepoHost(), "DeleteDiscussionComment", &mutation, variables)
+}
+
+// GetComment fetches a single discussion comment by node ID.
+func (c *discussionClient) GetComment(host string, commentID string) (*DiscussionComment, error) {
+	var query struct {
+		Node struct {
+			Typename          string `graphql:"__typename"`
+			DiscussionComment struct {
+				ID          string
+				URL         string `graphql:"url"`
+				Author      actorNode
+				Body        string
+				CreatedAt   time.Time
+				IsAnswer    bool
+				UpvoteCount int
+				Discussion  struct {
+					ID string
+				}
+				ReactionGroups []struct {
+					Content string
+					Users   struct {
+						TotalCount int
+					}
+				} `graphql:"reactionGroups"`
+			} `graphql:"... on DiscussionComment"`
+		} `graphql:"node(id: $id)"`
+	}
+
+	variables := map[string]interface{}{
+		"id": githubv4.ID(commentID),
+	}
+
+	if err := c.gql.Query(host, "GetDiscussionComment", &query, variables); err != nil {
+		return nil, err
+	}
+
+	if query.Node.Typename != "DiscussionComment" {
+		return nil, fmt.Errorf("node %s is not a discussion comment (got %s)", commentID, query.Node.Typename)
+	}
+
+	src := query.Node.DiscussionComment
+	comment := &DiscussionComment{
+		ID:           src.ID,
+		URL:          src.URL,
+		DiscussionID: src.Discussion.ID,
+		Author:       mapActorFromListNode(src.Author),
+		Body:         src.Body,
+		CreatedAt:    src.CreatedAt,
+		IsAnswer:     src.IsAnswer,
+		UpvoteCount:  src.UpvoteCount,
+	}
+	for _, rg := range src.ReactionGroups {
+		comment.ReactionGroups = append(comment.ReactionGroups, ReactionGroup{
+			Content:    rg.Content,
+			TotalCount: rg.Users.TotalCount,
+		})
+	}
+	return comment, nil
+}
+
+// ResolveCommentNodeID constructs a discussion comment node ID from a
+// repository and a comment database ID. It fetches the repository's database
+// ID via the API, then encodes the data into a  "DC_" prefixed node ID.
+func (c *discussionClient) ResolveCommentNodeID(repo ghrepo.Interface, commentDatabaseID int64) (string, error) {
+	meta, err := c.getRepositoryMeta(repo)
+	if err != nil {
+		return "", err
+	}
+
+	buf := bytes.Buffer{}
+	parts := []int64{0, meta.DatabaseId, commentDatabaseID}
+
+	encoder := msgpack.NewEncoder(&buf)
+	encoder.UseCompactInts(true)
+
+	if err := encoder.Encode(parts); err != nil {
+		return "", fmt.Errorf("encoding comment node ID: %w", err)
+	}
+
+	encoded := base64.RawURLEncoding.EncodeToString(buf.Bytes())
+	return "DC_" + encoded, nil
 }

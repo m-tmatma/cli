@@ -117,3 +117,157 @@ func TestParseDiscussionArg(t *testing.T) {
 		})
 	}
 }
+
+func TestParseDiscussionOrCommentArg(t *testing.T) {
+	tests := []struct {
+		name              string
+		arg               string
+		wantNumber        int32
+		wantOwner         string
+		wantRepo          string
+		wantHost          string
+		wantCommentNodeID string
+		wantCommentDBID   int64
+		wantErr           string
+	}{
+		// Same cases as ParseDiscussionArg
+		{
+			name:    "empty",
+			arg:     "",
+			wantErr: `invalid argument: "" (expected a discussion number, URL, or comment ID)`,
+		},
+		{
+			name:    "whitespaces",
+			arg:     "  ",
+			wantErr: `invalid argument: "  " (expected a discussion number, URL, or comment ID)`,
+		},
+		{
+			name:    "invalid string",
+			arg:     "not-a-number",
+			wantErr: `invalid argument: "not-a-number" (expected a discussion number, URL, or comment ID)`,
+		},
+		{
+			name:    "hash only",
+			arg:     "#",
+			wantErr: `invalid argument: "#" (expected a discussion number, URL, or comment ID)`,
+		},
+		{
+			name:    "hash non-numeric",
+			arg:     "#abc",
+			wantErr: `invalid argument: "#abc" (expected a discussion number, URL, or comment ID)`,
+		},
+		{
+			name:    "URL with wrong path",
+			arg:     "https://github.com/owner/repo/issues/10",
+			wantErr: `invalid discussion URL: "https://github.com/owner/repo/issues/10"`,
+		},
+		{
+			name:    "URL missing number",
+			arg:     "https://github.com/owner/repo/discussions/",
+			wantErr: `invalid discussion URL: "https://github.com/owner/repo/discussions/"`,
+		},
+		{
+			name:    "comment URL with invalid fragment",
+			arg:     "https://github.com/owner/repo/discussions/5#discussioncomment-abc",
+			wantErr: `invalid comment ID in URL fragment: "discussioncomment-abc"`,
+		},
+		{
+			name:       "zero",
+			arg:        "0",
+			wantNumber: 0,
+		},
+		{
+			name:       "plain number",
+			arg:        "42",
+			wantNumber: 42,
+		},
+		{
+			name:       "hash number",
+			arg:        "#99",
+			wantNumber: 99,
+		},
+		{
+			name:       "HTTPS discussion URL",
+			arg:        "https://github.com/cli/cli/discussions/123",
+			wantNumber: 123,
+			wantOwner:  "cli",
+			wantRepo:   "cli",
+			wantHost:   "github.com",
+		},
+		{
+			name:            "HTTPS comment URL",
+			arg:             "https://github.com/cli/cli/discussions/123#discussioncomment-789",
+			wantNumber:      123,
+			wantOwner:       "cli",
+			wantRepo:        "cli",
+			wantHost:        "github.com",
+			wantCommentDBID: 789,
+		},
+		{
+			name:       "HTTP discussion URL",
+			arg:        "http://github.com/owner/repo/discussions/7",
+			wantNumber: 7,
+			wantOwner:  "owner",
+			wantRepo:   "repo",
+			wantHost:   "github.com",
+		},
+		{
+			name:            "HTTP comment URL",
+			arg:             "http://github.com/owner/repo/discussions/7#discussioncomment-456",
+			wantNumber:      7,
+			wantOwner:       "owner",
+			wantRepo:        "repo",
+			wantHost:        "github.com",
+			wantCommentDBID: 456,
+		},
+		{
+			name:       "GHES discussion URL",
+			arg:        "https://git.example.com/org/project/discussions/55",
+			wantNumber: 55,
+			wantOwner:  "org",
+			wantRepo:   "project",
+			wantHost:   "git.example.com",
+		},
+		{
+			name:            "GHES comment URL",
+			arg:             "https://git.example.com/org/project/discussions/55#discussioncomment-100",
+			wantNumber:      55,
+			wantOwner:       "org",
+			wantRepo:        "project",
+			wantHost:        "git.example.com",
+			wantCommentDBID: 100,
+		},
+		{
+			name:              "comment node ID",
+			arg:               "DC_kwDOOokwWs4BBmcq",
+			wantCommentNodeID: "DC_kwDOOokwWs4BBmcq",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseDiscussionOrCommentArg(tt.arg)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.EqualError(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.wantNumber, result.Number)
+			assert.Equal(t, tt.wantCommentNodeID, result.CommentNodeID)
+			assert.Equal(t, tt.wantCommentDBID, result.CommentDatabaseID)
+
+			if tt.wantOwner != "" || tt.wantRepo != "" || tt.wantHost != "" {
+				require.NotNil(t, result.Repo)
+				assert.Equal(t, tt.wantOwner, result.Repo.RepoOwner())
+				assert.Equal(t, tt.wantRepo, result.Repo.RepoName())
+				assert.Equal(t, tt.wantHost, result.Repo.RepoHost())
+			} else {
+				assert.Nil(t, result.Repo)
+			}
+		})
+	}
+}

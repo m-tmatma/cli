@@ -36,38 +36,38 @@ jq-assert VIEW_JSON '.body' 'Discussion body content'
 jq-assert VIEW_JSON '.labels[0].name' 'bug'
 jq-assert VIEW_JSON '.labels[1].name' 'enhancement'
 
-# Get the discussion node ID for adding comments via API
-jq2env VIEW_JSON '.id' DISCUSSION_ID
+# Add two comments using the comment command
+exec gh discussion comment $DISCUSSION_URL --body 'First comment body'
+exec gh discussion comment $DISCUSSION_URL --body 'Second comment body'
 
-# Add two comments via API
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", body: "First comment body"}) { comment { id } } }' --jq '.data.addDiscussionComment.comment.id'
-stdout2env COMMENT1_ID
-
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", body: "Second comment body"}) { comment { id } } }' --jq '.data.addDiscussionComment.comment.id'
-stdout2env COMMENT2_ID
+# Get comment IDs for reply tests
+exec gh discussion view $DISCUSSION_URL --order oldest --json comments
+stdout2env COMMENTS_JSON
+jq2env COMMENTS_JSON '.comments.nodes[0].id' COMMENT1_ID
+jq2env COMMENTS_JSON '.comments.nodes[1].id' COMMENT2_ID
 
 # Add replies to the first comment
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", replyToId: "'$COMMENT1_ID'", body: "Reply one to first"}) { comment { id } } }'
-exec gh api graphql -f query='mutation { addDiscussionComment(input: {discussionId: "'$DISCUSSION_ID'", replyToId: "'$COMMENT1_ID'", body: "Reply two to first"}) { comment { id } } }'
+exec gh discussion comment $COMMENT1_ID --body 'Reply one to first'
+exec gh discussion comment $COMMENT1_ID --body 'Reply two to first'
 
 # View with --comments in non-interactive mode
 exec gh discussion view $DISCUSSION_URL --comments
 stdout 'First comment body'
 stdout 'Second comment body'
 
-# View with --comments in JSON mode
-exec gh discussion view $DISCUSSION_URL --comments --order oldest --json number,title,comments
+# View with comments in JSON mode
+exec gh discussion view $DISCUSSION_URL --order oldest --json number,title,comments
 stdout2env COMMENTS_JSON
 jq-assert COMMENTS_JSON '.comments.nodes[0].body' 'First comment body'
 jq-assert COMMENTS_JSON '.comments.nodes[1].body' 'Second comment body'
 
 # View replies for the first comment in non-interactive mode
-exec gh discussion view $DISCUSSION_URL --replies $COMMENT1_ID --order oldest
+exec gh discussion view $COMMENT1_ID --order oldest
 stdout 'Reply one to first'
 stdout 'Reply two to first'
 
 # View replies in JSON mode
-exec gh discussion view $DISCUSSION_URL --replies $COMMENT1_ID --order oldest --json number,title,comments
+exec gh discussion view $COMMENT1_ID --order oldest --json comments
 stdout2env REPLIES_JSON
 jq-assert REPLIES_JSON '.comments.nodes[0].replies.nodes[0].body' 'Reply one to first'
 jq-assert REPLIES_JSON '.comments.nodes[0].replies.nodes[1].body' 'Reply two to first'
@@ -75,12 +75,12 @@ jq-assert REPLIES_JSON '.comments.nodes[0].replies | has("cursor")' 'false'
 jq-assert REPLIES_JSON '.comments.nodes[0].replies | has("next")' 'false'
 
 # View replies of the second comment and confirm it has none
-exec gh discussion view $DISCUSSION_URL --replies $COMMENT2_ID --json number,title,comments
+exec gh discussion view $COMMENT2_ID --json number,title,comments
 stdout2env REPLIES2_JSON
 jq-assert REPLIES2_JSON '.comments.nodes[0].replies.totalCount' '^0$'
 
 # Pagination: limit comments to 1 and verify totalCount and next cursor
-exec gh discussion view $DISCUSSION_URL --comments --order oldest --limit 1 --json comments
+exec gh discussion view $DISCUSSION_URL --order oldest --limit 1 --json comments
 stdout2env PAGE1_JSON
 jq-assert PAGE1_JSON '.comments.totalCount' '^2$'
 jq-assert PAGE1_JSON '.comments.nodes | length' '^1$'
@@ -90,7 +90,7 @@ jq-assert PAGE1_JSON '.comments.next' '.+'
 
 # Fetch the second page of comments using the cursor
 jq2env PAGE1_JSON '.comments.next' COMMENTS_CURSOR
-exec gh discussion view $DISCUSSION_URL --comments --order oldest --limit 1 --after $COMMENTS_CURSOR --json comments
+exec gh discussion view $DISCUSSION_URL --order oldest --limit 1 --after $COMMENTS_CURSOR --json comments
 stdout2env PAGE2_JSON
 jq-assert PAGE2_JSON '.comments.nodes | length' '^1$'
 jq-assert PAGE2_JSON '.comments.nodes[0].body' 'Second comment body'
@@ -98,7 +98,7 @@ jq-assert PAGE2_JSON '.comments.cursor' '.+'
 jq-assert PAGE2_JSON '.comments | has("next")' 'false'
 
 # Pagination: limit replies to 1 and verify totalCount and next cursor
-exec gh discussion view $DISCUSSION_URL --replies $COMMENT1_ID --order oldest --limit 1 --json comments
+exec gh discussion view $COMMENT1_ID --order oldest --limit 1 --json comments
 stdout2env RPAGE1_JSON
 jq-assert RPAGE1_JSON '.comments.nodes[0].replies.totalCount' '^2$'
 jq-assert RPAGE1_JSON '.comments.nodes[0].replies.nodes | length' '^1$'
@@ -108,9 +108,17 @@ jq-assert RPAGE1_JSON '.comments.nodes[0].replies.next' '.+'
 
 # Fetch the second page of replies using the cursor
 jq2env RPAGE1_JSON '.comments.nodes[0].replies.next' REPLIES_CURSOR
-exec gh discussion view $DISCUSSION_URL --replies $COMMENT1_ID --order oldest --limit 1 --after $REPLIES_CURSOR --json comments
+exec gh discussion view $COMMENT1_ID --order oldest --limit 1 --after $REPLIES_CURSOR --json comments
 stdout2env RPAGE2_JSON
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies.nodes | length' '^1$'
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies.nodes[0].body' 'Reply two to first'
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies.cursor' '.+'
 jq-assert RPAGE2_JSON '.comments.nodes[0].replies | has("next")' 'false'
+
+# Fetch replies with a comment URL instead of node ID
+jq2env COMMENTS_JSON '.comments.nodes[0].url' COMMENT1_URL
+exec gh discussion view $COMMENT1_URL --order oldest --json comments
+stdout2env URL_REPLIES_JSON
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes | length' '^2$'
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[0].body' 'Reply one to first'
+jq-assert URL_REPLIES_JSON '.comments.nodes[0].replies.nodes[1].body' 'Reply two to first'

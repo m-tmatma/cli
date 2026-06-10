@@ -172,6 +172,7 @@ func (l DiscussionLabel) Export() map[string]interface{} {
 type DiscussionComment struct {
 	ID             string
 	URL            string
+	DiscussionID   string
 	Author         DiscussionActor
 	Body           string
 	CreatedAt      time.Time
