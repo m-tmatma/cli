@@ -253,7 +253,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(result.Discussions) == 0 {
-		return noResults(repo, opts.State)
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no discussions found in %s", ghrepo.FullName(repo)))
 	}
 
 	if err := opts.IO.StartPager(); err != nil {
@@ -300,17 +300,6 @@ func openInBrowser(opts *ListOptions, repo ghrepo.Interface) error {
 		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(discussionsURL))
 	}
 	return opts.Browser.Browse(discussionsURL)
-}
-
-func noResults(repo ghrepo.Interface, state string) error {
-	switch state {
-	case stateOpen:
-		return cmdutil.NewNoResultsError(fmt.Sprintf("no open discussions match your search in %s", ghrepo.FullName(repo)))
-	case stateClosed:
-		return cmdutil.NewNoResultsError(fmt.Sprintf("no closed discussions match your search in %s", ghrepo.FullName(repo)))
-	default:
-		return cmdutil.NewNoResultsError(fmt.Sprintf("no discussions match your search in %s", ghrepo.FullName(repo)))
-	}
 }
 
 func listHeader(repoName string, count, total int, state string) string {
@@ -371,7 +360,7 @@ func printDiscussions(opts *ListOptions, repoName string, discussions []client.D
 
 		if d.Answered {
 			if isTerminal {
-				tp.AddField("✓")
+				tp.AddField(cs.SuccessIcon())
 			} else {
 				tp.AddField("answered")
 			}

@@ -364,7 +364,7 @@ func TestListRun(t *testing.T) {
 			wantBrowse: "https://github.com/OWNER/REPO/discussions?q=is%3Aopen",
 		},
 		{
-			name: "no results open state",
+			name: "no results",
 			tty:  true,
 			opts: ListOptions{
 				State: stateOpen,
@@ -377,41 +377,7 @@ func TestListRun(t *testing.T) {
 					return &client.DiscussionListResult{}, nil
 				}
 			},
-			wantErr:   "no open discussions match your search in OWNER/REPO",
-			wantErrAs: &cmdutil.NoResultsError{},
-		},
-		{
-			name: "no results closed state",
-			tty:  true,
-			opts: ListOptions{
-				State: stateClosed,
-				Limit: 30,
-				Sort:  sortUpdated,
-				Order: orderDesc,
-			},
-			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.ListFunc = func(repo ghrepo.Interface, filters client.ListFilters, after string, limit int) (*client.DiscussionListResult, error) {
-					return &client.DiscussionListResult{}, nil
-				}
-			},
-			wantErr:   "no closed discussions match your search in OWNER/REPO",
-			wantErrAs: &cmdutil.NoResultsError{},
-		},
-		{
-			name: "no results all state",
-			tty:  true,
-			opts: ListOptions{
-				State: stateAll,
-				Limit: 30,
-				Sort:  sortUpdated,
-				Order: orderDesc,
-			},
-			clientStub: func(t *testing.T, m *client.DiscussionClientMock) {
-				m.ListFunc = func(repo ghrepo.Interface, filters client.ListFilters, after string, limit int) (*client.DiscussionListResult, error) {
-					return &client.DiscussionListResult{}, nil
-				}
-			},
-			wantErr:   "no discussions match your search in OWNER/REPO",
+			wantErr:   "no discussions found in OWNER/REPO",
 			wantErrAs: &cmdutil.NoResultsError{},
 		},
 		{
