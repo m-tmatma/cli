@@ -1,6 +1,8 @@
 package client
 
-import "time"
+import (
+	"time"
+)
 
 // Discussion represents a GitHub Discussion as a domain object.
 // Fields carry no JSON tags; serialization is handled by ExportData.
