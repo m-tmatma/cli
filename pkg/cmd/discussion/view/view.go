@@ -458,7 +458,7 @@ func printHumanComment(opts *ViewOptions, out io.Writer, c client.DiscussionComm
 		text.FuzzyAgo(now, c.CreatedAt),
 	)
 	if c.IsAnswer {
-		header += " " + cs.Green("✓ Answer")
+		header += fmt.Sprintf(" %s %s", cs.SuccessIcon(), cs.Green("Answer"))
 	}
 	fmt.Fprintln(out, header)
 
