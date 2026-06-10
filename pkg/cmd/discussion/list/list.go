@@ -106,10 +106,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			# List all discussions (closed or open) by label
 			$ gh discussion list --state all --label bug,enhancement
 
-			# List answered discussions as JSON
+			# List answered Q&A discussions as JSON
 			$ gh discussion list --answered --json number,title,url
 
-			# List unanswered discussions as JSON
+			# List unanswered Q&A discussions as JSON
 			$ gh discussion list --answered=false --json number,title,url
 		`),
 		Aliases: []string{"ls"},
