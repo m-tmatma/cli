@@ -484,25 +484,19 @@ func TestViewRun(t *testing.T) {
 				Order:    "oldest",
 			},
 			wantStdout: heredoc.Doc(`
-				title:	an interesting question
-				state:	OPEN
-				category:	Q&A
-				author:	monalisa
-				labels:	help-wanted
-				comments:	2
-				number:	123
-				url:	https://github.com/OWNER/REPO/discussions/123
-				--
-				about my interesting question
-				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
+				author:	octocat
+				created:	2025-03-01T00:00:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1
+				answer:	true
 				--
 				This is a comment
-				  comment:	hubot	2025-03-01T00:30:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
-				  --
-				  Thanks!
-				comment:	monalisa	2025-03-01T00:45:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				--
+				author:	monalisa
+				created:	2025-03-01T00:45:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
 				--
 				Another comment
+				--
 			`),
 		},
 		{
@@ -581,26 +575,19 @@ func TestViewRun(t *testing.T) {
 				Order:    "oldest",
 			},
 			wantStdout: heredoc.Doc(`
-				title:	an interesting question
-				state:	OPEN
-				category:	Q&A
-				author:	monalisa
-				labels:	help-wanted
-				comments:	2
-				next:	NEXT_CURSOR_456
-				number:	123
-				url:	https://github.com/OWNER/REPO/discussions/123
-				--
-				about my interesting question
-				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
+				author:	octocat
+				created:	2025-03-01T00:00:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1
+				answer:	true
 				--
 				This is a comment
-				  comment:	hubot	2025-03-01T00:30:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
-				  --
-				  Thanks!
-				comment:	monalisa	2025-03-01T00:45:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				--
+				author:	monalisa
+				created:	2025-03-01T00:45:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
 				--
 				Another comment
+				--
 			`),
 		},
 		{
@@ -884,16 +871,18 @@ func TestViewRun(t *testing.T) {
 				Order:         "oldest",
 			},
 			wantStdout: heredoc.Doc(`
-				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
-				replies:	2
+				author:	hubot
+				created:	2025-03-01T00:20:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
 				--
-				This is the parent comment
-				  comment:	hubot	2025-03-01T00:20:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
-				  --
-				  First reply
-				  comment:	monalisa	2025-03-01T00:40:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
-				  --
-				  Second reply
+				First reply
+				--
+				author:	monalisa
+				created:	2025-03-01T00:40:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				--
+				Second reply
+				--
 			`),
 		},
 		{
@@ -913,17 +902,18 @@ func TestViewRun(t *testing.T) {
 				Order:         "oldest",
 			},
 			wantStdout: heredoc.Doc(`
-				comment:	octocat	2025-03-01T00:00:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-1	answer
-				replies:	2
-				next:	NEXT_CUR_456
+				author:	hubot
+				created:	2025-03-01T00:20:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
 				--
-				This is the parent comment
-				  comment:	hubot	2025-03-01T00:20:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-2
-				  --
-				  First reply
-				  comment:	monalisa	2025-03-01T00:40:00Z	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
-				  --
-				  Second reply
+				First reply
+				--
+				author:	monalisa
+				created:	2025-03-01T00:40:00Z
+				url:	https://github.com/OWNER/REPO/discussions/123#discussioncomment-3
+				--
+				Second reply
+				--
 			`),
 		},
 		{

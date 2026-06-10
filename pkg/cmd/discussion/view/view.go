@@ -326,7 +326,11 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanView(opts, discussion)
 	}
 
-	return printRawView(opts.IO.Out, discussion, opts.Comments)
+	if opts.Comments {
+		return printRawComments(opts.IO.Out, discussion.Comments)
+	}
+
+	return printRawView(opts.IO.Out, discussion)
 }
 
 func printHumanView(opts *ViewOptions, d *client.Discussion) error {
@@ -446,7 +450,7 @@ func printHumanView(opts *ViewOptions, d *client.Discussion) error {
 	return nil
 }
 
-func printRawView(out io.Writer, d *client.Discussion, showComments bool) error {
+func printRawView(out io.Writer, d *client.Discussion) error {
 	fmt.Fprintf(out, "title:\t%s\n", d.Title)
 	state := "OPEN"
 	if d.Closed {
@@ -457,18 +461,25 @@ func printRawView(out io.Writer, d *client.Discussion, showComments bool) error 
 	fmt.Fprintf(out, "author:\t%s\n", d.Author.Login)
 	fmt.Fprintf(out, "labels:\t%s\n", labelList(d.Labels, nil))
 	fmt.Fprintf(out, "comments:\t%d\n", d.Comments.TotalCount)
-	if showComments && d.Comments.NextCursor != "" {
-		fmt.Fprintf(out, "next:\t%s\n", d.Comments.NextCursor)
-	}
 	fmt.Fprintf(out, "number:\t%d\n", d.Number)
 	fmt.Fprintf(out, "url:\t%s\n", d.URL)
 	fmt.Fprintln(out, "--")
 	fmt.Fprintln(out, d.Body)
 
-	if showComments {
-		for _, c := range d.Comments.Comments {
-			printRawComment(out, c, "")
-		}
+	return nil
+}
+
+// printRawComments writes the comments as a sequence of metadata blocks,
+// without any discussion-level fields or nested replies. Comments are
+// printed in chronological order regardless of how they were fetched.
+func printRawComments(out io.Writer, list client.DiscussionCommentList) error {
+	comments := slices.Clone(list.Comments)
+	if list.Direction == client.DiscussionCommentListDirectionBackward {
+		slices.Reverse(comments)
+	}
+
+	for _, c := range comments {
+		printRawComment(out, c)
 	}
 
 	return nil
@@ -576,23 +587,16 @@ func printHumanComment(opts *ViewOptions, out io.Writer, c client.DiscussionComm
 	return nil
 }
 
-func printRawComment(out io.Writer, c client.DiscussionComment, indent string) {
-	answer := ""
+func printRawComment(out io.Writer, c client.DiscussionComment) {
+	fmt.Fprintf(out, "author:\t%s\n", c.Author.Login)
+	fmt.Fprintf(out, "created:\t%s\n", c.CreatedAt.Format(time.RFC3339))
+	fmt.Fprintf(out, "url:\t%s\n", c.URL)
 	if c.IsAnswer {
-		answer = "\tanswer"
+		fmt.Fprintln(out, "answer:\ttrue")
 	}
-	fmt.Fprintf(out, "%scomment:\t%s\t%s\t%s%s\n", indent, c.Author.Login, c.CreatedAt.Format(time.RFC3339), c.URL, answer)
-	fmt.Fprintf(out, "%s--\n", indent)
-	if indent != "" {
-		fmt.Fprint(out, text.Indent(c.Body, indent))
-	} else {
-		fmt.Fprint(out, c.Body)
-	}
-	fmt.Fprintln(out)
-
-	for _, reply := range c.Replies.Comments {
-		printRawComment(out, reply, indent+"  ")
-	}
+	fmt.Fprintln(out, "--")
+	fmt.Fprintln(out, c.Body)
+	fmt.Fprintln(out, "--")
 }
 
 func labelList(labels []client.DiscussionLabel, cs *iostreams.ColorScheme) string {
@@ -632,21 +636,17 @@ func printHumanCommentAndReplies(opts *ViewOptions, c *client.DiscussionComment)
 	return nil
 }
 
+// printRawReplies writes the replies of a comment as a sequence of metadata
+// blocks, without any fields of the parent comment. Replies are printed in
+// chronological order regardless of how they were fetched.
 func printRawReplies(out io.Writer, c *client.DiscussionComment) error {
-	answer := ""
-	if c.IsAnswer {
-		answer = "\tanswer"
+	replies := slices.Clone(c.Replies.Comments)
+	if c.Replies.Direction == client.DiscussionCommentListDirectionBackward {
+		slices.Reverse(replies)
 	}
-	fmt.Fprintf(out, "comment:\t%s\t%s\t%s%s\n", c.Author.Login, c.CreatedAt.Format(time.RFC3339), c.URL, answer)
-	fmt.Fprintf(out, "replies:\t%d\n", c.Replies.TotalCount)
-	if c.Replies.NextCursor != "" {
-		fmt.Fprintf(out, "next:\t%s\n", c.Replies.NextCursor)
-	}
-	fmt.Fprintln(out, "--")
-	fmt.Fprintln(out, c.Body)
 
-	for _, reply := range c.Replies.Comments {
-		printRawComment(out, reply, "  ")
+	for _, reply := range replies {
+		printRawComment(out, reply)
 	}
 
 	return nil
