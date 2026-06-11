@@ -83,7 +83,7 @@ func TestInstallDir(t *testing.T) {
 			wantDir: filepath.Join("/home/monalisa", ".claude", "skills"),
 		},
 		{
-			name: "claude code user scope",
+			name: "claude code user scope, respect env var",
 			setup: func(t *testing.T) {
 				t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join("/home", "monalisa", ".config", "claude"))
 			},
