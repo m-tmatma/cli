@@ -36,9 +36,9 @@ on:
         type: boolean
         default: true
     secrets:
-      DEPLOY_APP_ID:
+      DEPLOY_APP_CLIENT_ID:
         required: true
-        description: "The GitHub App ID used to generate deploy tokens."
+        description: "The GitHub App Client ID used to generate deploy tokens."
       DEPLOY_APP_PRIVATE_KEY:
         required: true
         description: "The private key for the GitHub App used to generate deploy tokens."
@@ -65,7 +65,7 @@ jobs:
         id: deploy-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ secrets.DEPLOY_APP_ID }}
+          client-id: ${{ secrets.DEPLOY_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
           owner: cli
           repositories: cli
@@ -120,7 +120,7 @@ jobs:
         id: deploy-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ secrets.DEPLOY_APP_ID }}
+          client-id: ${{ secrets.DEPLOY_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
           owner: cli
           repositories: cli
@@ -212,7 +212,7 @@ jobs:
         id: deploy-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ secrets.DEPLOY_APP_ID }}
+          client-id: ${{ secrets.DEPLOY_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
           owner: cli
           repositories: cli
@@ -340,7 +340,7 @@ jobs:
         id: deploy-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ secrets.DEPLOY_APP_ID }}
+          client-id: ${{ secrets.DEPLOY_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
           owner: cli
           repositories: cli
