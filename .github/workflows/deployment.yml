@@ -37,11 +37,7 @@ on:
         default: true
     secrets:
       DEPLOY_APP_CLIENT_ID:
-        required: true
-        description: "The GitHub App Client ID used to generate deploy tokens."
       DEPLOY_APP_PRIVATE_KEY:
-        required: true
-        description: "The private key for the GitHub App used to generate deploy tokens."
 
 jobs:
   validate-tag-name:
