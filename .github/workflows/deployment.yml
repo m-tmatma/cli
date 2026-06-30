@@ -276,6 +276,7 @@ jobs:
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
+          DO_PUBLISH: ${{ inputs.environment == 'production' }}
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild

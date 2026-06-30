@@ -1,5 +1,11 @@
 #!/usr/bin/env pwsh
 
+# If DO_PUBLISH is not set or is set to "false", skip signing
+if ($null -eq $Env:DO_PUBLISH -or $Env:DO_PUBLISH -eq "false") {
+	Write-Host "Skipping Windows code signing; DO_PUBLISH not set or false"
+	exit
+}
+
 if ($null -eq $Env:DLIB_PATH) {
 	Write-Host "Skipping Windows code signing; DLIB_PATH not set"
 	exit
