@@ -56,7 +56,7 @@ func NewCmdCode(f *cmdutil.Factory, runF func(*CodeOptions) error) *cobra.Comman
 			# Search code matching "error handling"
 			$ gh search code "error handling"
 
-			# Search code using multiple search syntax qualifiers as separate arguments
+			# Search code using raw search qualifiers as separate arguments
 			$ gh search code panic path:pkg language:go
 
 			# Search code matching "deque" in Python files
