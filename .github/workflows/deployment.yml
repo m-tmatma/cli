@@ -17,6 +17,7 @@ on:
         required: true
         type: string
         description: "The ref to checkout for the release."
+        default: "trunk"
       tag_name:
         required: true
         type: string
