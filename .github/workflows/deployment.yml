@@ -21,18 +21,21 @@ on:
       tag_name:
         required: true
         type: string
+        description: "The tag name for the release (e.g. v2.100.0)."
       environment:
         default: production
-        type: string
+        type: environment
+        description: "The deployment environment..."
       platforms:
         default: "linux,macos,windows"
         type: string
+        description: "Comma-separated list of platforms to build."
       release:
         description: "Whether to create a GitHub Release"
         type: boolean
         default: true
       dry_run:
-        description: "Whether to sign but not publish a release."
+        description: "Perform a dry run without publishing artifacts or creating a release"
         type: boolean
         default: true
       
