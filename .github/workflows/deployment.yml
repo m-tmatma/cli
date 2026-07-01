@@ -35,6 +35,10 @@ on:
         description: "Whether to create a GitHub Release"
         type: boolean
         default: true
+      dry_run:
+        description: "Whether to sign but not publish a release."
+        type: boolean
+        default: true
     secrets:
       DEPLOY_APP_CLIENT_ID:
       DEPLOY_APP_PRIVATE_KEY:
@@ -276,7 +280,7 @@ jobs:
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
           TAG_NAME: ${{ inputs.tag_name }}
-          DO_PUBLISH: ${{ inputs.environment == 'production' }}
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: script/release --local "$TAG_NAME" --platform windows
       - name: Set up MSBuild
         id: setupmsbuild
@@ -317,6 +321,7 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.SPN_GITHUB_CLI_SIGNING_TENANT_ID }}
           DLIB_PATH: ${{ runner.temp }}\acs\bin\x64\Azure.CodeSigning.Dlib.dll
           METADATA_PATH: ${{ runner.temp }}\acs\metadata.json
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }} # Technically this could just be true since we don't run this step if the environment is not production, but we keep it the same as the build step for consistency.
         run: |
           Get-ChildItem -Path .\dist -Filter *.msi | ForEach-Object {
             .\script\sign.ps1 $_.FullName
@@ -452,7 +457,7 @@ jobs:
       - name: Create the release
         env:
           # In non-production environments, the assets will not have been signed
-          DO_PUBLISH: ${{ inputs.environment == 'production' }}
+          DO_PUBLISH: ${{ inputs.environment == 'production' && !inputs.dry_run }}
           TAG_NAME: ${{ inputs.tag_name }}
           GH_TOKEN: ${{ steps.deploy-token.outputs.token }}
         run: |
@@ -475,7 +480,7 @@ jobs:
           script/label-assets dist/gh_* | xargs $guard gh release create "${release_args[@]}" --
       - name: Publish site
         env:
-          DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') }}
+          DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') && !inputs.dry_run }}
           TAG_NAME: ${{ inputs.tag_name }}
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation

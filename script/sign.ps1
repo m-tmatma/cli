@@ -1,8 +1,7 @@
 #!/usr/bin/env pwsh
 
-# If DO_PUBLISH is not set or is set to "false", skip signing
-if ($null -eq $Env:DO_PUBLISH -or $Env:DO_PUBLISH -eq "false") {
-	Write-Host "Skipping Windows code signing; DO_PUBLISH not set or false"
+if ($null -eq $Env:DO_SIGN_ARTIFACTS -or $Env:DO_SIGN_ARTIFACTS -eq "false") {
+	Write-Host "Skipping Windows code signing; DO_SIGN_ARTIFACTS not set or false"
 	exit
 }
 
