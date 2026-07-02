@@ -717,6 +717,8 @@ The `dry_run` input (a boolean that defaults to `true` on the `workflow_dispatch
 
 The `Create the release` and `Publish site` steps consult their `DO_PUBLISH` environment variable: when it is `false` the release command is prefixed with `echo` (so the `gh release create` invocation is only printed, not executed) and the site push is replaced with a `git log` / `git diff` of the pending changes. This means a dry run exercises the entire pipeline end-to-end, making it a safe way to validate signing and packaging changes without creating a GitHub Release, publishing attestations, or pushing to the site repository.
 
+To make dry runs easy to spot in the Actions UI, the workflow's `run-name` appends a `(dry run)` suffix when `inputs.dry_run` is `true` (`run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}${{ inputs.dry_run == true && ' (dry run)' || '' }}`).
+
 ## <a id="deepest-dive">Deepest Dive</a>
 
 ### <a id="how-script-release-works">How script/release works</a>
