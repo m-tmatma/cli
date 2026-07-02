@@ -113,23 +113,21 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Configure macOS signing
+      - name: Install code signing certificate
         if: inputs.environment == 'production'
-        env:
-          APPLE_APPLICATION_CERT: ${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}
-          APPLE_APPLICATION_CERT_PASSWORD: ${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}
+        shell: bash
         run: |
-          keychain="$RUNNER_TEMP/build.keychain"
-          keychain_password="password1"
+          # create a keychain for the certificate
+          PW=pwd.${{ github.run_number }}
+          security create-keychain -p $PW $RUNNER_TEMP/build.keychain
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/build.keychain"
+          security default-keychain -s $RUNNER_TEMP/build.keychain
+          security unlock-keychain -p $PW $RUNNER_TEMP/build.keychain
 
-          security create-keychain -p "$keychain_password" "$keychain"
-          security default-keychain -s "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-
-          base64 -D <<<"$APPLE_APPLICATION_CERT" > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$APPLE_APPLICATION_CERT_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S "apple-tool:,apple:,codesign:" -s -k "$keychain_password" "$keychain"
-          rm "$RUNNER_TEMP/cert.p12"
+          # import the certificate
+          echo '${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}' | base64 -d > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P '${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}' -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
 
       - name: Add App Store Connect API key to keychain
         if: inputs.environment == 'production'
