@@ -640,7 +640,7 @@ The `cli.github.com` repository is checked out using a short-lived GitHub App in
 
 ### Site Package Repositories
 
-The `cli.github.com` website hosts RPM and Debian package repositories to support the [official sources installation instructions](https://github.com/cli/cli/blob/trunk/docs/install_linux.md#official-sources). In order to provide a secure installation method, artifacts in these repositories are signed by a GPG key, which must be loaded into `gpg` for use in later steps. Comments have been added to provide clarity to the script:
+The `cli.github.com` website hosts RPM and Debian package repositories to support the [official sources installation instructions](https://github.com/cli/cli/blob/trunk/docs/install_linux.md#recommended-official). In order to provide a secure installation method, artifacts in these repositories are signed by a GPG key, which must be loaded into `gpg` for use in later steps. Comments have been added to provide clarity to the script:
 
 ```sh
 # Import the public and private keys into gpg non-interactively
