@@ -175,12 +175,12 @@ jobs:
         env:
           TAG_NAME: ${{ inputs.tag_name }}
           KEYCHAIN: ${{ runner.temp }}/build.keychain
-          DEVELOPER_ID_CERT_IDENTIFIER: ${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT_IDENTIFIER }}
+          DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
         run: script/release --local "$TAG_NAME" --platform macos
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
-          DEVELOPER_ID_CERT_IDENTIFIER: ${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT_IDENTIFIER }}
+          DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
           KEYCHAIN: ${{ runner.temp }}/build.keychain
         run: |
           shopt -s failglob
