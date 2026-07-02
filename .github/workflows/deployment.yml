@@ -129,15 +129,6 @@ jobs:
           security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P '${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}' -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
 
-      - name: List available signing identities
-        if: inputs.environment == 'production'
-        shell: bash
-        run: |
-          # Prints each codesigning identity's SHA-1 and quoted common name.
-          # Compare this against DEVELOPER_ID_CERT_IDENTIFIER: codesign fails
-          # with "no identity found" when the two don't match.
-          security find-identity -v -p codesigning "$RUNNER_TEMP/build.keychain"
-
       - name: Add App Store Connect API key to keychain
         if: inputs.environment == 'production'
         uses: nodeselector/setup-apple-codesign@ab275d0f6fb63ef9e20b12b42ea0d567f935723c
