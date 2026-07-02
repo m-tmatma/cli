@@ -107,6 +107,9 @@ jobs:
       - name: Install code signing certificate
         if: inputs.environment == 'production'
         shell: bash
+        env:
+          DEVELOPER_ID_CERT: ${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}
         run: |
           # create a keychain for the certificate
           PW=pwd.${{ github.run_number }}
@@ -116,9 +119,10 @@ jobs:
           security unlock-keychain -p $PW $RUNNER_TEMP/build.keychain
 
           # import the certificate
-          echo '${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}' | base64 -d > $RUNNER_TEMP/cert.p12
-          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P '${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}' -T /usr/bin/codesign
+          base64 -d <<<"$DEVELOPER_ID_CERT" > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
+          rm $RUNNER_TEMP/cert.p12
 
       - name: Add App Store Connect API key to keychain
         if: inputs.environment == 'production'

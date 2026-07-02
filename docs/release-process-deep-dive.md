@@ -127,6 +127,9 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
       - name: Install code signing certificate
         if: inputs.environment == 'production'
         shell: bash
+        env:
+          DEVELOPER_ID_CERT: ${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}
         run: |
           # create a keychain for the certificate
           PW=pwd.${{ github.run_number }}
@@ -136,9 +139,10 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
           security unlock-keychain -p $PW $RUNNER_TEMP/build.keychain
 
           # import the certificate
-          echo '${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}' | base64 -d > $RUNNER_TEMP/cert.p12
-          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P '${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}' -T /usr/bin/codesign
+          base64 -d <<<"$DEVELOPER_ID_CERT" > $RUNNER_TEMP/cert.p12
+          security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
+          rm $RUNNER_TEMP/cert.p12
       - name: Add App Store Connect API key to keychain
         if: inputs.environment == 'production'
         uses: nodeselector/setup-apple-codesign@ab275d0f6fb63ef9e20b12b42ea0d567f935723c
@@ -246,15 +250,19 @@ security default-keychain -s $RUNNER_TEMP/build.keychain
 # Unlock the keychain so that future operations can access the secrets without user interaction.
 security unlock-keychain -p $PW $RUNNER_TEMP/build.keychain
 
-# Decode the base64-encoded certificate secret into a .p12 file.
-echo '${{ secrets.GATEWATCHER_DEVELOPER_ID_CERT }}' | base64 -d > $RUNNER_TEMP/cert.p12
+# Decode the base64-encoded certificate secret into a .p12 file. The
+# certificate and password are passed in via the DEVELOPER_ID_CERT and
+# DEVELOPER_ID_CERT_PASSWORD env vars (mapped from secrets) rather than
+# interpolated into the script, so a password containing shell
+# metacharacters cannot break quoting or be injected.
+base64 -d <<<"$DEVELOPER_ID_CERT" > $RUNNER_TEMP/cert.p12
 
 # Import the certificate into the keychain so that a later signing step can use it.
 # `man security` snippet:
 # -k keychain     Specify keychain into which item(s) will be imported.
 # -P passphrase   Specify the unwrapping passphrase immediately. The default is to obtain a secure passphrase via GUI.
 # -T appPath      Specify an application which may access the imported key (multiple -T options are allowed)
-security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P '${{ secrets.GATEWATCHER_DEVELOPER_ID_PASSWORD }}' -T /usr/bin/codesign
+security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
 
 # Enforce additional security requirements that only the applications used for signing can access the keychain. This allows for signing applications to access the keychain without user interaction.
 # The three values:
@@ -271,10 +279,12 @@ security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P '${{ sec
 #       -k password     Password for keychain
 #       -s              Match keys that can sign
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
+# Clean up the certificate so that it's not lying around for later steps to leak.
+rm $RUNNER_TEMP/cert.p12
 ```
 
 > [!NOTE]
-> The certificate and its password come from the `GATEWATCHER_DEVELOPER_ID_CERT` and `GATEWATCHER_DEVELOPER_ID_PASSWORD` secrets, replacing the previous `APPLE_APPLICATION_CERT` / `APPLE_APPLICATION_CERT_PASSWORD` secrets. The keychain is now named `build.keychain` (previously `buildagent.keychain`) and is passed explicitly to the signing scripts via the `KEYCHAIN` environment variable.
+> The certificate and its password come from the `GATEWATCHER_DEVELOPER_ID_CERT` and `GATEWATCHER_DEVELOPER_ID_PASSWORD` secrets, replacing the previous `APPLE_APPLICATION_CERT` / `APPLE_APPLICATION_CERT_PASSWORD` secrets. They are mapped into the step's `env:` and referenced as `"$DEVELOPER_ID_CERT"` / `"$DEVELOPER_ID_CERT_PASSWORD"` rather than being interpolated directly into the `run:` script, so a password containing shell metacharacters cannot break quoting or inject commands. The keychain is now named `build.keychain` (previously `buildagent.keychain`) and is passed explicitly to the signing scripts via the `KEYCHAIN` environment variable.
 
 When we execute `codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_IDENTIFIER?}" -v "$1"` in `./script/sign`, `codesign` searches the keychain for a certificate that matches the `DEVELOPER_ID_CERT_IDENTIFIER` environment variable (sourced from the `MAC_APP_SIGNING_IDENTITY` repository variable). The `--timestamp` and `--options=runtime` flags are required for Notarization, described below.
 
