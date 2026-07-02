@@ -162,12 +162,14 @@ jobs:
           TAG_NAME: ${{ inputs.tag_name }}
           KEYCHAIN: ${{ runner.temp }}/build.keychain
           DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: script/release --local "$TAG_NAME" --platform macos
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
           DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
           KEYCHAIN: ${{ runner.temp }}/build.keychain
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }} # Technically redundant given the step guard above, but kept for consistency with the build step.
         run: |
           shopt -s failglob
           script/sign dist/gh_*_macOS_*.zip

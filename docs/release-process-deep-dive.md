@@ -171,12 +171,14 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
           TAG_NAME: ${{ inputs.tag_name }}
           KEYCHAIN: ${{ runner.temp }}/build.keychain
           DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: script/release --local "$TAG_NAME" --platform macos
       - name: Notarize macOS archives
         if: inputs.environment == 'production'
         env:
           DEVELOPER_ID_CERT_IDENTIFIER: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
           KEYCHAIN: ${{ runner.temp }}/build.keychain
+          DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}
         run: |
           shopt -s failglob
           script/sign dist/gh_*_macOS_*.zip
@@ -287,6 +289,8 @@ rm $RUNNER_TEMP/cert.p12
 > The certificate and its password come from the `GATEWATCHER_DEVELOPER_ID_CERT` and `GATEWATCHER_DEVELOPER_ID_PASSWORD` secrets, replacing the previous `APPLE_APPLICATION_CERT` / `APPLE_APPLICATION_CERT_PASSWORD` secrets. They are mapped into the step's `env:` and referenced as `"$DEVELOPER_ID_CERT"` / `"$DEVELOPER_ID_CERT_PASSWORD"` rather than being interpolated directly into the `run:` script, so a password containing shell metacharacters cannot break quoting or inject commands. The keychain is now named `build.keychain` (previously `buildagent.keychain`) and is passed explicitly to the signing scripts via the `KEYCHAIN` environment variable.
 
 When we execute `codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_IDENTIFIER?}" -v "$1"` in `./script/sign`, `codesign` searches the keychain for a certificate that matches the `DEVELOPER_ID_CERT_IDENTIFIER` environment variable (sourced from the `MAC_APP_SIGNING_IDENTITY` repository variable). The `--timestamp` and `--options=runtime` flags are required for Notarization, described below.
+
+`./script/sign` only signs when `DO_SIGN_ARTIFACTS` is set to a value other than `false`; the `Build release binaries` and `Notarize macOS archives` steps set `DO_SIGN_ARTIFACTS: ${{ inputs.environment == 'production' }}` (mirroring the Windows job). This ensures non-production (staging) macOS builds skip signing gracefully rather than failing when `codesign` runs against a keychain that was never provisioned, regardless of whether `MAC_APP_SIGNING_IDENTITY` happens to be defined at repository scope.
 
 > [!TIP]
 > A `***: no identity found` failure from `codesign` means the value of `DEVELOPER_ID_CERT_IDENTIFIER` (i.e. `vars.MAC_APP_SIGNING_IDENTITY`) does not match any identity imported into the keychain. Run `security find-identity -v -p codesigning "$KEYCHAIN"` to list the available identities and their common names, then update the repository variable to match exactly.

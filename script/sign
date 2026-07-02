@@ -6,6 +6,11 @@
 set -e
 
 sign_macos() {
+  if [[ -z "$DO_SIGN_ARTIFACTS" || "$DO_SIGN_ARTIFACTS" == "false" ]]; then
+    echo "skipping macOS code-signing; DO_SIGN_ARTIFACTS not set or false" >&2
+    return 0
+  fi
+
   if [[ -z "$DEVELOPER_ID_CERT_IDENTIFIER" ]]; then
     echo "skipping macOS code-signing; DEVELOPER_ID_CERT_IDENTIFIER not set" >&2
     return 0
