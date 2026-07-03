@@ -299,7 +299,7 @@ When we execute `codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_
 
 [Code signing certifies that a `gh` executable was created by GitHub](https://developer.apple.com/documentation/security/code-signing-services). On the other hand, [Notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) is an additional security step upon which software is submitted to Apple for automated scanning. If passed, Apple generates a `ticket` that can be `stapled` to the software, and Apple's [Gatekeeper](https://support.apple.com/en-gb/guide/security/sec5599b66df/web) software is made aware of it.
 
-When we execute `xcrun notarytool submit "$1" --keychain $KEYCHAIN --keychain-profile "notarytool-password" --wait` in `./script/sign`, `notarytool` authenticates using the App Store Connect API key stored under the `notarytool-password` profile by the earlier `Configure notarization credentials` step. This replaces the previous Apple ID / app-specific password flow (`--apple-id` / `--team-id` / `--password`).
+When we execute `xcrun notarytool submit "$1" --keychain "$KEYCHAIN" --keychain-profile "notarytool-password" --wait` in `./script/sign`, `notarytool` authenticates using the App Store Connect API key stored under the `notarytool-password` profile by the earlier `Configure notarization credentials` step. This replaces the previous Apple ID / app-specific password flow (`--apple-id` / `--team-id` / `--password`).
 
 ### <a id="windows">[windows](https://github.com/cli/cli/blob/756f4ec04abdc9fdbab3fef35b182c546ef1dd17/.github/workflows/deployment.yml#L147-L248)</a>
 

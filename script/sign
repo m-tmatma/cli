@@ -22,7 +22,7 @@ sign_macos() {
   fi
 
   if [[ $1 == *.zip ]]; then
-    xcrun notarytool submit "$1" --keychain $KEYCHAIN --keychain-profile "notarytool-password" --wait
+    xcrun notarytool submit "$1" --keychain "$KEYCHAIN" --keychain-profile "notarytool-password" --wait
   else
     codesign --timestamp --options=runtime -s "${DEVELOPER_ID_CERT_IDENTIFIER?}" -v "$1"
   fi
