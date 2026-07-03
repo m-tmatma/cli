@@ -404,6 +404,7 @@ jobs:
           popd
       - name: Run reprepro
         if: ${{ inputs.environment == 'production' }}
+        env:
           # We are no longer adding to the distribution list.
           # All apt distributions should use "stable" according to our install documentation.
           # In the future we will remove legacy distributions listed here.

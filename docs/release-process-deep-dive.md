@@ -243,28 +243,28 @@ In order to perform signing, a keychain must be configured with the signing cert
 PW=pwd.${{ github.run_number }}
 
 # Create a new keychain for credentials to be stored in.
-security create-keychain -p $PW $RUNNER_TEMP/build.keychain
+security create-keychain -p $PW "$RUNNER_TEMP/build.keychain"
 # Raise the keychain auto-lock timeout (6 hours) so it does not lock mid-build.
 security set-keychain-settings -lut 21600 "$RUNNER_TEMP/build.keychain"
 # Mark the keychain as the system default so that a later signing step doesn't require
 # referencing the keychain by name.
-security default-keychain -s $RUNNER_TEMP/build.keychain
+security default-keychain -s "$RUNNER_TEMP/build.keychain"
 # Unlock the keychain so that future operations can access the secrets without user interaction.
-security unlock-keychain -p $PW $RUNNER_TEMP/build.keychain
+security unlock-keychain -p $PW "$RUNNER_TEMP/build.keychain"
 
 # Decode the base64-encoded certificate secret into a .p12 file. The
 # certificate and password are passed in via the DEVELOPER_ID_CERT and
 # DEVELOPER_ID_CERT_PASSWORD env vars (mapped from secrets) rather than
 # interpolated into the script, so a password containing shell
 # metacharacters cannot break quoting or be injected.
-base64 -d <<<"$DEVELOPER_ID_CERT" > $RUNNER_TEMP/cert.p12
+base64 -d <<<"$DEVELOPER_ID_CERT" > "$RUNNER_TEMP/cert.p12"
 
 # Import the certificate into the keychain so that a later signing step can use it.
 # `man security` snippet:
 # -k keychain     Specify keychain into which item(s) will be imported.
 # -P passphrase   Specify the unwrapping passphrase immediately. The default is to obtain a secure passphrase via GUI.
 # -T appPath      Specify an application which may access the imported key (multiple -T options are allowed)
-security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+security import "$RUNNER_TEMP/cert.p12" -k "$RUNNER_TEMP/build.keychain" -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
 
 # Enforce additional security requirements that only the applications used for signing can access the keychain. This allows for signing applications to access the keychain without user interaction.
 # The three values:
@@ -280,9 +280,9 @@ security import $RUNNER_TEMP/cert.p12 -k $RUNNER_TEMP/build.keychain -P "$DEVELO
 #                       Comma-separated partition list. See output of "security dump-keychain" for examples.
 #       -k password     Password for keychain
 #       -s              Match keys that can sign
-security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW $RUNNER_TEMP/build.keychain
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $PW "$RUNNER_TEMP/build.keychain"
 # Clean up the certificate so that it's not lying around for later steps to leak.
-rm $RUNNER_TEMP/cert.p12
+rm "$RUNNER_TEMP/cert.p12"
 ```
 
 > [!NOTE]
@@ -499,16 +499,15 @@ release:
           owner: github
           repositories: cli.github.com
       - name: Checkout documentation site
+        if: ${{ inputs.environment == 'production' }}
         uses: actions/checkout@v4
         with:
           repository: github/cli.github.com
           path: site
           fetch-depth: 0
-          # In non-production environments the App token step is skipped, so
-          # fall back to github.token for anonymous read access to the public
-          # cli.github.com repo (push is gated separately on DO_PUBLISH).
-          token: ${{ steps.site-deploy-token.outputs.token || github.token }}
+          token: ${{ steps.site-deploy-token.outputs.token }}
       - name: Update site man pages
+        if: ${{ inputs.environment == 'production' }}
         env:
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
@@ -557,26 +556,24 @@ release:
         with:
           subject-path: "dist/gh_*"
       - name: Run createrepo
-        env:
-          GPG_SIGN: ${{ inputs.environment == 'production' }}
+        if: ${{ inputs.environment == 'production' }}
         run: |
           mkdir -p site/packages/rpm
           cp dist/*.rpm site/packages/rpm/
           ./script/createrepo.sh
           cp -r dist/repodata site/packages/rpm/
           pushd site/packages/rpm
-          [ "$GPG_SIGN" = "false" ] || gpg --yes --detach-sign --armor repodata/repomd.xml
+          gpg --yes --detach-sign --armor repodata/repomd.xml
           popd
       - name: Run reprepro
+        if: ${{ inputs.environment == 'production' }}
         env:
-          GPG_SIGN: ${{ inputs.environment == 'production' }}
           # We are no longer adding to the distribution list.
           # All apt distributions should use "stable" according to our install documentation.
           # In the future we will remove legacy distributions listed here.
           RELEASES: "cosmic eoan disco groovy focal stable oldstable testing sid unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
-          [ "$GPG_SIGN" = "true" ] || sed -i.bak '/^SignWith:/d' script/distributions
           for release in $RELEASES; do
             for file in dist/*.deb; do
               reprepro --confdir="+b/script" includedeb "$release" "$file"
@@ -636,7 +633,7 @@ The following sections are not strictly in the same order as the workflow but in
 
 A git commit is created in the `cli.github.com` site repository containing the contents of the CLI Manual uploaded by the [`linux`](#linux) job. This is not pushed until the package repository artifacts are set up later.
 
-The `cli.github.com` repository is checked out using a short-lived GitHub App installation token rather than a long-lived PAT. The `Generate site deploy token` step (which only runs when `inputs.environment == 'production'`) uses [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token) with the `SITE_DEPLOY_APP_CLIENT_ID` / `SITE_DEPLOY_APP_PRIVATE_KEY` secrets to mint a token scoped to the `github/cli.github.com` repository, replacing the previous `SITE_DEPLOY_PAT` secret. In non-production environments the token step is skipped and the checkout falls back to `github.token` for anonymous read access (`token: ${{ steps.site-deploy-token.outputs.token || github.token }}`); pushing to the site is gated separately (see [Publishing behaviour and dry runs](#dry-run)).
+The `cli.github.com` repository is checked out using a short-lived GitHub App installation token rather than a long-lived PAT. The `Generate site deploy token` step (which only runs when `inputs.environment == 'production'`) uses [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token) with the `SITE_DEPLOY_APP_CLIENT_ID` / `SITE_DEPLOY_APP_PRIVATE_KEY` secrets to mint a token scoped to the `github/cli.github.com` repository, replacing the previous `SITE_DEPLOY_PAT` secret. The site-related steps (`Checkout documentation site`, `Update site man pages`, `Run createrepo`, `Run reprepro`, and `Publish site`) are all guarded by `if: inputs.environment == 'production'`, so in non-production environments the site is neither checked out nor mutated. Even in production, pushing to the site is gated separately on `DO_PUBLISH` (see [Publishing behaviour and dry runs](#dry-run)).
 
 ### Site Package Repositories
 
@@ -718,6 +715,9 @@ The `dry_run` input (a boolean that defaults to `true` on the `workflow_dispatch
 The `Create the release` and `Publish site` steps consult their `DO_PUBLISH` environment variable: when it is `false` the release command is prefixed with `echo` (so the `gh release create` invocation is only printed, not executed) and the site push is replaced with a `git log` / `git diff` of the pending changes. This means a dry run exercises the entire pipeline end-to-end, making it a safe way to validate signing and packaging changes without creating a GitHub Release, publishing attestations, or pushing to the site repository.
 
 To make dry runs easy to spot in the Actions UI, the workflow's `run-name` appends a `(dry run)` suffix when `inputs.dry_run` is `true` (`run-name: ${{ inputs.tag_name }} / ${{ inputs.environment }}${{ inputs.dry_run == true && ' (dry run)' || '' }}`).
+
+> [!IMPORTANT]
+> The default value of `dry_run` differs depending on how the workflow is triggered. On the `workflow_dispatch` form it defaults to `true`, so a manually triggered run is a dry run unless you explicitly untick the box. `./script/release` takes the opposite default: it defaults `dry_run` to `false` and only forwards `dry_run=true` when invoked with the `--dry-run` flag (`script/release [--staging] [--dry-run] <tag-name> ...`). In other words, `./script/release <tag-name>` performs a real release, while `./script/release --dry-run <tag-name>` exercises the full pipeline without publishing.
 
 ## <a id="deepest-dive">Deepest Dive</a>
 
