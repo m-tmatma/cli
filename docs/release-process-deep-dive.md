@@ -226,7 +226,7 @@ There are three levels of "signing" that occur in this job:
 > Although the job title is `Build & notarize universal macOS pkg installer`, the [`productbuild` docs](https://www.unix.com/man_page/osx/1/productbuild/) only refer to signing, thus notarization may not be the correct term here.
 
 > [!NOTE]
-> Historically the `.pkg` installer was never actually signed because `${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}` was [never set](https://github.com/cli/cli/actions/runs/13271193192/job/37050749548#step:9:11). The `Build & notarize universal macOS pkg installer` step now passes `APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.MAC_APP_SIGNING_IDENTITY }}`, so `productbuild` signing runs when that repository variable is populated.
+> Historically the `.pkg` installer was never actually signed because `${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}` was [never set](https://github.com/cli/cli/actions/runs/13271193192/job/37050749548#step:9:11). The `Build & notarize universal macOS pkg installer` step still passes `APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}`, so `productbuild` signing will run once that repository variable is populated.
 
 Signing of MacOS artifacts uses `codesign` and notarization uses `xcrun notarytool`, which submits the artifact to the Apple servers for additional checks.
 
