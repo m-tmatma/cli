@@ -191,7 +191,7 @@ There is no signing of linux artifacts in this job. See the [release job](#relea
         if: inputs.environment == 'production'
         env:
           TAG_NAME: ${{ inputs.tag_name }}
-          APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.MAC_APP_SIGNING_IDENTITY }}
+          APPLE_DEVELOPER_INSTALLER_ID: ${{ vars.APPLE_DEVELOPER_INSTALLER_ID }}
         run: |
           shopt -s failglob
           script/pkgmacos "$TAG_NAME"
