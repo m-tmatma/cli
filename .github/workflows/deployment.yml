@@ -335,16 +335,15 @@ jobs:
           owner: github
           repositories: cli.github.com
       - name: Checkout documentation site
+        if: ${{ inputs.environment == 'production' }}
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: github/cli.github.com
           path: site
           fetch-depth: 0
-          # In non-production environments the App token step is skipped, so
-          # fall back to github.token for anonymous read access to the public
-          # cli.github.com repo (push is gated separately on DO_PUBLISH).
-          token: ${{ steps.site-deploy-token.outputs.token || github.token }}
+          token: ${{ steps.site-deploy-token.outputs.token}}
       - name: Update site man pages
+        if: ${{ inputs.environment == 'production' }}
         env:
           GIT_COMMITTER_NAME: cli automation
           GIT_AUTHOR_NAME: cli automation
@@ -394,6 +393,7 @@ jobs:
           subject-path: "dist/gh_*"
           create-storage-record: false # (default: true)
       - name: Run createrepo
+        if: ${{ inputs.environment == 'production' }}
         env:
           GPG_SIGN: ${{ inputs.environment == 'production' }}
         run: |
@@ -405,6 +405,7 @@ jobs:
           [ "$GPG_SIGN" = "false" ] || gpg --yes --detach-sign --armor repodata/repomd.xml
           popd
       - name: Run reprepro
+        if: ${{ inputs.environment == 'production' }}
         env:
           GPG_SIGN: ${{ inputs.environment == 'production' }}
           # We are no longer adding to the distribution list.
@@ -447,6 +448,7 @@ jobs:
           [ "$DO_PUBLISH" = "false" ] || guard=""
           script/label-assets dist/gh_* | xargs $guard gh release create "${release_args[@]}" --
       - name: Publish site
+        if: ${{ inputs.environment == 'production' }}
         env:
           DO_PUBLISH: ${{ inputs.environment == 'production' && !contains(inputs.tag_name, '-') && !inputs.dry_run }}
           TAG_NAME: ${{ inputs.tag_name }}
