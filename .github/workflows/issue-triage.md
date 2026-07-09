@@ -21,6 +21,7 @@ on:
 permissions:
   contents: read
   issues: read
+  copilot-requests: write
 
 # GH_AW_RUNTIME_FEATURES enables native issue-intent rationale/confidence at runtime.
 # It is INERT unless a repo admin sets the repository variable to `issue_intents`.
