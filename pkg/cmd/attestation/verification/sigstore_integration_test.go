@@ -160,14 +160,11 @@ func TestLiveSigstoreVerifier(t *testing.T) {
 			TUFMetadataDir:     o.Some(t.TempDir()),
 		})
 		require.NoError(t, err)
-
-		require.NotPanics(t, func() {
-			results, verifyErr := verifier.Verify(attestations, githubPolicy)
-			require.Nil(t, results)
-			require.Error(t, verifyErr)
-			require.ErrorContains(t, verifyErr, "failed to choose verifier based on provided bundle issuer")
-			require.ErrorContains(t, verifyErr, "GitHub verifier is not available")
-		})
+		results, verifyErr := verifier.Verify(attestations, githubPolicy)
+		require.Nil(t, results)
+		require.Error(t, verifyErr)
+		require.ErrorContains(t, verifyErr, "failed to choose verifier based on provided bundle issuer")
+		require.ErrorContains(t, verifyErr, "GitHub verifier is not available")
 	})
 }
 
